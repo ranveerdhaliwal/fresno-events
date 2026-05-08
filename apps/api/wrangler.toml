@@ -1,0 +1,16 @@
+name = "fresno-events-api"
+main = "src/index.ts"
+compatibility_date = "2026-04-24"
+
+[vars]
+APP_ENV = "local"
+ALLOWED_ORIGIN = "http://localhost:5173"
+
+[[r2_buckets]]
+binding = "EVENT_IMAGES"
+bucket_name = "fresno-event-images-dev"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+

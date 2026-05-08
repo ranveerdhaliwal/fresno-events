@@ -1,0 +1,18 @@
+# Copy to .dev.vars (same folder) for `pnpm dev` inside apps/api or `pnpm dev:api` from repo root.
+# Wrangler loads .dev.vars for local Worker env. Do not commit real secrets.
+
+ALLOWED_ORIGIN=http://localhost:5174
+
+# Required for GET /events and GET /events/:slug
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Optional: anon works for reads if RLS allows your queries (service role is simpler for local dev)
+# SUPABASE_ANON_KEY=
+
+# Required for /review/* routes
+ADMIN_REVIEW_TOKEN=
+
+# Optional: when unset the API serves images at /images/<key>; in production set to your
+# public R2 base URL (e.g. https://images.whatupfresno.com)
+R2_PUBLIC_BASE_URL=
