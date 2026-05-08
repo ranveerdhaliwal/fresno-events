@@ -1,0 +1,20 @@
+node_modules
+dist
+.turbo
+.wrangler
+.env
+.env.*
+!.env.example
+*.local
+coverage
+supabase/.branches
+supabase/.temp
+apps/web/src/routeTree.gen.ts
+*.tsbuildinfo
+
+# API local secrets (Wrangler)
+apps/api/.dev.vars
+!apps/api/.dev.vars.example
+
+# Cursor workspace (kept private; mcp.json may be re-created locally)
+.cursor

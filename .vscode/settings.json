@@ -1,0 +1,20 @@
+{
+  "terminal.integrated.defaultProfile.linux": "zsh (nvm)",
+  "terminal.integrated.profiles.linux": {
+    "zsh (nvm)": {
+      "path": "/usr/bin/zsh",
+      "args": ["-il"],
+      "env": {
+        "NVM_DIR": "${env:HOME}/.nvm"
+      },
+      "icon": "terminal-zsh"
+    }
+  },
+  "terminal.integrated.automationProfile.linux": {
+    "path": "/usr/bin/zsh",
+    "args": ["-il"],
+    "env": {
+      "NVM_DIR": "${env:HOME}/.nvm"
+    }
+  }
+}

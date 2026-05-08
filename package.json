@@ -1,0 +1,27 @@
+{
+  "name": "fresno-events",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @fresno-events/web --filter @fresno-events/api dev",
+    "dev:web": "pnpm --filter @fresno-events/web dev",
+    "dev:api": "pnpm --filter @fresno-events/api dev",
+    "ingest:dev": "pnpm --filter @fresno-events/ingest dev",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "latest",
+    "typescript": "latest"
+  }
+}
