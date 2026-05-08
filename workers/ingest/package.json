@@ -1,0 +1,21 @@
+{
+  "name": "@fresno-events/ingest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled --port 8788",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@fresno-events/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260425.1",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.85.0"
+  }
+}

@@ -1,0 +1,20 @@
+# Copy to .dev.vars in this folder for `pnpm dev` (workers/ingest).
+# Wrangler loads .dev.vars for the local Worker env.
+
+APP_ENV=local
+USER_AGENT=WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)
+
+# Required to persist candidates and read event_sources
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Required to allow POST /trigger
+ADMIN_REVIEW_TOKEN=
+
+# Per-source secrets (only needed if that source is enabled)
+TICKETMASTER_API_KEY=
+SEATGEEK_CLIENT_ID=
+SEATGEEK_CLIENT_SECRET=
+EVENTBRITE_API_KEY=
+BANDSINTOWN_APP_ID=
+ANTHROPIC_API_KEY=

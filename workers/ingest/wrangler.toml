@@ -1,0 +1,20 @@
+name = "fresno-events-ingest"
+main = "src/index.ts"
+compatibility_date = "2026-04-24"
+
+[triggers]
+crons = ["0 */4 * * *"]
+
+[vars]
+APP_ENV = "local"
+USER_AGENT = "WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)"
+# Per-run budget caps. Override in production via wrangler vars or .dev.vars.
+MAX_SOURCES_PER_RUN = "8"
+MAX_ENRICH_PER_RUN = "25"
+
+[ai]
+binding = "AI"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
