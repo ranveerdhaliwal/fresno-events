@@ -1,6 +1,8 @@
 import type { EventCategory, NormalizedEvent } from "@fresno-events/shared";
 
 import type { IngestEnv } from "@/env";
+import { getJsonPromptBackend } from "@/llm/registry";
+import type { JsonPromptBackend, TextProviderRole } from "@/llm/types";
 import { fresnoSearchArea } from "@/sources";
 
 const VALID_CATEGORIES: EventCategory[] = [
@@ -16,10 +18,8 @@ const VALID_CATEGORIES: EventCategory[] = [
   "community",
   "outdoor",
   "wellness",
-  "education"
+  "education",
 ];
-
-const WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 export interface AiEnrichment {
   confidence: number;
@@ -45,27 +45,14 @@ export interface AiDiscoveryItem {
   priceMax?: number;
 }
 
-interface PromptArgs {
-  system: string;
-  user: string;
-}
+export type AiBackend = JsonPromptBackend;
 
-interface AiBackend {
-  generateJson<T>(args: PromptArgs): Promise<T | null>;
-}
-
-export function getAiBackend(env: IngestEnv): AiBackend | null {
-  if (env.AI) {
-    return workersAiBackend(env.AI);
-  }
-  if (env.ANTHROPIC_API_KEY) {
-    return anthropicBackend(env.ANTHROPIC_API_KEY);
-  }
-  return null;
+export function getAiBackend(env: IngestEnv, role?: TextProviderRole): AiBackend | null {
+  return getJsonPromptBackend(env, role);
 }
 
 export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): Promise<AiEnrichment | null> {
-  const backend = getAiBackend(env);
+  const backend = getJsonPromptBackend(env, "enrichment");
   if (!backend) {
     return null;
   }
@@ -74,7 +61,7 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
     "You are a strict event-quality classifier for a community events app focused on Fresno, California.",
     "Score how likely a candidate is a real, public, in-person event near Fresno.",
     "Return only minified JSON with keys: confidence (0..1), category (one of the allowed values or null),",
-    "cleaned_title (string or null), tags (array of short strings), is_junk (boolean), reasoning (short string)."
+    "cleaned_title (string or null), tags (array of short strings), is_junk (boolean), reasoning (short string).",
   ].join(" ");
 
   const user = [
@@ -86,9 +73,9 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
       startTs: event.startTs,
       category: event.category,
       descriptionText: event.descriptionText,
-      externalUrl: event.externalUrl
+      externalUrl: event.externalUrl,
     })}`,
-    "Mark is_junk=true for ads, gift cards, parking, livestream-only, NSFW, or events more than 50 miles from Fresno."
+    "Mark is_junk=true for ads, gift cards, parking, livestream-only, NSFW, or events more than 50 miles from Fresno.",
   ].join("\n");
 
   const result = await backend.generateJson<Partial<AiEnrichment>>({ system, user });
@@ -99,8 +86,11 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
   return normalizeEnrichment(result);
 }
 
-export async function discoverEventsFromHtml(env: IngestEnv, args: { url: string; html: string; label: string }): Promise<AiDiscoveryItem[]> {
-  const backend = getAiBackend(env);
+export async function discoverEventsFromHtml(
+  env: IngestEnv,
+  args: { url: string; html: string; label: string },
+): Promise<AiDiscoveryItem[]> {
+  const backend = getJsonPromptBackend(env, "discovery");
   if (!backend) {
     return [];
   }
@@ -117,7 +107,7 @@ export async function discoverEventsFromHtml(env: IngestEnv, args: { url: string
     "title (string), startTs (ISO 8601), venueName (string), venueAddress (string, optional), venueCity (string, optional),",
     "category (one of music, comedy, theater, sports, food_drink, festival, family, art, nightlife, community, outdoor, wellness, education), descriptionText (string, optional),",
     "ticketUrl (string, optional), externalUrl (string, optional), imageUrl (string, optional), priceMin (number, optional), priceMax (number, optional).",
-    "If a date is missing, omit the event. Never invent details."
+    "If a date is missing, omit the event. Never invent details.",
   ].join(" ");
 
   const user = [
@@ -127,93 +117,19 @@ export async function discoverEventsFromHtml(env: IngestEnv, args: { url: string
     "Page text follows between the markers --- BEGIN --- and --- END ---.",
     "--- BEGIN ---",
     cleaned,
-    "--- END ---"
+    "--- END ---",
   ].join("\n");
 
   const result = await backend.generateJson<{ events?: AiDiscoveryItem[] }>({ system, user });
   return Array.isArray(result?.events) ? result.events.filter(isPlausibleEvent) : [];
 }
 
-function workersAiBackend(ai: Ai): AiBackend {
-  return {
-    async generateJson<T>({ system, user }: PromptArgs): Promise<T | null> {
-      try {
-        const response = await ai.run(WORKERS_AI_MODEL, {
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: user }
-          ],
-          response_format: { type: "json_object" },
-          max_tokens: 1024
-        }) as { response?: string };
-
-        if (!response?.response) {
-          return null;
-        }
-        return parseJson<T>(response.response);
-      } catch (error) {
-        console.log(JSON.stringify({ event: "workers_ai_error", message: messageOf(error) }));
-        return null;
-      }
-    }
-  };
-}
-
-function anthropicBackend(apiKey: string): AiBackend {
-  return {
-    async generateJson<T>({ system, user }: PromptArgs): Promise<T | null> {
-      try {
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "claude-3-5-haiku-latest",
-            max_tokens: 1024,
-            system: `${system}\nRespond with only valid minified JSON. No prose, no code fences.`,
-            messages: [{ role: "user", content: user }]
-          })
-        });
-
-        if (!response.ok) {
-          console.log(JSON.stringify({ event: "anthropic_error", status: response.status, body: await safeText(response) }));
-          return null;
-        }
-
-        const payload = await response.json() as { content?: Array<{ type: string; text?: string }> };
-        const text = payload.content?.find((part) => part.type === "text")?.text ?? "";
-        return parseJson<T>(text);
-      } catch (error) {
-        console.log(JSON.stringify({ event: "anthropic_error", message: messageOf(error) }));
-        return null;
-      }
-    }
-  };
-}
-
-function parseJson<T>(value: string): T | null {
-  const trimmed = value.trim().replace(/^```json\s*/i, "").replace(/```\s*$/i, "");
-  try {
-    return JSON.parse(trimmed) as T;
-  } catch {
-    const match = trimmed.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[0]) as T;
-    } catch {
-      return null;
-    }
-  }
-}
-
 function normalizeEnrichment(input: Partial<AiEnrichment>): AiEnrichment {
   const confidence = clamp(typeof input.confidence === "number" ? input.confidence : 0.5, 0, 1);
-  const category = typeof input.category === "string" && VALID_CATEGORIES.includes(input.category as EventCategory)
-    ? (input.category as EventCategory)
-    : null;
+  const category =
+    typeof input.category === "string" && VALID_CATEGORIES.includes(input.category as EventCategory)
+      ? (input.category as EventCategory)
+      : null;
   const tags = Array.isArray(input.tags) ? input.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 8) : [];
   const cleaned = typeof input.cleaned_title === "string" && input.cleaned_title.trim().length > 0 ? input.cleaned_title.trim() : null;
   const isJunk = Boolean(input.is_junk);
@@ -241,16 +157,4 @@ function stripHtml(html: string) {
     .replace(/&nbsp;/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-async function safeText(response: Response) {
-  try {
-    return (await response.text()).slice(0, 240);
-  } catch {
-    return "";
-  }
-}
-
-function messageOf(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -1,4 +1,5 @@
 import type { IngestEnv } from "@/env";
+import { getJsonPromptBackend } from "@/llm/registry";
 import { allRegisteredSources, runIngest } from "@/runner";
 
 export default {
@@ -41,6 +42,40 @@ export default {
         console.log(JSON.stringify({ event: "ingest_run", trigger: "manual", ...summary }));
       }
       return jsonResponse({ ok: true, data: { summaries } });
+    }
+
+    if (url.pathname === "/ai/self-test") {
+      const auth = await checkAdminAuth(req, env);
+      if (auth) {
+        return jsonResponse({ ok: false, error: auth }, auth.status);
+      }
+
+      const backend = getJsonPromptBackend(env, "enrichment");
+      if (!backend) {
+        return jsonResponse(
+          {
+            ok: false,
+            error: {
+              code: "ai_unconfigured",
+              message: "No AI provider is available for this worker (configure AI binding, GEMINI_API_KEY, or ANTHROPIC_API_KEY).",
+            },
+          },
+          503,
+        );
+      }
+
+      const echo = await backend.generateJson<{ ok?: boolean }>({
+        system: 'Respond with only minified JSON: {"ok":true}. No other keys.',
+        user: "ping",
+      });
+
+      return jsonResponse({
+        ok: true,
+        data: {
+          provider: backend.provider,
+          echo_ok: echo?.ok === true,
+        },
+      });
     }
 
     return jsonResponse(

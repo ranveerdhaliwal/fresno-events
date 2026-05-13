@@ -21,7 +21,7 @@ export async function enrichRecentCandidates(env: IngestEnv, supabase: SupabaseC
     skipped_no_backend: false
   };
 
-  if (!getAiBackend(env)) {
+  if (!getAiBackend(env, "enrichment")) {
     summary.skipped_no_backend = true;
     return summary;
   }

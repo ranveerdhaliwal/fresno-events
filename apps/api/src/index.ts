@@ -19,12 +19,27 @@ app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: (origin, c) => c.env.ALLOWED_ORIGIN ?? origin,
+    origin: (origin, c) => resolveAllowedOrigin(origin, c.env),
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Authorization", "Content-Type", "x-admin-token"],
     credentials: true
   })
 );
+
+function resolveAllowedOrigin(origin: string, env: Env): string | null {
+  // ALLOWED_ORIGINS (plural, comma-separated) wins when set; lets prod allow
+  // both the public site and a localhost dev UI without dropping CORS.
+  const list = env.ALLOWED_ORIGINS;
+  if (list) {
+    const allowed = list.split(",").map((value) => value.trim()).filter(Boolean);
+    return allowed.includes(origin) ? origin : null;
+  }
+  if (env.ALLOWED_ORIGIN) {
+    return env.ALLOWED_ORIGIN === origin ? origin : null;
+  }
+  // No env configured: echo the request origin (dev-friendly default).
+  return origin;
+}
 
 app.get("/health", (c) =>
   ok(c, {

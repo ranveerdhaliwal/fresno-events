@@ -1,0 +1,37 @@
+---
+description: TypeScript discipline, file organization, and where logic lives. Apply to all TS code.
+alwaysApply: true
+---
+
+# Code quality
+
+## TypeScript discipline
+
+- Type everything. No `any`. Use `unknown` and narrow.
+- Reuse types. Don't redefine the same shape twice — import it.
+- Types live in `<Feature>.types.ts` next to the feature, not in a global `types/` dump.
+- Form schemas use zod. Derive TS types with `z.infer<typeof schema>` so the schema is the single source of truth.
+
+## File co-location per feature
+
+A feature is a small set of co-located files:
+
+- `Feature.tsx` — the component(s)
+- `Feature.types.ts` — types and zod schemas
+- `Feature.utils.ts` — pure logic, exported for unit tests
+- `Feature.module.scss` — styles
+
+Don't pre-create empty files. Add `.utils.ts` when there's logic worth testing. Add `.types.ts` when there are 2+ shared types. Until then, keep them inline in `Feature.tsx`.
+
+## Pure logic in utils
+
+- Anything that doesn't touch React (transformations, validation, parsing, math, formatting) lives in `.utils.ts`.
+- Components import and call. Components don't define logic inline beyond trivial render-time expressions.
+- Util functions are pure where possible. Pure = same input, same output, no side effects, unit-testable without mocks.
+
+## Don't
+
+- Don't use `any` to silence type errors. Fix the type or use `unknown` and narrow.
+- Don't put `fetch` calls in components or utils. They go in services.
+- Don't create a util file just to have one. Inline trivial helpers.
+- Don't mix zod schemas and unrelated types in the same `.types.ts`. Split if the file grows past ~150 lines.

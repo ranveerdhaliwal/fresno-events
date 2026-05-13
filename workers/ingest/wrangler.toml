@@ -2,6 +2,9 @@ name = "fresno-events-ingest"
 main = "src/index.ts"
 compatibility_date = "2026-04-24"
 
+# Top-level config = the implicit "local" profile used by `wrangler dev` /
+# `wrangler deploy` without --env. Per-env overrides live below.
+
 [triggers]
 crons = ["0 */4 * * *"]
 
@@ -16,5 +19,47 @@ MAX_ENRICH_PER_RUN = "25"
 binding = "AI"
 
 [observability]
+enabled = true
+head_sampling_rate = 1
+
+# --- Cloud dev profile -----------------------------------------------------
+# Use with: `wrangler dev --env dev` (loads workers/ingest/.dev.vars.dev) or
+# `wrangler deploy --env dev` to ship the dev-suffixed Worker. No cron in dev
+# by default; trigger manually via /trigger.
+[env.dev]
+name = "fresno-events-ingest-dev"
+
+[env.dev.vars]
+APP_ENV = "dev"
+USER_AGENT = "WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)"
+MAX_SOURCES_PER_RUN = "8"
+MAX_ENRICH_PER_RUN = "25"
+
+[env.dev.ai]
+binding = "AI"
+
+[env.dev.observability]
+enabled = true
+head_sampling_rate = 1
+
+# --- Production profile ---------------------------------------------------
+# Use with: `wrangler dev --env prod` (loads workers/ingest/.dev.vars.prod) or
+# `wrangler deploy --env prod` to ship prod. Cron Triggers active.
+[env.prod]
+name = "fresno-events-ingest"
+
+[env.prod.triggers]
+crons = ["0 */4 * * *"]
+
+[env.prod.vars]
+APP_ENV = "production"
+USER_AGENT = "WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)"
+MAX_SOURCES_PER_RUN = "8"
+MAX_ENRICH_PER_RUN = "25"
+
+[env.prod.ai]
+binding = "AI"
+
+[env.prod.observability]
 enabled = true
 head_sampling_rate = 1

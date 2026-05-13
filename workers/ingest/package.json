@@ -11,7 +11,8 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "@fresno-events/shared": "workspace:*"
+    "@fresno-events/shared": "workspace:*",
+    "@google/genai": "^2.2.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260425.1",

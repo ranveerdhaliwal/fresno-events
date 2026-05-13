@@ -1,7 +1,14 @@
 # Copy to .dev.vars (same folder) for `pnpm dev` inside apps/api or `pnpm dev:api` from repo root.
-# Wrangler loads .dev.vars for local Worker env. Do not commit real secrets.
+# For env-scoped runs:
+#   `wrangler dev --env dev`  -> loads .dev.vars.dev  (fall back to .dev.vars)
+#   `wrangler dev --env prod` -> loads .dev.vars.prod (fall back to .dev.vars)
+# All variants are gitignored. Never commit real secrets.
 
-ALLOWED_ORIGIN=http://localhost:5174
+# Single origin for the local Vite dev server (canonical port 5173).
+# For multi-origin (e.g. localhost + production domain), set ALLOWED_ORIGINS
+# instead with a comma-separated list. ALLOWED_ORIGINS takes precedence when set.
+ALLOWED_ORIGIN=http://localhost:5173
+# ALLOWED_ORIGINS=http://localhost:5173,https://whatupfresno.com
 
 # Required for GET /events and GET /events/:slug
 SUPABASE_URL=

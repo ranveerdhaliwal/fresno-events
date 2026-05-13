@@ -2,6 +2,9 @@ name = "fresno-events-api"
 main = "src/index.ts"
 compatibility_date = "2026-04-24"
 
+# Top-level = the implicit "local" profile (used by `wrangler dev` /
+# `wrangler deploy` without --env). Per-env overrides live below.
+
 [vars]
 APP_ENV = "local"
 ALLOWED_ORIGIN = "http://localhost:5173"
@@ -11,6 +14,43 @@ binding = "EVENT_IMAGES"
 bucket_name = "fresno-event-images-dev"
 
 [observability]
+enabled = true
+head_sampling_rate = 1
+
+# --- Cloud dev profile -----------------------------------------------------
+# `wrangler deploy --env dev` ships fresno-events-api-dev with the dev R2 bucket.
+# `wrangler dev --env dev` loads apps/api/.dev.vars.dev for local iteration
+# pointed at the cloud dev Supabase project.
+[env.dev]
+name = "fresno-events-api-dev"
+
+[env.dev.vars]
+APP_ENV = "dev"
+# Dev preview Pages URL goes here once you create the Pages project.
+ALLOWED_ORIGINS = "http://localhost:5173"
+
+[[env.dev.r2_buckets]]
+binding = "EVENT_IMAGES"
+bucket_name = "fresno-event-images-dev"
+
+[env.dev.observability]
+enabled = true
+head_sampling_rate = 1
+
+# --- Production profile ---------------------------------------------------
+# `wrangler deploy --env prod` ships the prod API Worker.
+[env.prod]
+name = "fresno-events-api"
+
+[env.prod.vars]
+APP_ENV = "production"
+ALLOWED_ORIGINS = "https://whatupfresno.com,https://www.whatupfresno.com"
+
+[[env.prod.r2_buckets]]
+binding = "EVENT_IMAGES"
+bucket_name = "fresno-event-images-prod"
+
+[env.prod.observability]
 enabled = true
 head_sampling_rate = 1
 

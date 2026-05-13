@@ -4,6 +4,8 @@ import type { Env } from "@/env";
 import { getEventFromSupabase, listEventsFromSupabase, SupabaseEventsError } from "@/lib/supabase-events";
 import { fail, ok } from "@/lib/responses";
 
+import { parseFrom, parseLimit, parseOptionalDate } from "./events.utils";
+
 export const eventsRoute = new Hono<{ Bindings: Env }>()
   .get("/", async (c) => {
     const limit = parseLimit(c.req.query("limit"));
@@ -45,31 +47,3 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
       return fail(c, "event_unavailable", "The event detail could not be loaded.", 502);
     }
   });
-
-function parseLimit(value: string | undefined) {
-  const parsed = Number(value ?? 12);
-
-  if (!Number.isFinite(parsed)) {
-    return 12;
-  }
-
-  return Math.min(Math.max(Math.trunc(parsed), 1), 50);
-}
-
-function parseFrom(value: string | undefined) {
-  if (!value) {
-    return new Date(Date.now() - 1000 * 60 * 60 * 6);
-  }
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function parseOptionalDate(value: string | undefined) {
-  if (!value) {
-    return undefined;
-  }
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}

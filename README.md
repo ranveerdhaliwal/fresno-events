@@ -90,23 +90,31 @@ Protected review endpoints live under `/review` on the API worker and require `A
 
 Approved images are streamed at `GET /images/<storage_key>` until you point a CDN-fronted custom domain at the bucket via `R2_PUBLIC_BASE_URL`.
 
-The web app exposes the review console at [/admin](http://localhost:5174/admin). Paste the `ADMIN_REVIEW_TOKEN` to unlock the queue. Edits made in the form are sent as a partial `event` payload on approve.
+The web app exposes the review console at [/admin](http://localhost:5173/admin). Paste the `ADMIN_REVIEW_TOKEN` to unlock the queue. Edits made in the form are sent as a partial `event` payload on approve.
 
 ## Ingest Worker
 
 `workers/ingest` is a Cloudflare Worker. It runs on Cron Triggers (default `0 */4 * * *`) and supports a manual `POST /trigger` endpoint guarded by `ADMIN_REVIEW_TOKEN`.
 
 ```bash
-# Local: starts wrangler dev with --test-scheduled on port 8788
+# Tab 1 - local: starts wrangler dev with --test-scheduled on port 8788
 pnpm ingest:dev
 
-# Manually fire a single source:
+# Tab 2 - one-line wrapper that POSTs /trigger with the right token:
+pnpm ingest:run --source=ticketmaster --force
+pnpm ingest:run --source=ai-discovery
+pnpm ingest:run                                  # all enabled, respects cadence
+pnpm ingest:run --force                          # all enabled, ignores cadence
+
+# Equivalent raw curl if you prefer:
 curl -X POST -H "x-admin-token: $ADMIN_REVIEW_TOKEN" \
   "http://127.0.0.1:8788/trigger?source=ticketmaster&force=true"
 
 # Or simulate the cron locally:
 curl -X POST "http://127.0.0.1:8788/__scheduled?cron=0+*%2F4+*+*+*"
 ```
+
+The `ingest:run` script ([scripts/ingest-run.sh](scripts/ingest-run.sh)) reads `ADMIN_REVIEW_TOKEN` from the shell or falls back to `workers/ingest/.dev.vars`. Candidates land in whichever Supabase the worker's `.dev.vars` points at — typically your cloud dev project for realistic data. See [docs/DEPLOY.md](docs/DEPLOY.md) Part E for the full local iteration loop.
 
 Sources are configured in the `event_sources` Supabase table. Toggle the `enabled` column or change `cadence_minutes` and `config` to control runs. After every run, the Worker logs structured JSON (`event=ingest_run`) and writes `last_run_at`/`last_status` back to the row.
 
@@ -126,14 +134,25 @@ where key = 'ai-discovery';
 ## Scripts
 
 - `pnpm dev` - run the web app and API worker in parallel
-- `pnpm dev:web` - run the Vite app
+- `pnpm dev:web` - run the Vite app (uses whatever `VITE_API_URL` env you set, falls back to mocks)
+- `pnpm dev:web:local-api` - Vite app pointed at `http://localhost:8787`
+- `pnpm dev:web:cloud-dev` - Vite app pointed at the cloud dev API Worker (reads `.env.cloud-targets`)
+- `pnpm dev:web:cloud-prod` - Vite app pointed at `https://api.whatupfresno.com`
 - `pnpm dev:api` - run the Hono worker with Wrangler
 - `pnpm ingest:dev` - run the ingest Worker locally via `wrangler dev --test-scheduled --port 8788` (loads `workers/ingest/.dev.vars`)
+- `pnpm ingest:run [--source=key] [--force]` - POST `/trigger` against the local ingest worker; auto-loads results into the configured Supabase
 - `pnpm --filter @fresno-events/ingest deploy` - deploy the ingest Worker (Cron Triggers come from `wrangler.toml`)
 - `pnpm db:start` - start local Supabase
 - `pnpm db:reset` - apply migrations and seed data to local Supabase
 - `pnpm typecheck` - typecheck all packages
 - `pnpm build` - build all packages
+
+For the cloud target scripts, create `.env.cloud-targets` (gitignored) at the repo root:
+
+```
+VITE_API_URL_DEV=https://fresno-events-api-dev.<account>.workers.dev
+VITE_API_URL_PROD=https://api.whatupfresno.com
+```
 
 ## Observability
 
@@ -148,31 +167,20 @@ For the frontend, set `VITE_SENTRY_DSN` to enable error tracking. The web app al
 
 ## Cloud Deploy
 
-The recommended production stack is Supabase Cloud + Cloudflare. See [docs/DEPLOY.md](docs/DEPLOY.md) for the full step-by-step. Summary:
+The recommended production stack is Supabase Cloud + Cloudflare. **Provisioning is manual** (creating Supabase projects, `wrangler login`, `wrangler deploy --env <env>`, Pages project setup, custom domains). The repo provides:
 
-1. **Supabase Cloud (prod project)**
-   - Create a new project, then `supabase link --project-ref <ref>` and `supabase db push` from this repo to apply migrations.
-   - In the dashboard, copy the project URL, anon key, and `service_role` key. Store them as Wrangler secrets (next steps).
+- `[env.dev]` / `[env.prod]` profiles in [apps/api/wrangler.toml](apps/api/wrangler.toml) and [workers/ingest/wrangler.toml](workers/ingest/wrangler.toml) — use `wrangler deploy --env dev` / `--env prod`.
+- An [environment matrix](docs/DEPLOY.md#environment-matrix), [migration push order](docs/DEPLOY.md#migration-push-order), and [secret parity checklist](docs/DEPLOY.md#secret-parity-checklist).
+- An automated-vs-manual table at the top of [docs/DEPLOY.md](docs/DEPLOY.md) that names exactly which steps require your account session.
 
-2. **Cloudflare Pages (frontend)**
-   - Create a Pages project from this repo. Build command `pnpm install && pnpm --filter @fresno-events/web build`. Output dir `apps/web/dist`.
-   - Environment variables: `VITE_API_URL=https://api.whatupfresno.com`, optionally `VITE_SENTRY_DSN`, and `VITE_COMING_SOON=true` for the holding-page deploy.
-   - Attach `whatupfresno.com` and `www.whatupfresno.com` as custom domains.
+See [docs/DEPLOY.md](docs/DEPLOY.md) for the full step-by-step (Parts A-F):
 
-3. **Cloudflare Worker for the API**
-   - `cd apps/api && wrangler deploy` (production). Then in the dashboard add a Worker Custom Domain `api.whatupfresno.com`.
-   - Secrets: `wrangler secret put SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_REVIEW_TOKEN`, optionally `R2_PUBLIC_BASE_URL`.
-   - The wrangler.toml already binds the `EVENT_IMAGES` R2 bucket; create it with `wrangler r2 bucket create fresno-event-images-prod` and update `bucket_name`.
-
-4. **Cloudflare Worker for ingest**
-   - `cd workers/ingest && wrangler deploy`. Cron Triggers in `wrangler.toml` will be installed automatically.
-   - Secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_REVIEW_TOKEN`, plus per-source API keys (`TICKETMASTER_API_KEY`, etc.).
-   - To use Workers AI for enrichment leave the `[ai] binding = "AI"` in `wrangler.toml`. To use Anthropic instead, `wrangler secret put ANTHROPIC_API_KEY` and remove the AI binding.
-
-5. **DNS**
-   - `whatupfresno.com` and `www.whatupfresno.com` -> Pages project (proxied A/AAAA records auto-created when you add the custom domains).
-   - `api.whatupfresno.com` -> Worker Custom Domain on `fresno-events-api` (auto-created).
-   - Optional: `images.whatupfresno.com` -> R2 public bucket if you front-end the bucket with a CDN, then set `R2_PUBLIC_BASE_URL=https://images.whatupfresno.com`.
+- **Part A** - Cloud dev environment (separate Supabase project, `--env dev` Workers, Pages preview).
+- **Part B** - Production deploy.
+- **Part C** - Adding more event sources.
+- **Part D** - Setting up the AI discovery agent.
+- **Part E** - Local scraper iteration loop (`pnpm ingest:dev` + `pnpm ingest:run`).
+- **Part F** - Supabase MCP for AI-assisted data inspection / cleanup.
 
 ## Design Gate
 

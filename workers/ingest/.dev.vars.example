@@ -1,5 +1,8 @@
-# Copy to .dev.vars in this folder for `pnpm dev` (workers/ingest).
-# Wrangler loads .dev.vars for the local Worker env.
+# Copy to .dev.vars in this folder for `pnpm ingest:dev` (top-level profile).
+# For env-scoped runs:
+#   `wrangler dev --env dev`  -> loads .dev.vars.dev  (fall back to .dev.vars)
+#   `wrangler dev --env prod` -> loads .dev.vars.prod (fall back to .dev.vars)
+# All variants are gitignored. Never commit real secrets.
 
 APP_ENV=local
 USER_AGENT=WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)
@@ -18,3 +21,15 @@ SEATGEEK_CLIENT_SECRET=
 EVENTBRITE_API_KEY=
 BANDSINTOWN_APP_ID=
 ANTHROPIC_API_KEY=
+
+# Gemini (Developer API / AI Studio). Server-side only — never use VITE_*.
+# GOOGLE_APPLICATION_CREDENTIALS / service account JSON is NOT required for this path;
+# use that only for separate GCP client libraries (Vertex, TTS, etc.).
+GEMINI_API_KEY=
+# GOOGLE_API_KEY=
+
+# Optional: workers_ai | gemini | anthropic (per-role overrides below)
+# AI_TEXT_PROVIDER=gemini
+# AI_TEXT_PROVIDER_ENRICHMENT=gemini
+# AI_TEXT_PROVIDER_DISCOVERY=workers_ai
+# GEMINI_MODEL=gemini-2.5-flash

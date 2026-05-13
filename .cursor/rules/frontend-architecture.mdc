@@ -1,0 +1,87 @@
+---
+description: React frontend folder structure and component composition. Apply to React projects.
+alwaysApply: true
+---
+
+# Frontend architecture (React)
+
+## Folder structure
+
+```
+src/
+  components/   reusable UI primitives, used across features
+  features/     feature modules, self-contained
+    <feature>/
+      Feature.tsx
+      Feature.types.ts
+      Feature.utils.ts
+      Feature.module.scss
+      subcomponents/    optional, only when Feature.tsx grows
+  pages/        route-level composition
+  services/     API calls, grouped by domain
+    <domain>.service.ts
+  hooks/        shared cross-feature hooks
+  lib/          framework-adjacent helpers (date, format, etc.)
+```
+
+**Dependency direction:**
+
+- pages → import from features, components, services
+- features → import from components, services, hooks, lib
+- components → don't import from features or pages
+- services → standalone
+
+If you find yourself importing from `pages/` anywhere, that thing isn't page-specific — extract it to `features/` or `components/`.
+
+## Component composition
+
+### No boolean prop variants
+
+Each boolean doubles the state space and breeds unmaintainable conditionals. Use explicit variant components.
+
+```tsx
+// No
+<Composer isThread isEditing={false} channelId="abc" />
+
+// Yes
+<ThreadComposer channelId="abc" />
+<EditComposer messageId="xyz" />
+```
+
+### Compound components for complex pieces
+
+Components with 3+ internal sections expose subcomponents under one namespace. Subcomponents read shared state from a Provider context, not props.
+
+```tsx
+<Composer.Provider state={state} actions={actions}>
+  <Composer.Frame>
+    <Composer.Input />
+    <Composer.Footer>
+      <Composer.Submit />
+    </Composer.Footer>
+  </Composer.Frame>
+</Composer.Provider>
+```
+
+Consumers compose exactly the pieces they need. No render props, no `showFormatting` flags.
+
+### Lift state to providers when siblings need it
+
+If a component outside the visual hierarchy needs the same state, the state goes in a Provider that wraps both. Never `useEffect`-sync state up. Never read from refs across the tree.
+
+### Children over render props
+
+Use `renderItem`-style props only when the parent must pass data back to the child (lists, virtualized rows). Otherwise use `children`.
+
+## Services
+
+- All HTTP/API code lives in `src/services/`. One file per domain: `script.service.ts`, `media.service.ts`.
+- Services return typed results. Components call services, never `fetch` directly.
+- Service errors are typed. No throwing strings, no unchecked `Error`.
+- A service file shouldn't know anything about React. It's pure data access.
+
+## Don't
+
+- Don't import from `pages/`. Anywhere.
+- Don't reach into another feature's internals (`features/foo/Foo.utils.ts` from `features/bar/`). Cross-feature reuse goes through `components/`, `hooks/`, or `lib/`.
+- Don't create a feature folder for a single 30-line component. Put it in `components/` until it earns its own folder.

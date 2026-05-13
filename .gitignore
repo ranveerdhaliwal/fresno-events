@@ -12,9 +12,15 @@ supabase/.temp
 apps/web/src/routeTree.gen.ts
 *.tsbuildinfo
 
-# API local secrets (Wrangler)
-apps/api/.dev.vars
-!apps/api/.dev.vars.example
+# Wrangler local secrets (API + ingest, all env profiles)
+**/.dev.vars
+**/.dev.vars.*
+!**/.dev.vars.example
 
-# Cursor workspace (kept private; mcp.json may be re-created locally)
-.cursor
+# Cloud target URLs for `pnpm dev:web:cloud-{dev,prod}` (gitignored convenience)
+.env.cloud-targets
+
+# Cursor: track shared project rules; keep local MCP/settings private
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**

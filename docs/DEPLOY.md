@@ -4,6 +4,108 @@ This is the fastest path from a green local stack to `whatupfresno.com` live, us
 
 ---
 
+## What this doc automates vs what stays manual
+
+This walkthrough is for **you in a browser + terminal**. The agent that authored these docs cannot create Supabase projects, run interactive `wrangler login`, set Wrangler secrets, create Cloudflare Pages projects, or add custom domains on your behalf — those require your account session.
+
+| Step | Where it happens |
+| --- | --- |
+| Edit repo files (this doc, `wrangler.toml`, `.dev.vars.example`, scripts, code) | Already done in the repo |
+| Add Supabase MCP entry to `.cursor/mcp.json` | Done; you fill in `<DEV_PROJECT_REF>` and `SUPABASE_ACCESS_TOKEN` after A1 |
+| Apply migrations to dev / prod Supabase once projects exist | You run `supabase db push` (or via Supabase MCP `apply_migration`) |
+| Create Supabase projects (dev + prod) | You, in browser at supabase.com |
+| `wrangler login` | You, in terminal |
+| Deploy Workers (`wrangler deploy --env dev`, `--env prod`) | You, in terminal |
+| Set Wrangler secrets | You, in terminal (interactive) |
+| Create Pages project + connect repo | You, in browser at dash.cloudflare.com |
+| Add custom domains | You, in browser |
+| Enable R2 (one-time, requires payment method) | You, in browser |
+
+Everything past step 0 is something you actively do.
+
+---
+
+## Environment matrix
+
+One row per environment shows every moving piece and how they line up.
+
+| Surface | Local | Cloud dev | Cloud prod |
+| --- | --- | --- | --- |
+| Database | Local Supabase (`pnpm db:start`, `54321`/`54322`/`54323`) | Supabase project `what-up-fresno-dev` | Supabase project `what-up-fresno-prod` |
+| API Worker name | `fresno-events-api` (top-level) | `fresno-events-api-dev` (`--env dev`) | `fresno-events-api` (`--env prod`) |
+| API Worker URL | `http://localhost:8787` | `https://fresno-events-api-dev.<account>.workers.dev` | `https://api.whatupfresno.com` |
+| Ingest Worker name | `fresno-events-ingest` (top-level) | `fresno-events-ingest-dev` (`--env dev`) | `fresno-events-ingest` (`--env prod`) |
+| Ingest Worker URL | `http://localhost:8788` | `https://fresno-events-ingest-dev.<account>.workers.dev` | `https://fresno-events-ingest.<account>.workers.dev` |
+| Cron triggers | none (manual `/trigger` only) | none by default | `0 */4 * * *` |
+| R2 bucket | `fresno-event-images-dev` | `fresno-event-images-dev` | `fresno-event-images-prod` |
+| Pages branch | n/a | `dev` (preview) | `main` (production) |
+| Vite UI URL | `http://localhost:5173` | `https://<hash>.fresno-events.pages.dev` | `https://whatupfresno.com` |
+| `VITE_API_URL` for that UI | `http://localhost:8787` | dev API Worker URL | `https://api.whatupfresno.com` |
+| Wrangler `--env` flag | none | `--env dev` | `--env prod` |
+| Local secrets file | `.dev.vars` | `.dev.vars.dev` | `.dev.vars.prod` (rarely used; prefer Wrangler secrets) |
+
+### Wrangler env profiles
+
+Both Workers ship with `[env.dev]` and `[env.prod]` blocks ([apps/api/wrangler.toml](apps/api/wrangler.toml), [workers/ingest/wrangler.toml](workers/ingest/wrangler.toml)).
+
+- `wrangler dev --env dev` loads `.dev.vars.dev` (falls back to `.dev.vars`).
+- `wrangler deploy --env dev` ships the dev-suffixed Worker.
+- Same pattern for `--env prod`.
+- Top-level (no `--env`) is the local profile and uses `.dev.vars`.
+- There is no `--var-file` flag in Wrangler; `.dev.vars.<env>` is the supported pattern.
+
+### Pointing local Vite at any backend
+
+```bash
+pnpm dev:web:local-api   # -> http://localhost:8787
+pnpm dev:web:cloud-dev   # -> dev Worker URL (reads .env.cloud-targets)
+pnpm dev:web:cloud-prod  # -> https://api.whatupfresno.com
+```
+
+Create `.env.cloud-targets` at the repo root once (gitignored):
+
+```
+VITE_API_URL_DEV=https://fresno-events-api-dev.<account>.workers.dev
+VITE_API_URL_PROD=https://api.whatupfresno.com
+```
+
+---
+
+## Migration push order
+
+Always dev first, then prod. Use `--db-url` so it doesn't depend on the implicit `supabase link` state:
+
+```bash
+pnpm dlx supabase db push --db-url "postgresql://postgres:<DEV_PASS>@db.<DEV_REF>.supabase.co:5432/postgres"
+# smoke-test, then:
+pnpm dlx supabase db push --db-url "postgresql://postgres:<PROD_PASS>@db.<PROD_REF>.supabase.co:5432/postgres"
+```
+
+---
+
+## Secret parity checklist
+
+Before flipping prod cron triggers on, confirm both API and ingest Workers in dev and prod have the same logical secrets:
+
+| Worker | Secret | Required? |
+| --- | --- | --- |
+| API | `SUPABASE_URL` | yes |
+| API | `SUPABASE_SERVICE_ROLE_KEY` | yes |
+| API | `ADMIN_REVIEW_TOKEN` | yes (review endpoints) |
+| API | `R2_PUBLIC_BASE_URL` | optional (CDN-fronted R2) |
+| Ingest | `SUPABASE_URL` | yes |
+| Ingest | `SUPABASE_SERVICE_ROLE_KEY` | yes |
+| Ingest | `ADMIN_REVIEW_TOKEN` | yes (`POST /trigger`) |
+| Ingest | `TICKETMASTER_API_KEY` | per-source |
+| Ingest | `SEATGEEK_CLIENT_ID` / `SEATGEEK_CLIENT_SECRET` | per-source |
+| Ingest | `EVENTBRITE_API_KEY` | per-source |
+| Ingest | `BANDSINTOWN_APP_ID` | per-source |
+| Ingest | `ANTHROPIC_API_KEY` | optional (overrides Workers AI) |
+
+A missing per-source key looks like silent zero-event runs in `wrangler tail`.
+
+---
+
 ## 0. Prerequisites (one-time, in browser)
 
 1. Cloudflare account with a payment method (R2 requires it). Enable R2 from the Cloudflare dashboard sidebar.
@@ -11,6 +113,7 @@ This is the fastest path from a green local stack to `whatupfresno.com` live, us
 3. Source-API accounts you intend to enable (Ticketmaster, SeatGeek, Eventbrite, Bandsintown). Anthropic optional.
 4. `wrangler login` from this machine.
 5. `pnpm dlx supabase login` from this machine.
+6. (Optional, for AI-assisted data cleanup) Supabase personal access token from `supabase.com/dashboard/account/tokens`. See [Supabase MCP](#supabase-mcp-ai-assisted-data-cleanup) below.
 
 ---
 
@@ -46,18 +149,16 @@ The dev API worker's `wrangler.toml` already has `bucket_name = "fresno-event-im
 
 ### A3. Deploy the dev API worker
 
-You can either use a `[env.dev]` section in `apps/api/wrangler.toml` or deploy a separate Worker name. The simplest approach is separate Worker names so secrets stay isolated:
+The dev profile (`[env.dev]` in [apps/api/wrangler.toml](apps/api/wrangler.toml)) names the Worker `fresno-events-api-dev`, binds the dev R2 bucket, and sets `ALLOWED_ORIGINS` to localhost. Deploy + secrets:
 
 ```bash
 cd apps/api
 
-# Deploy with dev name
-wrangler deploy --name fresno-events-api-dev
+wrangler deploy --env dev
 
-# Set dev secrets
-wrangler secret put SUPABASE_URL --name fresno-events-api-dev
-wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name fresno-events-api-dev
-wrangler secret put ADMIN_REVIEW_TOKEN --name fresno-events-api-dev
+wrangler secret put SUPABASE_URL --env dev
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env dev
+wrangler secret put ADMIN_REVIEW_TOKEN --env dev
 ```
 
 The dev worker will be reachable at `https://fresno-events-api-dev.<account>.workers.dev`. No custom domain needed.
@@ -68,17 +169,25 @@ Verify:
 curl -s https://fresno-events-api-dev.<account>.workers.dev/health
 ```
 
+When the dev Pages preview goes live, edit `[env.dev.vars] ALLOWED_ORIGINS` in `wrangler.toml` to include the preview URL:
+
+```toml
+ALLOWED_ORIGINS = "http://localhost:5173,https://dev.fresno-events.pages.dev"
+```
+
+Then redeploy: `wrangler deploy --env dev`.
+
 ### A4. Deploy the dev ingest worker
 
 ```bash
 cd workers/ingest
 
-wrangler deploy --name fresno-events-ingest-dev
+wrangler deploy --env dev
 
-wrangler secret put SUPABASE_URL --name fresno-events-ingest-dev
-wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name fresno-events-ingest-dev
-wrangler secret put ADMIN_REVIEW_TOKEN --name fresno-events-ingest-dev
-wrangler secret put TICKETMASTER_API_KEY --name fresno-events-ingest-dev
+wrangler secret put SUPABASE_URL --env dev
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env dev
+wrangler secret put ADMIN_REVIEW_TOKEN --env dev
+wrangler secret put TICKETMASTER_API_KEY --env dev
 ```
 
 Test a manual run:
@@ -88,7 +197,7 @@ curl -X POST -H "x-admin-token: $DEV_ADMIN_TOKEN" \
   "https://fresno-events-ingest-dev.<account>.workers.dev/trigger?source=ticketmaster&force=true"
 ```
 
-The Cron Trigger (`0 */4 * * *`) installs automatically. If you only want cron on prod, remove the `[triggers]` section before deploying dev and rely on manual `/trigger` calls instead.
+The dev profile intentionally has no `[env.dev.triggers]` block, so Cron Triggers are off in dev — runs only happen via `/trigger`. Production cron lives in `[env.prod.triggers]` (Part B).
 
 ### A5. Dev frontend (Pages preview)
 
@@ -144,21 +253,23 @@ openssl rand -hex 32
 wrangler r2 bucket create fresno-event-images-prod
 ```
 
-Update `apps/api/wrangler.toml` -> `[[r2_buckets]] bucket_name = "fresno-event-images-prod"` for the production deploy.
+The prod profile (`[env.prod]` in [apps/api/wrangler.toml](apps/api/wrangler.toml)) is already wired to `bucket_name = "fresno-event-images-prod"`. No edit needed.
 
 ### B3. API worker (prod)
 
 ```bash
 cd apps/api
-wrangler secret put SUPABASE_URL
-wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-wrangler secret put ADMIN_REVIEW_TOKEN
+wrangler secret put SUPABASE_URL --env prod
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env prod
+wrangler secret put ADMIN_REVIEW_TOKEN --env prod
 # optional:
-wrangler secret put R2_PUBLIC_BASE_URL   # e.g. https://images.whatupfresno.com
-wrangler deploy
+wrangler secret put R2_PUBLIC_BASE_URL --env prod   # e.g. https://images.whatupfresno.com
+wrangler deploy --env prod
 ```
 
 Then in the Cloudflare dashboard for the `fresno-events-api` Worker -> Triggers -> Custom Domains, add `api.whatupfresno.com`. DNS will be created automatically.
+
+`[env.prod.vars] ALLOWED_ORIGINS` ships pre-set to `https://whatupfresno.com,https://www.whatupfresno.com`. Adjust if your apex differs.
 
 Verify:
 
@@ -170,21 +281,21 @@ curl -s https://api.whatupfresno.com/health
 
 ```bash
 cd workers/ingest
-wrangler secret put SUPABASE_URL
-wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-wrangler secret put ADMIN_REVIEW_TOKEN
-wrangler secret put TICKETMASTER_API_KEY
+wrangler secret put SUPABASE_URL --env prod
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env prod
+wrangler secret put ADMIN_REVIEW_TOKEN --env prod
+wrangler secret put TICKETMASTER_API_KEY --env prod
 # optional, only if you enable these source rows:
-wrangler secret put SEATGEEK_CLIENT_ID
-wrangler secret put SEATGEEK_CLIENT_SECRET
-wrangler secret put EVENTBRITE_API_KEY
-wrangler secret put BANDSINTOWN_APP_ID
+wrangler secret put SEATGEEK_CLIENT_ID --env prod
+wrangler secret put SEATGEEK_CLIENT_SECRET --env prod
+wrangler secret put EVENTBRITE_API_KEY --env prod
+wrangler secret put BANDSINTOWN_APP_ID --env prod
 # optional, AI fallback if you remove the [ai] binding:
-wrangler secret put ANTHROPIC_API_KEY
-wrangler deploy
+wrangler secret put ANTHROPIC_API_KEY --env prod
+wrangler deploy --env prod
 ```
 
-Cron Triggers come from `wrangler.toml`. Confirm they installed in dashboard -> Workers -> fresno-events-ingest -> Triggers.
+Cron Triggers come from `[env.prod.triggers]`. Confirm they installed in dashboard -> Workers -> fresno-events-ingest -> Triggers.
 
 Manual smoke test:
 
@@ -429,3 +540,142 @@ update public.event_sources
 set config = jsonb_set(config, '{urls}', '<paste full array here>'::jsonb)
 where key = 'ai-discovery';
 ```
+
+---
+
+## Part E: Local scraper iteration
+
+This is the loop you'll use to develop new scrapers and tune existing ones without touching cloud Workers.
+
+### E1. One-time setup
+
+1. Copy `workers/ingest/.dev.vars.example` -> `workers/ingest/.dev.vars`.
+2. Fill in:
+   - `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` -> **cloud dev** Supabase project (Part A1). Candidates land in dev, you can browse them in Supabase Studio without affecting prod.
+   - `ADMIN_REVIEW_TOKEN` -> any string. Mirror it in your shell so the helper script can read it: `export ADMIN_REVIEW_TOKEN=<same>`.
+   - `TICKETMASTER_API_KEY` (and any other source keys you want to exercise locally).
+3. Optional: also create `workers/ingest/.dev.vars.dev` with the same values if you ever want `wrangler dev --env dev` parity.
+
+If you'd rather run fully offline against local Postgres: `pnpm db:start` then point `SUPABASE_URL=http://127.0.0.1:54321` and use the local `service_role` key the CLI prints.
+
+### E2. The loop
+
+Two terminals:
+
+```bash
+# Tab 1: ingest worker on :8788, hot reloads on file save
+pnpm ingest:dev
+```
+
+```bash
+# Tab 2: trigger one source (or all)
+pnpm ingest:run --source=ticketmaster --force
+pnpm ingest:run --source=ai-discovery
+pnpm ingest:run                          # all enabled sources, respects cadence
+pnpm ingest:run --force                  # all enabled sources, ignores cadence
+```
+
+Output is the JSON `summaries` array (events found, errors, persistence result) printed via `jq`. Rows land in `event_candidates` with `status='pending_review'`. Inspect them via:
+
+- Supabase Studio for the cloud dev project (or `http://127.0.0.1:54323` if local Postgres).
+- Or the admin UI at `/admin` once `pnpm dev:web:cloud-dev` is pointing at your dev API.
+
+### E3. Iteration tips
+
+- `wrangler dev --test-scheduled` does **not** auto-fire scheduled runs on a timer. The scheduled handler only runs when you POST to `/__scheduled`. So local iteration is safe from surprise writes.
+- The `ingest_runs` table records every run with status, timing, and counts; great for "did my new scraper actually try?" debugging.
+- A failing scraper writes a row to `event_sources.last_status='error'` and `last_error`; check there before assuming the script is broken.
+- Use `wrangler tail fresno-events-ingest-dev` against the deployed dev Worker if you want to test the cloud build path without polluting prod.
+
+### E4. Pointing ingest at a different DB temporarily
+
+Without editing files, override the env in your shell for one run:
+
+```bash
+SUPABASE_URL=https://<other-project>.supabase.co \
+  SUPABASE_SERVICE_ROLE_KEY=<other-service-role> \
+  pnpm ingest:dev
+```
+
+Useful for sanity-checking against a clean throwaway project.
+
+### E5. Future: trigger from the admin UI
+
+Currently a separate plan, not yet implemented. Concept:
+
+1. Add `POST /admin/ingest` to [apps/api/src/index.ts](apps/api/src/index.ts) that proxies to the ingest Worker's `/trigger` (or imports `runIngest` directly).
+2. Add a "Run scrapers" button block to [apps/web/src/features/admin/admin-page.tsx](apps/web/src/features/admin/admin-page.tsx) with per-source dropdown + last-summary display.
+3. Stream progress via SSE if patience-friendly; otherwise return summary on response.
+
+---
+
+## Part F: Supabase MCP for AI-assisted data cleanup
+
+The official [Supabase MCP server](https://github.com/supabase-community/mcp-server-supabase) exposes your Supabase project to AI tools (this assistant in any Cursor window pointed at this repo) so we can list tables, query rows, propose cleanups, and apply migrations under your supervision.
+
+### F1. Get a personal access token
+
+1. Visit `https://supabase.com/dashboard/account/tokens`.
+2. Generate a new token (descriptive label, e.g. "Cursor MCP - what-up-fresno").
+3. Copy the `sbp_...` token. Store it somewhere safe; you can't view it again.
+
+### F2. Configure `.cursor/mcp.json`
+
+The file already has a Supabase entry stub (gitignored, won't be committed). Replace placeholders:
+
+```json
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase",
+        "--read-only",
+        "--project-ref=<DEV_PROJECT_REF>"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "<sbp_... from F1>"
+      }
+    }
+  }
+}
+```
+
+`<DEV_PROJECT_REF>` is the alphanumeric ID after `supabase.co/dashboard/project/` for your dev project.
+
+Reload the Cursor window (Cmd/Ctrl+Shift+P -> "Reload Window") and the MCP picks up.
+
+### F3. Safety guardrails (default)
+
+- `--read-only` blocks `INSERT`, `UPDATE`, `DELETE`, `DROP`, etc., at the MCP layer. AI tools physically cannot mutate the database.
+- `--project-ref=<DEV_PROJECT_REF>` scopes the server to a single project. **Prod is unreachable** through this MCP unless you add a second entry pointing at the prod ref.
+- The token is project-scoped to your account; revoke from Supabase dashboard at any time.
+
+### F4. Doing destructive cleanup work
+
+When you want me (or another AI tool) to actually delete/update rows:
+
+**Option A (recommended):** keep `--read-only`. AI drafts the SQL, you paste it into Supabase Studio's SQL editor, eyeball the affected rows, run it.
+
+**Option B:** temporarily remove `--read-only` from the args, reload Cursor window, do the work, restore `--read-only`. Risky in mixed sessions.
+
+**Option C:** add a second MCP entry called `supabase-write` pointing at dev (no `--read-only`), keep the default `supabase` entry read-only. AI must explicitly invoke the write entry, so accidental writes are unlikely.
+
+### F5. Useful MCP tools to ask for
+
+- `list_tables` -> schema overview.
+- `execute_sql` -> arbitrary SELECT (read-only mode).
+- `list_migrations` -> what's been applied.
+- `apply_migration` -> apply a SQL migration to dev (requires write access).
+- `get_logs` -> recent Postgres / Auth logs.
+
+Example prompts you can drop in chat once MCP is up:
+
+- "Find candidates in `event_candidates` with `confidence_score < 0.2` and propose a cleanup query."
+- "Show me `events` rows missing `hero_image_id`; group by `category`."
+- "Compare `event_sources.last_status` to recent `ingest_runs` and tell me which sources are silently failing."
+
+### F6. Adding GitHub MCP alongside
+
+The repo's `.cursor/mcp.json` already has a `github` entry too (gitignored). If you set up a fresh machine, add it back manually with your GitHub PAT in the `Authorization` header. See [GitHub MCP install guide for Cursor](https://github.com/github/github-mcp-server/blob/main/docs/installation-guides/install-cursor.md).
