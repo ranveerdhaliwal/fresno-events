@@ -1,20 +1,27 @@
 import type { ScraperRun } from "@fresno-events/shared";
 
 import type { IngestEnv } from "@/env";
+import { createAiCrawlRunner } from "@/scrapers/ai-crawl";
 import { createAiDiscoveryRunner } from "@/scrapers/ai-discovery";
+import { civicDiscoveryUrls } from "@/sources/civic-urls";
 import { run as runBandsintown } from "@/scrapers/bandsintown";
+import { run as runDowntownFresno } from "@/scrapers/downtown-fresno-api";
 import { run as runEventbrite } from "@/scrapers/eventbrite";
+import { run as runMilb } from "@/scrapers/milb-api";
 import { run as runSeatGeek } from "@/scrapers/seatgeek";
+import { createSpecialUrlRunner } from "@/scrapers/seed-special-url";
 import { run as runTicketmaster } from "@/scrapers/ticketmaster";
+import { run as runVisitFresno } from "@/scrapers/visit-fresno-api";
 
 export interface RegisteredScraper {
-  /** Stable key used as `event_sources.key` in Supabase. */
+  /** Stable source key (stored on candidates and ingest_runs). */
   key: string;
-  /** Human label shown in admin UI. */
   label: string;
-  /** Default cadence in minutes when the DB does not provide one. */
+  /** Minutes between cron runs; manual `--force` ignores this. */
   defaultCadenceMinutes: number;
-  /** Whether to enable by default if no DB row exists. */
+  /** Per-source options (URLs, radius, etc.) — defined in code, not the database. */
+  defaultConfig?: Record<string, unknown>;
+  /** Included when cron runs with no `--source` (still respects cadence). */
   enabledByDefault: boolean;
   /** Per-source secret env keys this scraper needs. Used for a quick missing-secret message. */
   requiredSecrets?: ReadonlyArray<keyof IngestEnv>;
@@ -62,7 +69,49 @@ export const scrapers: RegisteredScraper[] = [
     label: "AI discovery (no-API venues)",
     defaultCadenceMinutes: 1440,
     enabledByDefault: false,
+    defaultConfig: {
+      maxPerUrl: 20,
+      urls: [...civicDiscoveryUrls]
+    },
     runFactory: (env) => createAiDiscoveryRunner(env)
+  },
+  {
+    key: "ai-crawl",
+    label: "AI crawl (Browser Rendering)",
+    defaultCadenceMinutes: 1440,
+    enabledByDefault: false,
+    requiredSecrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
+    runFactory: (env) => createAiCrawlRunner(env)
+  },
+  {
+    key: "visit-fresno-api",
+    label: "Visit Fresno County (CMS REST)",
+    defaultCadenceMinutes: 360,
+    enabledByDefault: false,
+    requiredSecrets: ["VISIT_FRESNO_API_TOKEN"],
+    run: runVisitFresno
+  },
+  {
+    key: "downtown-fresno-api",
+    label: "Downtown Fresno (CityLightStudio BBQ)",
+    defaultCadenceMinutes: 720,
+    enabledByDefault: false,
+    requiredSecrets: ["DOWNTOWN_FRESNO_API_KEY"],
+    run: runDowntownFresno
+  },
+  {
+    key: "milb-api",
+    label: "MiLB Fresno Grizzlies (statsapi)",
+    defaultCadenceMinutes: 720,
+    enabledByDefault: false,
+    run: runMilb
+  },
+  {
+    key: "seed-special-url",
+    label: "Special-URL HTML parsers",
+    defaultCadenceMinutes: 720,
+    enabledByDefault: false,
+    runFactory: (env) => createSpecialUrlRunner(env)
   }
 ];
 

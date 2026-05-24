@@ -12,7 +12,20 @@ export interface EnrichmentSummary {
   skipped_no_backend: boolean;
 }
 
-export async function enrichRecentCandidates(env: IngestEnv, supabase: SupabaseConfig, limit: number): Promise<EnrichmentSummary> {
+export interface EnrichRecentCandidatesOptions {
+  dryRun?: boolean;
+  /** Filter by event_candidates.source (e.g. api:visitfresnocounty). */
+  sourceFilter?: string;
+  /** Override MAX_ENRICH_PER_RUN for this call. */
+  limit?: number;
+}
+
+export async function enrichRecentCandidates(
+  env: IngestEnv,
+  supabase: SupabaseConfig,
+  limit: number,
+  options: EnrichRecentCandidatesOptions = {}
+): Promise<EnrichmentSummary> {
   const summary: EnrichmentSummary = {
     processed: 0,
     updated: 0,
@@ -29,23 +42,57 @@ export async function enrichRecentCandidates(env: IngestEnv, supabase: SupabaseC
   const params = new URLSearchParams({
     select: "id,normalized_event,confidence_score,review_notes",
     status: "eq.pending_review",
-    "review_notes": "is.null",
+    review_notes: "is.null",
     order: "created_at.desc",
     limit: String(Math.min(Math.max(limit, 1), 100))
   });
 
+  if (options.sourceFilter) {
+    params.set("source", `eq.${options.sourceFilter}`);
+  }
+
   const rows = await supabaseFetch<CandidateRow[]>(supabase, `/rest/v1/event_candidates?${params}`);
+
+  console.log(
+    JSON.stringify({
+      event: "ai_enrichment_batch_start",
+      candidates: rows.length,
+      limit,
+      dry_run: options.dryRun ?? false,
+      ...(options.sourceFilter ? { source_filter: options.sourceFilter } : {})
+    })
+  );
 
   for (const row of rows) {
     summary.processed += 1;
+    const index = summary.processed;
+    console.log(
+      JSON.stringify({
+        event: "ai_enrichment_item_start",
+        candidate_id: row.id,
+        index,
+        total: rows.length,
+        title: row.normalized_event.title
+      })
+    );
+
     try {
       const enrichment = await enrichCandidate(env, row.normalized_event);
       if (!enrichment) {
+        console.log(
+          JSON.stringify({
+            event: "ai_enrichment_item_skip",
+            candidate_id: row.id,
+            index,
+            reason: "no_model_response"
+          })
+        );
         continue;
       }
 
       const patch: CandidatePatch = {
         confidence_score: enrichment.confidence,
+        suggested_priority: enrichment.suggested_priority,
         review_notes: enrichment.reasoning ? `[ai] ${enrichment.reasoning}` : null,
         updated_at: new Date().toISOString()
       };
@@ -62,12 +109,44 @@ export async function enrichRecentCandidates(env: IngestEnv, supabase: SupabaseC
         patch.normalized_event = enrichedNormalized;
       }
 
-      await patchCandidate(supabase, row.id, patch);
-      summary.updated += 1;
-    } catch {
+      if (options.dryRun) {
+        console.log(
+          JSON.stringify({
+            event: "ai_enrichment_item_would_patch",
+            candidate_id: row.id,
+            index,
+            would_patch: patch
+          })
+        );
+      } else {
+        await patchCandidate(supabase, row.id, patch);
+        summary.updated += 1;
+        console.log(
+          JSON.stringify({
+            event: "ai_enrichment_item_done",
+            candidate_id: row.id,
+            index,
+            confidence: enrichment.confidence,
+            is_junk: enrichment.is_junk,
+            category: enrichment.category,
+            suggested_priority: enrichment.suggested_priority
+          })
+        );
+      }
+    } catch (error) {
       summary.errors += 1;
+      console.log(
+        JSON.stringify({
+          event: "ai_enrichment_item_error",
+          candidate_id: row.id,
+          index,
+          message: error instanceof Error ? error.message : String(error)
+        })
+      );
     }
   }
+
+  console.log(JSON.stringify({ event: "ai_enrichment_batch_end", ...summary }));
 
   return summary;
 }
@@ -104,6 +183,7 @@ interface CandidateRow {
 
 interface CandidatePatch {
   confidence_score?: number;
+  suggested_priority?: number;
   review_notes?: string | null;
   status?: "rejected";
   reviewed_by?: string;

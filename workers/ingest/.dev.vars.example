@@ -7,7 +7,7 @@
 APP_ENV=local
 USER_AGENT=WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)
 
-# Required to persist candidates and read event_sources
+# Supabase — use repo-root dev-target.env + `pnpm env:local` or `pnpm env:cloud-dev`.
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 
@@ -29,7 +29,21 @@ GEMINI_API_KEY=
 # GOOGLE_API_KEY=
 
 # Optional: workers_ai | gemini | anthropic (per-role overrides below)
+# Local wrangler dev prefers gemini/anthropic when APP_ENV=local (Workers AI needs --remote).
 # AI_TEXT_PROVIDER=gemini
 # AI_TEXT_PROVIDER_ENRICHMENT=gemini
 # AI_TEXT_PROVIDER_DISCOVERY=workers_ai
 # GEMINI_MODEL=gemini-2.5-flash
+
+# Lane 1: hidden JSON / BBQ APIs (public site tokens — rotate if revoked)
+VISIT_FRESNO_API_TOKEN=
+DOWNTOWN_FRESNO_API_KEY=
+
+# Browser Rendering (ai-crawl)
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_API_TOKEN=
+# MAX_PAGES_PER_SEED=10
+# MAX_CRAWL_DEPTH=3
+
+# Skip scrape validation gate (logs ingest_validation_skipped). Emergency only.
+# INGEST_SKIP_VALIDATION=true

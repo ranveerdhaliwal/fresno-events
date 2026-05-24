@@ -1,25 +1,12 @@
-import type { EventCategory, NormalizedEvent, ScrapeContext, ScrapeError, ScrapeResult } from "@fresno-events/shared";
+import type { NormalizedEvent, ScrapeContext, ScrapeError, ScrapeResult } from "@fresno-events/shared";
 
 import { discoverEventsFromHtml } from "@/ai";
 import type { IngestEnv } from "@/env";
+import { getJsonPromptBackend } from "@/llm/registry";
+import { toNormalizedEventFromDiscovery } from "@/normalized-event";
 
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_HTML_BYTES = 1_500_000;
-const ALLOWED_CATEGORIES = new Set<EventCategory>([
-  "music",
-  "comedy",
-  "theater",
-  "sports",
-  "food_drink",
-  "festival",
-  "family",
-  "art",
-  "nightlife",
-  "community",
-  "outdoor",
-  "wellness",
-  "education"
-]);
 
 interface AiDiscoveryConfig {
   urls?: Array<{ url: string; label?: string }>;
@@ -34,11 +21,12 @@ export function createAiDiscoveryRunner(env: IngestEnv) {
     const urls = (config.urls ?? []).filter((entry) => typeof entry?.url === "string" && /^https?:\/\//.test(entry.url));
     const maxPerUrl = typeof config.maxPerUrl === "number" && config.maxPerUrl > 0 ? Math.min(config.maxPerUrl, 50) : 20;
 
-    if (!env.AI && !env.ANTHROPIC_API_KEY) {
+    if (!getJsonPromptBackend(env, "discovery")) {
       return result(ctx, [], [
         {
           source: "ai-discovery",
-          message: "Neither the Workers AI binding nor ANTHROPIC_API_KEY is configured.",
+          message:
+            "No AI provider configured (Workers AI binding, GEMINI_API_KEY, or ANTHROPIC_API_KEY).",
           recoverable: true
         }
       ], 0, started);
@@ -78,7 +66,7 @@ export function createAiDiscoveryRunner(env: IngestEnv) {
       });
 
       for (const item of items.slice(0, maxPerUrl)) {
-        const normalized = toNormalizedEvent(item, entry.url);
+        const normalized = toNormalizedEventFromDiscovery(item, entry.url, entry.url, "ai-discovery");
         if (normalized) {
           events.push(normalized);
         }
@@ -140,50 +128,3 @@ async function fetchHtml(url: string, ctx: ScrapeContext): Promise<string | null
   }
 }
 
-function toNormalizedEvent(item: { title: string; startTs: string; venueName: string; venueAddress?: string; venueCity?: string; category?: string; descriptionText?: string; ticketUrl?: string; externalUrl?: string; imageUrl?: string; priceMin?: number; priceMax?: number; }, sourceUrl: string): NormalizedEvent | null {
-  if (!item.title.trim() || !item.venueName.trim() || !item.startTs) {
-    return null;
-  }
-
-  const start = new Date(item.startTs);
-  if (Number.isNaN(start.getTime())) {
-    return null;
-  }
-
-  const category = ALLOWED_CATEGORIES.has(item.category as EventCategory) ? (item.category as EventCategory) : "community";
-  const sourceEventId = `ai:${hashSync(`${item.title}|${item.venueName}|${start.toISOString()}|${sourceUrl}`)}`;
-
-  return {
-    source: "manual",
-    sourceEventId,
-    title: item.title.trim(),
-    venueName: item.venueName.trim(),
-    startTs: start.toISOString(),
-    timezone: "America/Los_Angeles",
-    category,
-    subcategories: [],
-    tags: ["ai-discovery"],
-    currency: "USD",
-    ...(item.descriptionText ? { descriptionText: item.descriptionText } : {}),
-    ...(item.venueAddress ? { venueAddress: item.venueAddress } : {}),
-    ...(item.venueCity ? { venueCity: item.venueCity } : { venueCity: "Fresno" }),
-    ...(typeof item.priceMin === "number" ? { priceMin: item.priceMin } : {}),
-    ...(typeof item.priceMax === "number" ? { priceMax: item.priceMax } : {}),
-    externalUrl: item.externalUrl ?? sourceUrl,
-    ...(item.ticketUrl ? { ticketUrl: item.ticketUrl } : {}),
-    ...(item.imageUrl ? { imageUrl: item.imageUrl } : {})
-  };
-}
-
-/**
- * Lightweight, deterministic 32-bit FNV-1a hash converted to base36. Good enough
- * to distinguish AI-discovered candidates without requiring async crypto.
- */
-function hashSync(value: string) {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
-  }
-  return hash.toString(36);
-}

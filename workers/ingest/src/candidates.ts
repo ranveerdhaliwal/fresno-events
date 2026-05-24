@@ -7,8 +7,11 @@ export type PersistenceResult =
   | { persisted: false; reason: string }
   | { persisted: true; candidates: number };
 
+const CANDIDATE_UPSERT_BATCH_SIZE = 40;
+
 export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult): Promise<PersistenceResult> {
   const config = getSupabaseConfig(env);
+  const uniqueEvents = dedupeEventsBySourceId(result.events);
 
   if (!config) {
     return {
@@ -27,29 +30,62 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       id: result.runId,
       source: result.source,
       status: result.errors.length > 0 ? "completed_with_errors" : "completed",
-      events_found: result.events.length,
+      events_found: uniqueEvents.length,
       errors_count: result.errors.length,
       metrics: result.metrics,
       finished_at: new Date().toISOString()
     })
   });
 
-  if (result.events.length === 0) {
+  if (uniqueEvents.length === 0) {
     return { persisted: true, candidates: 0 };
   }
 
-  const rows = await Promise.all(result.events.map((event) => toCandidateRow(result.runId, event)));
+  const persistStarted = performance.now();
+  console.log(
+    JSON.stringify({
+      event: "ingest_persist_start",
+      source: result.source,
+      runId: result.runId,
+      candidates: uniqueEvents.length,
+      batches: Math.ceil(uniqueEvents.length / CANDIDATE_UPSERT_BATCH_SIZE)
+    })
+  );
 
-  await supabaseRequest(config, "/rest/v1/event_candidates?on_conflict=source,source_event_id", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=minimal"
-    },
-    body: JSON.stringify(rows)
-  });
+  for (let offset = 0; offset < uniqueEvents.length; offset += CANDIDATE_UPSERT_BATCH_SIZE) {
+    const chunk = uniqueEvents.slice(offset, offset + CANDIDATE_UPSERT_BATCH_SIZE);
+    const rows = await Promise.all(chunk.map((event) => toCandidateRow(result.runId, event)));
 
-  return { persisted: true, candidates: result.events.length };
+    await supabaseRequest(config, "/rest/v1/event_candidates?on_conflict=source,source_event_id", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal"
+      },
+      body: JSON.stringify(rows)
+    });
+  }
+
+  console.log(
+    JSON.stringify({
+      event: "ingest_persist_end",
+      source: result.source,
+      runId: result.runId,
+      candidates: uniqueEvents.length,
+      duration_ms: Math.round(performance.now() - persistStarted)
+    })
+  );
+
+  return { persisted: true, candidates: uniqueEvents.length };
+}
+
+/** Postgres upsert rejects duplicate (source, source_event_id) in one batch. */
+function dedupeEventsBySourceId(events: NormalizedEvent[]): NormalizedEvent[] {
+  const byKey = new Map<string, NormalizedEvent>();
+  for (const event of events) {
+    byKey.set(`${event.source}:${event.sourceEventId}`, event);
+  }
+  return [...byKey.values()];
 }
 
 async function toCandidateRow(runId: string, event: NormalizedEvent) {

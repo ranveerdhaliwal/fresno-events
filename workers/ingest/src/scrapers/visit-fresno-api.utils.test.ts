@@ -1,0 +1,61 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+import { VisitFresnoResponseSchema } from "./visit-fresno-api.types";
+import {
+  buildVisitFresnoDateRanges,
+  buildVisitFresnoUrl,
+  extractVisitFresnoDocs,
+  toNormalizedEvent,
+  visitFresnoTotalCount
+} from "./visit-fresno-api.utils";
+
+const fixturePath = join(
+  process.cwd(),
+  "../../tools/spikes/fixtures/visit-fresno-sample.json"
+);
+
+describe("visit-fresno-api.utils", () => {
+  it("buildVisitFresnoDateRanges splits a 30-day horizon into weekly windows", () => {
+    const ranges = buildVisitFresnoDateRanges(new Date("2026-05-23T12:00:00Z"));
+    expect(ranges.length).toBeGreaterThanOrEqual(4);
+    expect(ranges[0]?.start.toISOString().slice(0, 10)).toBe("2026-05-23");
+  });
+
+  it("buildVisitFresnoUrl includes json filter and token", () => {
+    const now = new Date("2026-05-23T12:00:00Z");
+    const [range] = buildVisitFresnoDateRanges(now);
+    expect(range).toBeDefined();
+    const url = buildVisitFresnoUrl({
+      token: "test-token",
+      skip: 0,
+      limit: 50,
+      range: range!
+    });
+    expect(url).toContain("plugins_events_events_by_date");
+    expect(url).toContain("token=test-token");
+    expect(url).toContain("json=");
+  });
+
+  it("maps fixture docs to NormalizedEvent", () => {
+    const raw = readFileSync(fixturePath, "utf8");
+    const parsed = VisitFresnoResponseSchema.parse(JSON.parse(raw));
+    const docs = extractVisitFresnoDocs(parsed);
+    expect(docs.length).toBeGreaterThan(0);
+    expect(visitFresnoTotalCount(parsed)).toBe(224);
+
+    const firstDoc = docs[0];
+    expect(firstDoc).toBeDefined();
+    const event = toNormalizedEvent(firstDoc!);
+    expect(event).not.toBeNull();
+    expect(event?.source).toBe("api:visitfresnocounty");
+    expect(event?.sourceEventId).toBe(firstDoc!._id);
+    expect(event?.title.length).toBeGreaterThan(0);
+    expect(event?.startTs).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    const normalized = docs.map((doc) => toNormalizedEvent(doc)).filter((e) => e !== null);
+    const ids = normalized.map((e) => e.sourceEventId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

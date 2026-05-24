@@ -1,6 +1,7 @@
 import type { IngestEnv } from "@/env";
 import { getJsonPromptBackend } from "@/llm/registry";
-import { allRegisteredSources, runIngest } from "@/runner";
+import { runIngest, runPostIngestEnrichment } from "@/runner";
+import { listRunnableSources } from "@/planner";
 
 export default {
   async scheduled(_controller: ScheduledController, env: IngestEnv, ctx: ExecutionContext): Promise<void> {
@@ -14,7 +15,7 @@ export default {
     );
   },
 
-  async fetch(req: Request, env: IngestEnv): Promise<Response> {
+  async fetch(req: Request, env: IngestEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
 
     if (url.pathname === "/" || url.pathname === "/health") {
@@ -24,7 +25,7 @@ export default {
           service: "fresno-events-ingest",
           environment: env.APP_ENV ?? "unknown",
           time: new Date().toISOString(),
-          registered_sources: allRegisteredSources
+          registered_sources: listRunnableSources(env)
         }
       });
     }
@@ -35,13 +36,63 @@ export default {
         return jsonResponse({ ok: false, error: auth }, auth.status);
       }
 
-      const source = url.searchParams.get("source") ?? undefined;
+      const sources = url.searchParams.get("source") ?? url.searchParams.get("sources") ?? undefined;
       const force = url.searchParams.get("force") === "true";
-      const summaries = await runIngest(env, { force, ...(source ? { source } : {}) });
+      const dryRun = url.searchParams.get("dry_run") === "true";
+      const resumeJobs = url.searchParams.get("resume_jobs") === "true";
+      const skipEnrichment = url.searchParams.get("no_enrich") === "true" || url.searchParams.get("skip_enrichment") === "true";
+
+      if (dryRun && resumeJobs) {
+        return jsonResponse(
+          {
+            ok: false,
+            error: {
+              code: "invalid_flags",
+              message: "dry_run and resume_jobs cannot be used together."
+            }
+          },
+          400
+        );
+      }
+
+      const summaries = await runIngest(env, {
+        force,
+        dryRun,
+        resumeJobs,
+        skipEnrichment: true,
+        signal: req.signal,
+        ...(sources ? { sources } : {})
+      });
       for (const summary of summaries) {
         console.log(JSON.stringify({ event: "ingest_run", trigger: "manual", ...summary }));
       }
+
+      if (!dryRun && !skipEnrichment) {
+        ctx.waitUntil(runPostIngestEnrichment(env));
+      }
+
       return jsonResponse({ ok: true, data: { summaries } });
+    }
+
+    if (url.pathname === "/enrichment/trigger") {
+      const auth = await checkAdminAuth(req, env);
+      if (auth) {
+        return jsonResponse({ ok: false, error: auth }, auth.status);
+      }
+
+      const dryRun = url.searchParams.get("dry_run") === "true";
+      const sourceFilter = url.searchParams.get("source") ?? undefined;
+      const limitParam = url.searchParams.get("limit");
+      const parsedLimit = limitParam ? Number(limitParam) : NaN;
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.trunc(parsedLimit) : undefined;
+
+      const summary = await runPostIngestEnrichment(env, {
+        dryRun,
+        ...(sourceFilter ? { sourceFilter } : {}),
+        ...(limit !== undefined ? { limit } : {})
+      });
+
+      return jsonResponse({ ok: true, data: { summary, dry_run: dryRun, limit } });
     }
 
     if (url.pathname === "/ai/self-test") {

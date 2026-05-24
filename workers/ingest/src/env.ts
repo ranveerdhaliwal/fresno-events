@@ -22,5 +22,13 @@ export interface IngestEnv {
   AI_TEXT_PROVIDER?: string;
   AI_TEXT_PROVIDER_ENRICHMENT?: string;
   AI_TEXT_PROVIDER_DISCOVERY?: string;
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  CLOUDFLARE_API_TOKEN?: string;
+  MAX_PAGES_PER_SEED?: string;
+  MAX_CRAWL_DEPTH?: string;
+  VISIT_FRESNO_API_TOKEN?: string;
+  DOWNTOWN_FRESNO_API_KEY?: string;
+  /** When true, skip scrape validation (logs ingest_validation_skipped). */
+  INGEST_SKIP_VALIDATION?: string;
   AI?: Ai;
 }

@@ -1,10 +1,16 @@
-import type { ScrapeContext, ScrapeResult } from "@fresno-events/shared";
+import type { CoordinatorMode, ScrapeContext, ScrapeResult } from "@fresno-events/shared";
 
-import { enrichRecentCandidates } from "@/enrichment";
+import { enrichRecentCandidates, type EnrichRecentCandidatesOptions, type EnrichmentSummary } from "@/enrichment";
 import { persistScrapeResult, type PersistenceResult } from "@/candidates";
 import type { IngestEnv } from "@/env";
-import { findScraper, resolveScraperRun, scrapers } from "@/registry";
-import { getSupabaseConfig, loadEnabledSources, recordSourceRun, type EventSourceRow } from "@/sources";
+import { listRunnableSources, planIngestRuns, type PlanItem } from "@/planner";
+import { resolveScraperRun, findScraper } from "@/registry";
+import { getSupabaseConfig } from "@/sources";
+import {
+  getProfileForScraper,
+  validateScrapeResult,
+  type ScrapeValidationResult
+} from "@/validation";
 
 export interface RunSummary {
   source: string;
@@ -15,36 +21,61 @@ export interface RunSummary {
   duration_ms: number;
   ok: boolean;
   message?: string;
+  dry_run?: boolean;
+  events?: Array<{
+    title: string;
+    venueName: string;
+    startTs: string;
+    sourceEventId: string;
+    externalUrl?: string;
+  }>;
+  scrape_errors?: Array<{ url?: string; message: string }>;
+  seed_metrics?: Array<{ url: string; label?: string | null; events_found: number }>;
+  validation?: ScrapeValidationResult;
 }
 
 export interface RunOptions {
-  /** Limit the run to a single source key. Useful for the manual-trigger endpoint. */
-  source?: string;
-  /** Force run even if cadence has not elapsed. */
+  /** One key, comma-separated keys, or `all`. */
+  sources?: string;
   force?: boolean;
+  dryRun?: boolean;
+  resumeJobs?: boolean;
+  /** When true, skip post-ingest AI enrichment (caller may run it via `waitUntil`). */
+  skipEnrichment?: boolean;
+  /** Propagates to scrapers; ai-crawl cancels in-flight Browser Rendering jobs on abort. */
+  signal?: AbortSignal;
 }
+
+const DRY_RUN_EVENT_PREVIEW_LIMIT = 25;
 
 export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promise<RunSummary[]> {
   const supabase = getSupabaseConfig(env);
   const userAgent = env.USER_AGENT ?? "WhatUpFresnoBot/0.1";
   const now = new Date();
 
-  const dbSources = supabase ? await safeLoadSources(supabase, options) : [];
-  const planned = options.source
-    ? planForKey(options.source, dbSources)
-    : planScheduled(dbSources);
+  const planOpts: { sources?: string; force?: boolean } = {};
+  if (options.sources) {
+    planOpts.sources = options.sources;
+  }
+  if (options.force) {
+    planOpts.force = true;
+  }
+  const planned = await planIngestRuns(env, planOpts);
 
   if (planned.length === 0) {
+    const hint = options.sources
+      ? `No runnable source for "${options.sources}" (check API keys in .dev.vars).`
+      : "No sources due or runnable. Use --source=ticketmaster or --all --force.";
     return [
       {
-        source: options.source ?? "all",
+        source: options.sources ?? "none",
         runId: "skipped",
         events_found: 0,
         errors: 0,
-        persistence: { persisted: false, reason: supabase ? "No enabled sources are due to run." : "Supabase env vars missing." },
+        persistence: { persisted: false, reason: hint },
         duration_ms: 0,
         ok: true,
-        message: supabase ? "No sources due." : "Skipped: Supabase env vars missing."
+        message: hint
       }
     ];
   }
@@ -53,8 +84,34 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
   const cappedPlan = planned.slice(0, maxSources);
   const summaries: RunSummary[] = [];
 
-  for (const plan of cappedPlan) {
-    summaries.push(await runOne(env, plan, { now, userAgent, supabase }));
+  console.log(
+    JSON.stringify({
+      event: "ingest_batch_start",
+      sources: cappedPlan.map((p) => p.key),
+      sourceTotal: cappedPlan.length,
+      plannedTotal: planned.length,
+      ...(planned.length > cappedPlan.length ? { truncated: planned.length - cappedPlan.length } : {}),
+      dry_run: options.dryRun ?? false
+    })
+  );
+
+  const runCtx: RunOneContext = { now, userAgent, supabase };
+  if (options.dryRun) {
+    runCtx.dryRun = true;
+  }
+  if (options.resumeJobs) {
+    runCtx.resumeJobs = true;
+  }
+  if (options.signal) {
+    runCtx.signal = options.signal;
+  }
+
+  for (let i = 0; i < cappedPlan.length; i += 1) {
+    const plan = cappedPlan[i];
+    if (!plan) {
+      continue;
+    }
+    summaries.push(await runOne(env, plan, runCtx, { sourceIndex: i + 1, sourceTotal: cappedPlan.length }));
   }
 
   if (planned.length > cappedPlan.length) {
@@ -66,18 +123,40 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
     }));
   }
 
-  if (supabase) {
-    try {
-      const enriched = await enrichRecentCandidates(env, supabase, parsePositiveInt(env.MAX_ENRICH_PER_RUN, 25));
-      if (enriched.processed > 0) {
-        console.log(JSON.stringify({ event: "ai_enrichment", ...enriched }));
-      }
-    } catch (error) {
-      console.log(JSON.stringify({ event: "ai_enrichment_failed", message: errorMessage(error) }));
-    }
+  if (options.dryRun) {
+    return summaries;
+  }
+
+  if (!options.skipEnrichment) {
+    await runPostIngestEnrichment(env);
   }
 
   return summaries;
+}
+
+export async function runPostIngestEnrichment(
+  env: IngestEnv,
+  options: EnrichRecentCandidatesOptions = {}
+): Promise<EnrichmentSummary | null> {
+  const supabase = getSupabaseConfig(env);
+  if (!supabase) {
+    return null;
+  }
+
+  console.log(JSON.stringify({ event: "ai_enrichment_run_start", dry_run: options.dryRun ?? false }));
+
+  try {
+    const limit = options.limit ?? parsePositiveInt(env.MAX_ENRICH_PER_RUN, 25);
+    const enriched = await enrichRecentCandidates(env, supabase, limit, options);
+    if (enriched.processed > 0) {
+      console.log(JSON.stringify({ event: "ai_enrichment", ...enriched }));
+    }
+    console.log(JSON.stringify({ event: "ai_enrichment_run_end", ...enriched }));
+    return enriched;
+  } catch (error) {
+    console.log(JSON.stringify({ event: "ai_enrichment_failed", message: errorMessage(error) }));
+    return null;
+  }
 }
 
 function parsePositiveInt(value: string | undefined, fallback: number) {
@@ -86,56 +165,31 @@ function parsePositiveInt(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : fallback;
 }
 
-interface PlanItem {
-  key: string;
-  config: Record<string, unknown>;
-}
-
-function planScheduled(dbSources: EventSourceRow[]): PlanItem[] {
-  return dbSources
-    .filter((row) => Boolean(findScraper(row.key)))
-    .map((row) => ({ key: row.key, config: row.config }));
-}
-
-function planForKey(key: string, dbSources: EventSourceRow[]): PlanItem[] {
-  if (!findScraper(key)) {
-    return [];
-  }
-
-  const dbRow = dbSources.find((row) => row.key === key);
-  return [{ key, config: dbRow?.config ?? {} }];
-}
-
-async function safeLoadSources(supabase: ReturnType<typeof getSupabaseConfig>, options: RunOptions): Promise<EventSourceRow[]> {
-  if (!supabase) {
-    return [];
-  }
-
-  try {
-    const all = await loadEnabledSources(supabase, new Date(0));
-    return options.force ? all : applyCadence(all);
-  } catch (error) {
-    console.log(JSON.stringify({ event: "load_sources_failed", message: errorMessage(error) }));
-    return [];
-  }
-}
-
-function applyCadence(rows: EventSourceRow[]): EventSourceRow[] {
-  const now = Date.now();
-  return rows.filter((row) => {
-    if (!row.last_run_at) return true;
-    const elapsed = (now - new Date(row.last_run_at).getTime()) / 60000;
-    return elapsed >= row.cadence_minutes;
-  });
-}
-
 interface RunOneContext {
   now: Date;
   userAgent: string;
   supabase: ReturnType<typeof getSupabaseConfig>;
+  dryRun?: boolean;
+  resumeJobs?: boolean;
+  signal?: AbortSignal;
 }
 
-async function runOne(env: IngestEnv, plan: PlanItem, ctx: RunOneContext): Promise<RunSummary> {
+function resolveCoordinatorMode(ctx: RunOneContext): CoordinatorMode {
+  if (ctx.dryRun) {
+    return "dry-run";
+  }
+  if (ctx.resumeJobs) {
+    return "resume-jobs";
+  }
+  return "real";
+}
+
+async function runOne(
+  env: IngestEnv,
+  plan: PlanItem,
+  ctx: RunOneContext,
+  batch: { sourceIndex: number; sourceTotal: number }
+): Promise<RunSummary> {
   const scraper = findScraper(plan.key);
 
   if (!scraper) {
@@ -154,12 +208,26 @@ async function runOne(env: IngestEnv, plan: PlanItem, ctx: RunOneContext): Promi
   const runId = crypto.randomUUID();
   const started = performance.now();
 
+  console.log(
+    JSON.stringify({
+      event: "ingest_source_start",
+      source: plan.key,
+      runId,
+      sourceIndex: batch.sourceIndex,
+      sourceTotal: batch.sourceTotal,
+      dry_run: ctx.dryRun ?? false,
+      resume_jobs: ctx.resumeJobs ?? false
+    })
+  );
+
   const scrapeContext: ScrapeContext = {
     runId,
     now: ctx.now,
     userAgent: ctx.userAgent,
     secrets: extractSecrets(env, scraper.requiredSecrets ?? []),
-    config: plan.config
+    config: plan.config,
+    coordinatorMode: resolveCoordinatorMode(ctx),
+    ...(ctx.signal ? { signal: ctx.signal } : {})
   };
 
   let result: ScrapeResult;
@@ -169,13 +237,6 @@ async function runOne(env: IngestEnv, plan: PlanItem, ctx: RunOneContext): Promi
     result = await runHandler(scrapeContext);
   } catch (error) {
     const message = errorMessage(error);
-    if (ctx.supabase) {
-      try {
-        await recordSourceRun(ctx.supabase, plan.key, { last_status: "failed", last_error: message });
-      } catch {
-        // noop
-      }
-    }
     return {
       source: plan.key,
       runId,
@@ -184,22 +245,84 @@ async function runOne(env: IngestEnv, plan: PlanItem, ctx: RunOneContext): Promi
       persistence: { persisted: false, reason: message },
       duration_ms: Math.round(performance.now() - started),
       ok: false,
-      message
+      message,
+      ...(ctx.dryRun ? { dry_run: true } : {})
+    };
+  }
+
+  const validation = runScrapeValidation(env, plan.key, result);
+
+  if (ctx.dryRun) {
+    return {
+      source: plan.key,
+      runId,
+      events_found: result.events.length,
+      errors: result.errors.length,
+      persistence: { persisted: false, reason: "Dry run — no database writes." },
+      duration_ms: Math.round(performance.now() - started),
+      ok: validation.ok,
+      validation,
+      dry_run: true,
+      events: result.events.slice(0, DRY_RUN_EVENT_PREVIEW_LIMIT).map((event) => ({
+        title: event.title,
+        venueName: event.venueName,
+        startTs: event.startTs,
+        sourceEventId: event.sourceEventId,
+        ...(event.externalUrl ? { externalUrl: event.externalUrl } : {})
+      })),
+      scrape_errors: result.errors.map((err) => ({
+        ...(err.url ? { url: err.url } : {}),
+        message: err.message
+      })),
+      ...(result.seedMetrics?.length
+        ? {
+            seed_metrics: result.seedMetrics.map((metric) => ({
+              url: metric.url,
+              ...(metric.label ? { label: metric.label } : {}),
+              events_found: metric.eventsFound
+            }))
+          }
+        : {})
+    };
+  }
+
+  if (!validation.ok) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_validation_failed",
+        source: plan.key,
+        runId,
+        hard: validation.hard,
+        soft: validation.soft
+      })
+    );
+    return {
+      source: plan.key,
+      runId,
+      events_found: result.events.length,
+      errors: result.errors.length,
+      persistence: { persisted: false, reason: "Validation failed — no candidates written." },
+      duration_ms: Math.round(performance.now() - started),
+      ok: false,
+      message: validation.hard.map((i) => i.message).join("; "),
+      validation
     };
   }
 
   const persistence = await persistScrapeResult(env, result);
-
-  if (ctx.supabase) {
-    try {
-      await recordSourceRun(ctx.supabase, plan.key, {
-        last_status: result.errors.length === 0 ? "completed" : "completed_with_errors",
-        last_error: result.errors[0]?.message ?? null
-      });
-    } catch (error) {
-      console.log(JSON.stringify({ event: "record_source_run_failed", source: plan.key, message: errorMessage(error) }));
-    }
-  }
+  console.log(
+    JSON.stringify({
+      event: "ingest_source_end",
+      source: plan.key,
+      runId,
+      sourceIndex: batch.sourceIndex,
+      sourceTotal: batch.sourceTotal,
+      events_found: result.events.length,
+      errors: result.errors.length,
+      persistence,
+      duration_ms: Math.round(performance.now() - started)
+    })
+  );
 
   return {
     source: plan.key,
@@ -208,8 +331,35 @@ async function runOne(env: IngestEnv, plan: PlanItem, ctx: RunOneContext): Promi
     errors: result.errors.length,
     persistence,
     duration_ms: Math.round(performance.now() - started),
-    ok: true
+    ok: true,
+    validation
   };
+}
+
+function runScrapeValidation(
+  env: IngestEnv,
+  scraperKey: string,
+  result: ScrapeResult
+): ScrapeValidationResult {
+  if (env.INGEST_SKIP_VALIDATION === "true") {
+    console.log(JSON.stringify({ event: "ingest_validation_skipped", source: scraperKey }));
+    return { ok: true, hard: [], soft: [] };
+  }
+
+  const profile = getProfileForScraper(scraperKey);
+  const validation = validateScrapeResult(result, profile);
+
+  if (validation.soft.length > 0) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_validation_warn",
+        source: scraperKey,
+        soft: validation.soft
+      })
+    );
+  }
+
+  return validation;
 }
 
 function extractSecrets(env: IngestEnv, keys: ReadonlyArray<keyof IngestEnv>) {
@@ -227,10 +377,4 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** Exported for testing/manual ad-hoc runs. */
-export const allRegisteredSources = scrapers.map((scraper) => ({
-  key: scraper.key,
-  label: scraper.label,
-  enabledByDefault: scraper.enabledByDefault,
-  requiredSecrets: scraper.requiredSecrets ?? []
-}));
+export const allRegisteredSources = listRunnableSources;

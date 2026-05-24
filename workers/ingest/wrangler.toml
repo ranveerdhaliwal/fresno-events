@@ -2,6 +2,9 @@ name = "fresno-events-ingest"
 main = "src/index.ts"
 compatibility_date = "2026-04-24"
 
+[limits]
+cpu_ms = 300_000
+
 # Top-level config = the implicit "local" profile used by `wrangler dev` /
 # `wrangler deploy` without --env. Per-env overrides live below.
 
@@ -14,9 +17,12 @@ USER_AGENT = "WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)"
 # Per-run budget caps. Override in production via wrangler vars or .dev.vars.
 MAX_SOURCES_PER_RUN = "8"
 MAX_ENRICH_PER_RUN = "25"
+MAX_PAGES_PER_SEED = "30"
+MAX_CRAWL_DEPTH = "3"
 
 [ai]
 binding = "AI"
+remote = true
 
 [observability]
 enabled = true
@@ -34,31 +40,35 @@ APP_ENV = "dev"
 USER_AGENT = "WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)"
 MAX_SOURCES_PER_RUN = "8"
 MAX_ENRICH_PER_RUN = "25"
+MAX_PAGES_PER_SEED = "30"
+MAX_CRAWL_DEPTH = "3"
 
 [env.dev.ai]
 binding = "AI"
+remote = true
 
 [env.dev.observability]
 enabled = true
 head_sampling_rate = 1
 
 # --- Production profile ---------------------------------------------------
-# Use with: `wrangler dev --env prod` (loads workers/ingest/.dev.vars.prod) or
-# `wrangler deploy --env prod` to ship prod. Cron Triggers active.
+# Do not deploy prod ingest for now — scraping runs on dev/local only.
+# Prod events are promoted manually later (see README roadmap).
+# No [env.prod.triggers]: prod must not auto-scrape.
 [env.prod]
 name = "fresno-events-ingest"
-
-[env.prod.triggers]
-crons = ["0 */4 * * *"]
 
 [env.prod.vars]
 APP_ENV = "production"
 USER_AGENT = "WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)"
 MAX_SOURCES_PER_RUN = "8"
 MAX_ENRICH_PER_RUN = "25"
+MAX_PAGES_PER_SEED = "30"
+MAX_CRAWL_DEPTH = "3"
 
 [env.prod.ai]
 binding = "AI"
+remote = true
 
 [env.prod.observability]
 enabled = true

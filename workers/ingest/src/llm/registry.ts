@@ -48,6 +48,18 @@ export function resolveTextProvider(env: IngestEnv, role?: TextProviderRole): Te
     }
   }
 
+  // Local `wrangler dev` exposes the AI binding stub but calls fail unless --remote.
+  const preferExternalLlm = env.APP_ENV === "local" || env.APP_ENV === "development";
+
+  if (preferExternalLlm) {
+    if (hasGeminiKey(env)) {
+      return "gemini";
+    }
+    if (env.ANTHROPIC_API_KEY?.trim()) {
+      return "anthropic";
+    }
+  }
+
   if (env.AI) {
     return "workers_ai";
   }
