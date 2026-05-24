@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Fire a manual ingest run against the local ingest worker.
+# Run data ingestion against the local ingest worker (fetch → dev DB).
 #
-# Usage:
-#   pnpm ingest:run --source=ticketmaster
-#   pnpm ingest:run --source=ai-discovery --force
-#   pnpm ingest:run                         # all enabled sources, respecting cadence
-#   pnpm ingest:run --force                 # all enabled sources, ignore cadence
-#   pnpm ingest:run --port=8788 --source=eventbrite
+# Prerequisite: pnpm ingest:dev in another terminal.
 #
-# Requires the ingest worker to already be running (`pnpm ingest:dev`).
-# Reads ADMIN_REVIEW_TOKEN from shell env, falling back to workers/ingest/.dev.vars.
+# Examples:
+#   pnpm ingest:run --source=ticketmaster --force
+#   pnpm ingest:run --source=ai-discovery --dry-run
+#   pnpm ingest:run --source=ticketmaster,ai-discovery --force
+#   pnpm ingest:run --all --force
+#   pnpm ingest:run                    # cron-style: default sources that are due
 
 set -euo pipefail
 
@@ -17,20 +16,34 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${INGEST_PORT:-8788}"
 SOURCE=""
 FORCE="false"
+DRY_RUN="false"
+RESUME_JOBS="false"
+NO_ENRICH="false"
+
+usage() {
+  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --source=*) SOURCE="${1#*=}" ;;
     --source) shift; SOURCE="${1:-}" ;;
+    --sources=*) SOURCE="${1#*=}" ;;
+    --sources) shift; SOURCE="${1:-}" ;;
+    --all) SOURCE="all"; FORCE="true" ;;
     --force) FORCE="true" ;;
+    --dry-run) DRY_RUN="true" ;;
+    --resume-jobs) RESUME_JOBS="true" ;;
+    --no-enrich) NO_ENRICH="true" ;;
     --port=*) PORT="${1#*=}" ;;
     --port) shift; PORT="${1:-8788}" ;;
     -h|--help)
-      sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+      usage
       exit 0
       ;;
     *)
       echo "Unknown argument: $1" >&2
+      usage >&2
       exit 2
       ;;
   esac
@@ -55,9 +68,17 @@ if [[ -z "${ADMIN_REVIEW_TOKEN:-}" ]]; then
   exit 1
 fi
 
-QUERY="force=$FORCE"
+if [[ "$DRY_RUN" == "true" && "$RESUME_JOBS" == "true" ]]; then
+  echo "Cannot combine --dry-run and --resume-jobs." >&2
+  exit 2
+fi
+
+QUERY="force=$FORCE&dry_run=$DRY_RUN&resume_jobs=$RESUME_JOBS"
+if [[ "$NO_ENRICH" == "true" ]]; then
+  QUERY="${QUERY}&no_enrich=true"
+fi
 if [[ -n "$SOURCE" ]]; then
-  QUERY="source=$SOURCE&$QUERY"
+  QUERY="source=${SOURCE}&$QUERY"
 fi
 URL="http://127.0.0.1:${PORT}/trigger?${QUERY}"
 

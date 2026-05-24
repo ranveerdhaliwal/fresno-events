@@ -55,4 +55,4 @@ EOF
 fi
 
 echo "Pointing local Vite dev server at $TARGET API: $URL"
-exec env VITE_API_URL="$URL" pnpm --filter @fresno-events/web dev
+exec bash "$REPO_ROOT/scripts/with-dev-ports.sh" env VITE_API_URL="$URL" pnpm --filter @fresno-events/web dev
