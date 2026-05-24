@@ -1,3 +1,5 @@
+import type { LineupEntry } from "./lineup.js";
+
 export const eventCategories = [
   "music",
   "comedy",
@@ -29,10 +31,32 @@ export type EventSource =
   | "bandsintown"
   | "seatgeek"
   | `scrape:${string}`
+  | `api:${string}`
+  | `manual:${string}`
   | "manual"
   | "recurring";
 
+export type SeedLane = "api" | "special_url" | "crawl" | "manual";
+
+export type { LineupEntry } from "./lineup.js";
+export { LineupEntrySchema, LineupSchema, parseLineup } from "./lineup.js";
+
 export type EventCandidateStatus = "pending_review" | "approved" | "rejected" | "needs_changes" | "duplicate";
+
+export const EVENT_PRIORITY_MIN = 0;
+export const EVENT_PRIORITY_MAX = 5;
+export const EVENT_PRIORITY_DEFAULT = 5;
+
+export {
+  clampEventPriority,
+  clampSuggestedPriorityForOrganicEvent,
+  EVENT_DISPLAY_PRIORITY,
+  formatEventDisplayPriorityRubric,
+  getEventDisplayPriorityLabel,
+  type EventDisplayPriorityTier
+} from "./priority.js";
+
+export type CoordinatorMode = "real" | "dry-run" | "resume-jobs";
 
 export interface ImageAsset {
   id: string;
@@ -112,6 +136,10 @@ export interface Event {
   dedupeHash?: string;
   confidenceScore?: number;
   lastSeenAt?: string;
+  priority: number;
+  seriesId?: string;
+  seriesName?: string;
+  lineup?: LineupEntry[];
   createdAt: string;
   updatedAt: string;
 }
@@ -177,6 +205,9 @@ export interface NormalizedEvent {
   ticketUrl?: string;
   externalUrl?: string;
   imageUrl?: string;
+  seriesId?: string;
+  seriesName?: string;
+  lineup?: LineupEntry[];
 }
 
 export interface ScrapeError {
@@ -193,6 +224,14 @@ export interface ScrapeContext {
   signal?: AbortSignal;
   secrets: Record<string, string | undefined>;
   config: Record<string, unknown>;
+  /** ai-crawl coordinator mode (defaults to real when omitted). */
+  coordinatorMode?: CoordinatorMode;
+}
+
+export interface ScrapeSeedMetric {
+  url: string;
+  label?: string | null;
+  eventsFound: number;
 }
 
 export interface ScrapeResult {
@@ -204,6 +243,7 @@ export interface ScrapeResult {
     pagesVisited: number;
     durationMs: number;
   };
+  seedMetrics?: ScrapeSeedMetric[];
 }
 
 export type ScraperRun = (ctx: ScrapeContext) => Promise<ScrapeResult>;
@@ -234,6 +274,8 @@ export interface EventCandidate {
   rawPayload: Record<string, unknown>;
   dedupeHash: string;
   confidenceScore: number;
+  /** 0–5 from AI enrichment; omitted until enriched. */
+  suggestedPriority?: number;
   status: EventCandidateStatus;
   reviewNotes?: string;
   reviewedAt?: string;
@@ -255,4 +297,11 @@ export interface EventCandidateDetailResponse {
 export interface ReviewDecisionResponse {
   candidate: EventCandidate;
   event?: Event;
+}
+
+export type CandidateDeleteSkipReason = "approved" | "not_found";
+
+export interface CandidateBulkDeleteResponse {
+  deleted: number;
+  skipped: Array<{ id: string; reason: CandidateDeleteSkipReason }>;
 }
