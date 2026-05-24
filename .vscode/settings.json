@@ -1,4 +1,13 @@
 {
+  "files.associations": {
+    "**/.dev.vars": "dotenv",
+    "**/.dev.vars.*": "dotenv",
+    ".vscode/queries/*.sql": "postgres"
+  },
+  "vscode-postgres.showExplorer": true,
+  "vscode-postgres.defaultConnection": "127.0.0.1",
+  "vscode-postgres.defaultDatabase": "postgres",
+  "vscode-postgres.setConnectionFromExplorer": true,
   "terminal.integrated.defaultProfile.linux": "zsh (nvm)",
   "terminal.integrated.profiles.linux": {
     "zsh (nvm)": {

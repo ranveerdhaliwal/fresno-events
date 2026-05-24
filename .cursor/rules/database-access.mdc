@@ -1,0 +1,52 @@
+---
+description: How to query cloud dev (Supabase MCP) vs local Postgres (Docker). Use when the user asks about DB access, SQL, cleanup, migrations, or ingest data.
+alwaysApply: true
+---
+
+# Database access
+
+Full reference: [docs/DATABASE_ACCESS.md](docs/DATABASE_ACCESS.md)
+
+## Cloud dev — use Supabase MCP
+
+- **Project ref:** `mrfkpvbvgzbtcutulfnc` (`what-up-fresno-dev`)
+- **Config:** `.cursor/mcp.json` → hosted OAuth URL `https://mcp.supabase.com/mcp?project_ref=mrfkpvbvgzbtcutulfnc`
+- **Cursor MCP server:** `project-0-fresno-events-supabase` (call tools via MCP, not terminal secrets)
+
+**Prefer these tools for cloud dev SQL/diagnostics:**
+
+- `list_tables` — public schema (`schemas: ["public"]`, `verbose: false` unless columns needed)
+- `execute_sql` — queries (`event_candidates`, `ingest_runs`, `events`, `venues`, …)
+- `list_migrations` — compare to `supabase/migrations/`
+- `get_logs` — when ingest/API errors need Postgres or platform logs
+- `apply_migration` — only with explicit user approval (DDL on remote)
+
+Do **not** use `SUPABASE_ACCESS_TOKEN` / `sbp_` PAT unless MCP OAuth is broken and the user asks to switch back to npx MCP.
+
+Workers still use `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `.dev.vars` — separate from MCP.
+
+## Local Postgres — use Docker / CLI (not MCP)
+
+Local stack: `pnpm db:start` then `pnpm db:reset` / `pnpm db:status`.
+
+- **Connection:** `postgresql://postgres:postgres@127.0.0.1:54322/postgres`
+- **Studio:** http://127.0.0.1:54323
+- **Container (typical):** `supabase_db_what-up-fresno` (`project_id` in `supabase/config.toml`)
+
+**Agent local queries:**
+
+```bash
+docker exec supabase_db_what-up-fresno psql -U postgres -d postgres -c "<SQL>"
+```
+
+If container name differs: `docker ps --filter name=supabase_db`.
+
+## Pick the right target
+
+| User intent | Approach |
+| --- | --- |
+| Cloud dev data, cleanup, remote diagnostics | Supabase MCP `execute_sql` |
+| Local ingest test, fresh reset | `pnpm db:reset` + Docker `psql` |
+| “What’s in the DB?” without specifying | Check `.dev.vars` `SUPABASE_URL`: `127.0.0.1` = local, `*.supabase.co` = cloud dev |
+
+Never point MCP or ingest writes at **prod** unless the user explicitly requests prod.

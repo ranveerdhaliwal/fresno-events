@@ -2,13 +2,19 @@
 
 A modern events discovery app for Fresno, Clovis, Madera, Kingsburg, Sanger, and the surrounding Central Valley.
 
+## Roadmap / TODO
+
+- [ ] **Now:** Follow [docs/LAUNCH_PLAN.md](docs/LAUNCH_PLAN.md) — Docker + dev DB setup, then implement [docs/INGESTION_OVERHAUL_PLAN.md](docs/INGESTION_OVERHAUL_PLAN.md), ingest into dev DB, UI work.
+- [ ] **Later:** Auto-promote approved dev events to prod (API `approve-and-promote` + optional scheduled sync). Until then, prod is updated manually or by re-approving after pointing UI at prod.
+- [ ] **Later:** Daily dev ingest cron + refresh/cancel detection for approved events.
+
 ## Workspace
 
 - `apps/web` - Vite, React, TanStack Router, Tailwind, PWA shell, `/admin` review console
 - `apps/api` - Hono API for Cloudflare Workers (events, review, image streaming)
 - `workers/ingest` - Cloudflare Worker with Cron Triggers + manual `POST /trigger` for ingestion sources and AI enrichment
 - `packages/shared` - shared TypeScript contracts
-- `supabase` - migrations and seed data including `event_candidates`, `ingest_runs`, and `event_sources`
+- `supabase` - migrations and seed data (`event_candidates`, `ingest_runs`, `events`, …)
 
 ## Prerequisites
 
@@ -33,7 +39,7 @@ pnpm install
 pnpm dev
 ```
 
-Copy `.env.example` to `.env.local` for app-specific secrets as integrations come online.
+Copy `.env.example` to `apps/web/.env.local` for the Vite app (`VITE_API_URL` should point at the local API, e.g. `http://127.0.0.1:8790`).
 
 For fast UI-only mobile testing, run:
 
@@ -41,9 +47,53 @@ For fast UI-only mobile testing, run:
 pnpm dev:web
 ```
 
-The Vite app runs at `http://localhost:5173`. The full stack command also starts the API worker at `http://localhost:8787`; `GET /health` is the smoke test endpoint.
+Local dev uses dedicated ports (not Vite’s default `5173`) so other apps can keep `5173` / `8787`. Edit [scripts/dev-ports.env](scripts/dev-ports.env) to change them.
 
-For local Worker env (Supabase URL, service role, `ADMIN_REVIEW_TOKEN`, `ALLOWED_ORIGIN`), copy [apps/api/.dev.vars.example](apps/api/.dev.vars.example) to `apps/api/.dev.vars` and fill in values. Then `curl -s http://localhost:8787/events?from=2026-01-01T00:00:00.000Z&until=2027-01-01T00:00:00.000Z&limit=5` should return `ok: true` when the database has rows in range.
+| Service | URL |
+| --- | --- |
+| Web (Vite) | http://localhost:5182 |
+| API (Wrangler) | http://127.0.0.1:8790 (`GET /health` smoke test) |
+
+For local Worker env (Supabase URL, service role, `ADMIN_REVIEW_TOKEN`, `ALLOWED_ORIGIN`), copy [apps/api/.dev.vars.example](apps/api/.dev.vars.example) to `apps/api/.dev.vars` and set `ALLOWED_ORIGIN` to match `scripts/dev-ports.env`. Then `curl -s "http://127.0.0.1:8790/events?from=2026-01-01T00:00:00.000Z&until=2027-01-01T00:00:00.000Z&limit=5"` should return `ok: true` when the database has rows in range.
+
+## Local vs cloud Supabase (`dev-target.env`)
+
+Ingest and the review API both read `SUPABASE_URL` from their `.dev.vars` files. Those must stay in sync. Use one toggle file at the repo root instead of editing URLs by hand.
+
+**Setup (once):**
+
+```bash
+cp dev-target.env.example dev-target.env
+# Fill SUPABASE_URL_* and SUPABASE_SERVICE_ROLE_KEY_* for local (pnpm db:status) and cloud dev
+```
+
+**Switch target** (writes the active URL + service role into `apps/api/.dev.vars` and `workers/ingest/.dev.vars`):
+
+| Command | Database |
+| --- | --- |
+| `pnpm env:local` | Local Docker Postgres (`pnpm db:start` / `db:reset`) |
+| `pnpm env:cloud-dev` | Supabase cloud dev (`what-up-fresno-dev`) |
+| `pnpm env:cloud-prod` | Production (use with care) |
+| `pnpm env:status` | Show active target and whether `.dev.vars` files match |
+
+After switching, **restart** `pnpm dev:api` and `pnpm ingest:dev` so Wrangler reloads secrets.
+
+**What talks to which DB:**
+
+```text
+/admin UI  →  VITE_API_URL (local API :8790)  →  apps/api SUPABASE_URL  →  Postgres
+ingest:run / ingest:promote / ingest:enrich  →  workers/ingest SUPABASE_URL  →  same Postgres when env is in sync
+```
+
+Local and cloud are **separate sandboxes**. Candidates and events on local do not appear on cloud and vice versa. `pnpm db:reset` only affects local. Cloud may still have rows from earlier runs when you switch to `env:cloud-dev`.
+
+Worker secrets: copy [apps/api/.dev.vars.example](apps/api/.dev.vars.example) and [workers/ingest/.dev.vars.example](workers/ingest/.dev.vars.example) if missing. `ADMIN_REVIEW_TOKEN` must match in both files.
+
+## Database access
+
+**Cloud dev (Cursor agent):** Supabase MCP via OAuth — see [docs/DATABASE_ACCESS.md](docs/DATABASE_ACCESS.md).
+
+**Local Docker:** `pnpm db:start` / `pnpm db:reset` — same doc for connection strings and agent `docker exec` patterns.
 
 ## Local Database
 
@@ -63,9 +113,9 @@ After reset, the Supabase CLI prints local credentials. Use the `service_role` k
 | Studio | `http://127.0.0.1:54323` | Browser-based table viewer + SQL editor |
 | Inbucket | `http://127.0.0.1:54324` | Local email outbox for auth flows |
 
-For DBeaver/Beekeeper, create a Postgres connection with host `127.0.0.1`, port `54322`, database `postgres`, user `postgres`, password `postgres`. The `event_candidates`, `event_sources`, `ingest_runs`, `events`, `venues`, and `images` tables live in the `public` schema.
+For DBeaver/Beekeeper, create a Postgres connection with host `127.0.0.1`, port `54322`, database `postgres`, user `postgres`, password `postgres`. The `event_candidates`, `ingest_runs`, `events`, `venues`, and `images` tables live in the `public` schema.
 
-The web app reads through the Worker API when `VITE_API_URL=http://localhost:8787` is set; without it, the UI falls back to mock data.
+The web app reads through the Worker API when `VITE_API_URL` points at the local API (see `scripts/dev-ports.env`); without it, the UI falls back to mock data.
 
 ## Coming Soon Deploy
 
@@ -90,62 +140,132 @@ Protected review endpoints live under `/review` on the API worker and require `A
 
 Approved images are streamed at `GET /images/<storage_key>` until you point a CDN-fronted custom domain at the bucket via `R2_PUBLIC_BASE_URL`.
 
-The web app exposes the review console at [/admin](http://localhost:5173/admin). Paste the `ADMIN_REVIEW_TOKEN` to unlock the queue. Edits made in the form are sent as a partial `event` payload on approve.
+The web app exposes the review console at [/admin](http://localhost:5182/admin). Paste the `ADMIN_REVIEW_TOKEN` to unlock the queue. Edits use Pacific date/time fields (empty time = all-day). The list is grouped by display priority (AI `suggested_priority` when enriched, overridable in the form) then confidence. Approve sends a partial `event` payload plus `priority` for the published row.
 
-## Ingest Worker
+## Data ingestion
 
-`workers/ingest` is a Cloudflare Worker. It runs on Cron Triggers (default `0 */4 * * *`) and supports a manual `POST /trigger` endpoint guarded by `ADMIN_REVIEW_TOKEN`.
+**End-to-end flow (local or cloud — same steps, different DB):**
+
+```text
+ingest:promote (or ingest:run)  →  event_candidates (pending_review)
+ingest:enrich                   →  confidence, suggested_priority, category/tags (AI)
+/admin approve                  →  events (+ venues, images) in the same database
+```
+
+Prod is separate: approving on cloud dev does not publish to production until you have a prod promotion path (see roadmap).
+
+More detail: **[docs/INGEST.md](docs/INGEST.md)**, **[docs/INGEST_TESTING.md](docs/INGEST_TESTING.md)**. Scraper registry: [`workers/ingest/src/registry.ts`](workers/ingest/src/registry.ts).
+
+### Prerequisite
 
 ```bash
-# Tab 1 - local: starts wrangler dev with --test-scheduled on port 8788
+pnpm env:local          # or pnpm env:cloud-dev
+pnpm ingest:dev         # terminal 1 — worker on http://127.0.0.1:8788
+pnpm dev:api            # terminal 2 — for /admin (or pnpm dev)
+```
+
+### Preflight vs promote
+
+| | **Preflight** | **Promote** |
+| --- | --- | --- |
+| Command | `pnpm ingest:preflight --source=<key>` | `pnpm ingest:promote --source=<key>` |
+| Writes DB? | **No** — dry-run only | **Yes** — persists candidates |
+| Purpose | “Will this source work? How many events? Validation OK?” | Safe path to real ingest: preflight first, then real run |
+| Fails when | Scraper/validation hard errors (dupes, missing fields, …) | Same on preflight step; stops before DB write |
+
+`ingest:promote` options:
+
+- `--skip-preflight` — real run only (you already trust the source)
+- `--no-enrich` — skip background enrichment; run `pnpm ingest:enrich` yourself later
+
+### Ingest commands
+
+| Command | What it does |
+| --- | --- |
+| `pnpm ingest:dev` | Start local ingest worker (port 8788) |
+| `pnpm ingest:preflight --source=<key>` | Dry-run one or comma-separated sources; exit 1 if validation fails |
+| `pnpm ingest:preflight --all` | Dry-run every runnable scraper (needs API keys) |
+| `pnpm ingest:preflight-apis` | Preflight Gate B APIs: visit-fresno, downtown-fresno, milb, seed-special-url |
+| `pnpm ingest:promote --source=<key>` | Preflight then **real** persist (+ enrichment unless `--no-enrich`) |
+| `pnpm ingest:promote --all` | Preflight + promote all runnable sources |
+| `pnpm ingest:run` | Lower-level `POST /trigger` (see flags below) |
+| `pnpm ingest:enrich` | AI enrichment on existing `pending_review` rows (`suggested_priority`, confidence, …) |
+
+**`ingest:run` flags:**
+
+- `--source=<key>` — scraper key, comma list, or `--all`
+- `--force` — run even if not “due” on the schedule
+- `--dry-run` — no DB writes (same idea as preflight)
+- `--no-enrich` — after a real run, skip background enrichment
+- `--resume-jobs` — ai-crawl resume (not with `--dry-run`)
+
+**`ingest:enrich` flags:**
+
+- `--dry-run` — log patches only, no DB update
+- `--source=api:visitfresnocounty` — filter by DB `event_candidates.source` (not scraper key)
+- `--limit=N` — max rows per request (default 25; max 100 per API call)
+- `--all` — loop batches until no pending rows are left without `[ai]` review notes (default batch size 100; use `--limit=50` for smaller batches)
+
+For **100+ pending** candidates after promote: `pnpm ingest:enrich --all` (runs multiple batches automatically), or `pnpm ingest:enrich --limit=100` repeatedly until `processed` is 0.
+
+### Scraper keys (`--source=` for preflight / promote / run)
+
+| Scraper key | Typical `event_candidates.source` | Notes |
+| --- | --- | --- |
+| `visit-fresno-api` | `api:visitfresnocounty` | ~224 events typical |
+| `downtown-fresno-api` | `api:downtownfresno` | ~27 |
+| `milb-api` | `api:milb` | ~88 |
+| `seed-special-url` | varies | e.g. gobulldogs (often 0) |
+| `ticketmaster`, `seatgeek`, `eventbrite`, `bandsintown` | per provider | Needs API keys in `workers/ingest/.dev.vars` |
+| `ai-discovery`, `ai-crawl` | crawl lanes | BR + LLM keys |
+
+### Recommended workflow (one source, local)
+
+```bash
+pnpm env:local
 pnpm ingest:dev
-
-# Tab 2 - one-line wrapper that POSTs /trigger with the right token:
-pnpm ingest:run --source=ticketmaster --force
-pnpm ingest:run --source=ai-discovery
-pnpm ingest:run                                  # all enabled, respects cadence
-pnpm ingest:run --force                          # all enabled, ignores cadence
-
-# Equivalent raw curl if you prefer:
-curl -X POST -H "x-admin-token: $ADMIN_REVIEW_TOKEN" \
-  "http://127.0.0.1:8788/trigger?source=ticketmaster&force=true"
-
-# Or simulate the cron locally:
-curl -X POST "http://127.0.0.1:8788/__scheduled?cron=0+*%2F4+*+*+*"
+pnpm ingest:preflight --source=visit-fresno-api
+pnpm ingest:promote --source=visit-fresno-api
+pnpm ingest:enrich --limit=50          # if you used --no-enrich on promote
+pnpm dev:api                           # open http://127.0.0.1:5182/admin
 ```
 
-The `ingest:run` script ([scripts/ingest-run.sh](scripts/ingest-run.sh)) reads `ADMIN_REVIEW_TOKEN` from the shell or falls back to `workers/ingest/.dev.vars`. Candidates land in whichever Supabase the worker's `.dev.vars` points at — typically your cloud dev project for realistic data. See [docs/DEPLOY.md](docs/DEPLOY.md) Part E for the full local iteration loop.
+Check data in Studio (http://127.0.0.1:54323 when on local). For cloud dev, use `pnpm env:cloud-dev`, restart workers, run the same ingest commands, and use the Supabase dashboard or MCP — local Studio will not show cloud rows.
 
-Sources are configured in the `event_sources` Supabase table. Toggle the `enabled` column or change `cadence_minutes` and `config` to control runs. After every run, the Worker logs structured JSON (`event=ingest_run`) and writes `last_run_at`/`last_status` back to the row.
-
-If a Workers AI binding (`AI`) or `ANTHROPIC_API_KEY` is configured, the Worker also runs an AI pre-review pass over recent pending candidates. It tightens the confidence score, suggests a category and tags, and auto-rejects obvious junk (status moves to `rejected` with `reviewed_by = "ai"`).
-
-The `ai-discovery` source can scrape no-API venue pages with an LLM. Add URLs by updating its `config` in the `event_sources` row, e.g.
-
-```sql
-update public.event_sources
-set config = jsonb_build_object('urls', jsonb_build_array(
-  jsonb_build_object('url', 'https://www.tower2023.com/events', 'label', 'Tower Theatre')
-), 'maxPerUrl', 20),
-    enabled = true
-where key = 'ai-discovery';
-```
+Validation can be bypassed in an emergency with `INGEST_SKIP_VALIDATION=true` in `workers/ingest/.dev.vars` (logged; avoid for normal use).
 
 ## Scripts
 
-- `pnpm dev` - run the web app and API worker in parallel
-- `pnpm dev:web` - run the Vite app (uses whatever `VITE_API_URL` env you set, falls back to mocks)
-- `pnpm dev:web:local-api` - Vite app pointed at `http://localhost:8787`
-- `pnpm dev:web:cloud-dev` - Vite app pointed at the cloud dev API Worker (reads `.env.cloud-targets`)
-- `pnpm dev:web:cloud-prod` - Vite app pointed at `https://api.whatupfresno.com`
-- `pnpm dev:api` - run the Hono worker with Wrangler
-- `pnpm ingest:dev` - run the ingest Worker locally via `wrangler dev --test-scheduled --port 8788` (loads `workers/ingest/.dev.vars`)
-- `pnpm ingest:run [--source=key] [--force]` - POST `/trigger` against the local ingest worker; auto-loads results into the configured Supabase
-- `pnpm --filter @fresno-events/ingest deploy` - deploy the ingest Worker (Cron Triggers come from `wrangler.toml`)
-- `pnpm db:start` - start local Supabase
-- `pnpm db:reset` - apply migrations and seed data to local Supabase
-- `pnpm typecheck` - typecheck all packages
-- `pnpm build` - build all packages
+**Dev stack**
+
+- `pnpm dev` — web + API in parallel (ports in [scripts/dev-ports.env](scripts/dev-ports.env))
+- `pnpm dev:web` — Vite only
+- `pnpm dev:api` — API worker only
+- `pnpm dev:web:local-api` — Vite → local API :8790
+- `pnpm dev:web:cloud-dev` / `dev:web:cloud-prod` — Vite → deployed API (`.env.cloud-targets`)
+
+**Supabase target**
+
+- `pnpm env:local` / `pnpm env:cloud-dev` / `pnpm env:cloud-prod` — sync URL + key to API + ingest `.dev.vars`
+- `pnpm env:status` — show active target
+
+**Database**
+
+- `pnpm db:start` / `pnpm db:stop` / `pnpm db:reset` / `pnpm db:status` — local Supabase CLI
+
+**Ingest** (see [Data ingestion](#data-ingestion))
+
+- `pnpm ingest:dev`
+- `pnpm ingest:preflight --source=<key>` / `--all`
+- `pnpm ingest:preflight-apis`
+- `pnpm ingest:promote --source=<key>` / `--all` [`--skip-preflight`] [`--no-enrich`]
+- `pnpm ingest:run [--source=...] [--force] [--dry-run] [--no-enrich]`
+- `pnpm ingest:enrich [--dry-run] [--source=api:...] [--limit=N]`
+- `pnpm --filter @fresno-events/ingest deploy` — deploy ingest worker (cron from `wrangler.toml`)
+
+**Build**
+
+- `pnpm typecheck` / `pnpm build`
 
 For the cloud target scripts, create `.env.cloud-targets` (gitignored) at the repo root:
 
@@ -167,20 +287,9 @@ For the frontend, set `VITE_SENTRY_DSN` to enable error tracking. The web app al
 
 ## Cloud Deploy
 
-The recommended production stack is Supabase Cloud + Cloudflare. **Provisioning is manual** (creating Supabase projects, `wrangler login`, `wrangler deploy --env <env>`, Pages project setup, custom domains). The repo provides:
+**Order:** [docs/LAUNCH_PLAN.md](docs/LAUNCH_PLAN.md) (setup + build path) → [docs/INGESTION_OVERHAUL_PLAN.md](docs/INGESTION_OVERHAUL_PLAN.md) (ingest implementation spec).
 
-- `[env.dev]` / `[env.prod]` profiles in [apps/api/wrangler.toml](apps/api/wrangler.toml) and [workers/ingest/wrangler.toml](workers/ingest/wrangler.toml) — use `wrangler deploy --env dev` / `--env prod`.
-- An [environment matrix](docs/DEPLOY.md#environment-matrix), [migration push order](docs/DEPLOY.md#migration-push-order), and [secret parity checklist](docs/DEPLOY.md#secret-parity-checklist).
-- An automated-vs-manual table at the top of [docs/DEPLOY.md](docs/DEPLOY.md) that names exactly which steps require your account session.
-
-See [docs/DEPLOY.md](docs/DEPLOY.md) for the full step-by-step (Parts A-F):
-
-- **Part A** - Cloud dev environment (separate Supabase project, `--env dev` Workers, Pages preview).
-- **Part B** - Production deploy.
-- **Part C** - Adding more event sources.
-- **Part D** - Setting up the AI discovery agent.
-- **Part E** - Local scraper iteration loop (`pnpm ingest:dev` + `pnpm ingest:run`).
-- **Part F** - Supabase MCP for AI-assisted data inspection / cleanup.
+Prod does **not** run ingest or scrape cron. Events reach production only after you promote them from dev (automation is on the roadmap above).
 
 ## Design Gate
 

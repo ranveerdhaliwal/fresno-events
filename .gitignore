@@ -20,6 +20,9 @@ apps/web/src/routeTree.gen.ts
 # Cloud target URLs for `pnpm dev:web:cloud-{dev,prod}` (gitignored convenience)
 .env.cloud-targets
 
+# Dev Supabase toggle (local vs cloud-dev vs cloud-prod) — see dev-target.env.example
+dev-target.env
+
 # Cursor: track shared project rules; keep local MCP/settings private
 .cursor/*
 !.cursor/rules/
