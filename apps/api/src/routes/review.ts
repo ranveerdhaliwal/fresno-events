@@ -1,24 +1,29 @@
 import { Hono } from "hono";
 
 import {
+  EVENT_PRIORITY_DEFAULT,
+  EVENT_PRIORITY_MAX,
+  EVENT_PRIORITY_MIN,
   eventCategories,
   type Event,
   type EventCandidate,
   type EventCandidateDetailResponse,
   type EventCandidateListResponse,
   type EventCandidateStatus,
+  parseLineup,
+  type CandidateBulkDeleteResponse,
   type EventCategory,
-  type EventSource,
   type NormalizedEvent,
   type ReviewDecisionResponse
 } from "@fresno-events/shared";
 
 import type { Env } from "@/env";
+import { toEventSource } from "@/lib/event-source";
 import { mirrorImageToR2 } from "@/lib/images";
 import { fail, ok } from "@/lib/responses";
+import { partitionCandidatesForDelete } from "@/routes/review-delete.utils";
 
 const validCandidateStatuses: EventCandidateStatus[] = ["pending_review", "approved", "rejected", "needs_changes", "duplicate"];
-const validSources = ["ticketmaster", "eventbrite", "bandsintown", "seatgeek", "manual", "recurring"] as const;
 
 export const reviewRoute = new Hono<{ Bindings: Env }>();
 
@@ -97,13 +102,14 @@ reviewRoute
       }
 
       const normalized = mergeNormalizedEvent(candidate.normalizedEvent, body.event);
+      const priority = parseApprovePriority(body);
       const venue = await upsertVenue(c.env, normalized);
 
       const heroImage = normalized.imageUrl
         ? await mirrorImageWithLogging(c.env, normalized.imageUrl, normalized.title)
         : null;
 
-      const event = await upsertEvent(c.env, candidate, normalized, venue.id, heroImage?.id ?? null);
+      const event = await upsertEvent(c.env, candidate, normalized, venue.id, heroImage?.id ?? null, priority);
       const updated = await updateCandidate(c.env, candidate.id, {
         status: "approved",
         review_notes: typeof body.notes === "string" ? body.notes : candidate.reviewNotes ?? null,
@@ -115,6 +121,52 @@ reviewRoute
       return ok<ReviewDecisionResponse>(c, { candidate: updated ?? candidate, event });
     } catch (error) {
       return handleReviewError(c, error, "Review candidate could not be approved.");
+    }
+  })
+  .delete("/candidates/:id", async (c) => {
+    const force = c.req.query("force") === "true";
+
+    try {
+      const result = await deleteCandidates(c.env, [c.req.param("id")], { force });
+      if (result.deleted === 0 && result.skipped.length > 0) {
+        const skip = result.skipped[0];
+        if (skip?.reason === "not_found") {
+          return fail(c, "candidate_not_found", "That event candidate could not be found.", 404);
+        }
+        if (skip?.reason === "approved") {
+          return fail(
+            c,
+            "candidate_delete_blocked",
+            "Approved candidates cannot be deleted without force=true.",
+            409
+          );
+        }
+      }
+      return ok<CandidateBulkDeleteResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Review candidate could not be deleted.");
+    }
+  })
+  .post("/candidates/bulk-delete", async (c) => {
+    const force = c.req.query("force") === "true";
+    const body = await readJsonBody(c.req.raw);
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [];
+
+    if (ids.length === 0) {
+      return fail(c, "invalid_request", "ids must be a non-empty array.", 400);
+    }
+
+    if (ids.length > 100) {
+      return fail(c, "invalid_request", "At most 100 ids per bulk-delete request.", 400);
+    }
+
+    try {
+      const result = await deleteCandidates(c.env, ids, { force });
+      return ok<CandidateBulkDeleteResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Candidates could not be deleted.");
     }
   });
 
@@ -142,6 +194,7 @@ const candidateSelect = [
   "raw_payload",
   "dedupe_hash",
   "confidence_score",
+  "suggested_priority",
   "status",
   "review_notes",
   "reviewed_at",
@@ -186,6 +239,33 @@ async function secureCompare(actual: string, expected: string) {
 
 async function sha256(value: string) {
   return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+
+async function deleteCandidates(
+  env: Env,
+  ids: string[],
+  options: { force: boolean }
+): Promise<CandidateBulkDeleteResponse> {
+  const uniqueIds = [...new Set(ids)];
+  const params = new URLSearchParams({
+    select: "id,status",
+    id: `in.(${uniqueIds.join(",")})`
+  });
+  const rows = await supabaseRequest<Array<{ id: string; status: string }>>(
+    env,
+    `/rest/v1/event_candidates?${params}`
+  );
+  const { toDelete, skipped } = partitionCandidatesForDelete(uniqueIds, rows, options.force);
+
+  if (toDelete.length > 0) {
+    const deleteParams = new URLSearchParams({ id: `in.(${toDelete.join(",")})` });
+    await supabaseRequest(env, `/rest/v1/event_candidates?${deleteParams}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" }
+    });
+  }
+
+  return { deleted: toDelete.length, skipped };
 }
 
 async function getCandidate(env: Env, id: string) {
@@ -235,12 +315,26 @@ async function upsertVenue(env: Env, event: NormalizedEvent) {
   return venue;
 }
 
+function parseApprovePriority(body: Record<string, unknown>): number {
+  const raw = body.priority;
+  if (raw === undefined) {
+    return EVENT_PRIORITY_DEFAULT;
+  }
+
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < EVENT_PRIORITY_MIN || raw > EVENT_PRIORITY_MAX) {
+    throw new ReviewRouteError("priority must be an integer 0–5.", 400);
+  }
+
+  return raw;
+}
+
 async function upsertEvent(
   env: Env,
   candidate: EventCandidate,
   normalized: NormalizedEvent,
   venueId: string,
-  heroImageId: string | null
+  heroImageId: string | null,
+  priority: number
 ): Promise<Event> {
   const now = new Date().toISOString();
   const sourceRefs = compactRecord({
@@ -283,6 +377,10 @@ async function upsertEvent(
       dedupe_hash: candidate.dedupeHash,
       confidence_score: candidate.confidenceScore,
       last_seen_at: now,
+      priority,
+      series_id: normalized.seriesId ?? null,
+      series_name: normalized.seriesName ?? null,
+      lineup: normalized.lineup ?? null,
       updated_at: now
     })
   });
@@ -339,6 +437,7 @@ function mapCandidateRow(row: SupabaseCandidateRow): EventCandidate {
     rawPayload: toRecord(row.raw_payload),
     dedupeHash: row.dedupe_hash,
     confidenceScore: row.confidence_score,
+    ...(row.suggested_priority !== null ? { suggestedPriority: row.suggested_priority } : {}),
     status: toCandidateStatus(row.status) ?? "pending_review",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -353,6 +452,8 @@ function mapCandidateRow(row: SupabaseCandidateRow): EventCandidate {
 }
 
 function mapEventRow(row: SupabaseEventRow): Event {
+  const lineup = parseLineup(row.lineup);
+
   return {
     id: row.id,
     slug: row.slug,
@@ -369,6 +470,7 @@ function mapEventRow(row: SupabaseEventRow): Event {
     status: "scheduled",
     galleryImageIds: row.gallery_image_ids ?? [],
     allArtistIds: row.all_artist_ids ?? [],
+    priority: row.priority ?? EVENT_PRIORITY_DEFAULT,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     ...(row.source_event_id ? { sourceEventId: row.source_event_id } : {}),
@@ -382,7 +484,10 @@ function mapEventRow(row: SupabaseEventRow): Event {
     ...(row.external_url ? { externalUrl: row.external_url } : {}),
     ...(row.dedupe_hash ? { dedupeHash: row.dedupe_hash } : {}),
     ...(row.confidence_score !== null ? { confidenceScore: row.confidence_score } : {}),
-    ...(row.last_seen_at ? { lastSeenAt: row.last_seen_at } : {})
+    ...(row.last_seen_at ? { lastSeenAt: row.last_seen_at } : {}),
+    ...(row.series_id ? { seriesId: row.series_id } : {}),
+    ...(row.series_name ? { seriesName: row.series_name } : {}),
+    ...(lineup ? { lineup } : {})
   };
 }
 
@@ -405,14 +510,6 @@ function toCandidateStatus(value: string | undefined | null) {
 
 function toEventCategory(value: string | null | undefined): EventCategory {
   return eventCategories.includes(value as EventCategory) ? value as EventCategory : "community";
-}
-
-function toEventSource(value: string): EventSource {
-  if (validSources.includes(value as (typeof validSources)[number]) || value.startsWith("scrape:")) {
-    return value as EventSource;
-  }
-
-  return "manual";
 }
 
 function parseLimit(value: string | undefined) {
@@ -503,6 +600,7 @@ interface SupabaseCandidateRow {
   raw_payload: unknown;
   dedupe_hash: string;
   confidence_score: number;
+  suggested_priority: number | null;
   status: string;
   review_notes: string | null;
   reviewed_at: string | null;
@@ -544,6 +642,10 @@ interface SupabaseEventRow {
   dedupe_hash: string | null;
   confidence_score: number | null;
   last_seen_at: string | null;
+  priority: number | null;
+  series_id: string | null;
+  series_name: string | null;
+  lineup: unknown;
   created_at: string;
   updated_at: string;
 }

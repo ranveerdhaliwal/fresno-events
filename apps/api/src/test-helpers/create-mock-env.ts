@@ -18,7 +18,7 @@ function createMockR2Bucket(): R2Bucket {
 export function createMockEnv(overrides: Partial<Env> = {}): Env {
   return {
     APP_ENV: "test",
-    ALLOWED_ORIGIN: "http://localhost:5173",
+    ALLOWED_ORIGIN: "http://localhost:5182",
     EVENT_IMAGES: createMockR2Bucket(),
     ...overrides
   };

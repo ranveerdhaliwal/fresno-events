@@ -1,21 +1,22 @@
 import {
+  EVENT_PRIORITY_DEFAULT,
   eventCategories,
   type Event,
   type EventCategory,
   type EventDetailResponse,
   type EventListItem,
+  parseLineup,
   type EventListResponse,
-  type EventSource,
   type EventStatus,
   type ImageAsset,
   type Venue
 } from "@fresno-events/shared";
 
 import type { Env } from "@/env";
+import { toEventSource } from "@/lib/event-source";
 
 const scheduledStatuses = ["scheduled", "sold_out", "postponed"] as const;
 const validStatuses: EventStatus[] = ["scheduled", "cancelled", "postponed", "sold_out", "inferred_cancelled"];
-const validSources = ["ticketmaster", "eventbrite", "bandsintown", "seatgeek", "manual", "recurring"] as const;
 
 export class SupabaseEventsError extends Error {
   constructor(
@@ -29,15 +30,21 @@ export class SupabaseEventsError extends Error {
 
 export async function listEventsFromSupabase(
   env: Env,
-  options: { from: Date; until?: Date; limit: number }
+  options: { from: Date; until?: Date; limit: number; maxPriority?: number }
 ): Promise<EventListResponse> {
   const { url, key } = getSupabaseConfig(env);
-  const params = createEventParams({
+  const filters: Record<string, string> = {
     status: `in.(${scheduledStatuses.join(",")})`,
     start_ts: `gte.${options.from.toISOString()}`,
-    order: "start_ts.asc",
+    order: "priority.asc,start_ts.asc",
     limit: String(options.limit)
-  });
+  };
+
+  if (options.maxPriority !== undefined) {
+    filters.priority = `lte.${options.maxPriority}`;
+  }
+
+  const params = createEventParams(filters);
 
   if (options.until) {
     params.set("start_ts", `gte.${options.from.toISOString()}`);
@@ -122,6 +129,10 @@ function createEventParams(filters: Record<string, string>) {
       "dedupe_hash",
       "confidence_score",
       "last_seen_at",
+      "priority",
+      "series_id",
+      "series_name",
+      "lineup",
       "created_at",
       "updated_at",
       "venue:venues(id,slug,name,address,city,neighborhood,lat,lng,capacity,website,phone,socials,hero_image_id,description,primary_category,created_at,updated_at)",
@@ -180,6 +191,8 @@ function mapEventRow(row: SupabaseEventRow): EventListItem {
     throw new SupabaseEventsError(`Event ${row.id} is missing its venue relationship.`);
   }
 
+  const lineup = parseLineup(row.lineup);
+
   const event: Event = {
     id: row.id,
     slug: row.slug,
@@ -213,7 +226,11 @@ function mapEventRow(row: SupabaseEventRow): EventListItem {
     ...(row.external_url ? { externalUrl: row.external_url } : {}),
     ...(row.dedupe_hash ? { dedupeHash: row.dedupe_hash } : {}),
     ...(row.confidence_score !== null ? { confidenceScore: row.confidence_score } : {}),
-    ...(row.last_seen_at ? { lastSeenAt: row.last_seen_at } : {})
+    ...(row.last_seen_at ? { lastSeenAt: row.last_seen_at } : {}),
+    priority: row.priority ?? EVENT_PRIORITY_DEFAULT,
+    ...(row.series_id ? { seriesId: row.series_id } : {}),
+    ...(row.series_name ? { seriesName: row.series_name } : {}),
+    ...(lineup ? { lineup } : {})
   };
 
   const venue = mapVenue(row.venue);
@@ -268,14 +285,6 @@ function toEventStatus(value: string | null): EventStatus {
   return validStatuses.includes(value as EventStatus) ? value as EventStatus : "scheduled";
 }
 
-function toEventSource(value: string): EventSource {
-  if (validSources.includes(value as (typeof validSources)[number]) || value.startsWith("scrape:")) {
-    return value as EventSource;
-  }
-
-  return "manual";
-}
-
 function toStringRecord(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -324,6 +333,10 @@ interface SupabaseEventRow {
   dedupe_hash: string | null;
   confidence_score: number | null;
   last_seen_at: string | null;
+  priority: number | null;
+  series_id: string | null;
+  series_name: string | null;
+  lineup: unknown;
   created_at: string;
   updated_at: string;
   venue: SupabaseVenueRow | null;

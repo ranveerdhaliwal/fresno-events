@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { parseFrom, parseLimit, parseOptionalDate } from "./events.utils";
+import { parseFrom, parseLimit, parseMaxPriority, parseOptionalDate } from "./events.utils";
 
 describe("parseLimit", () => {
   it("defaults invalid input to 12", () => {
@@ -59,5 +59,22 @@ describe("parseOptionalDate", () => {
 
   it("parses valid ISO string", () => {
     expect(parseOptionalDate("2026-03-01T00:00:00.000Z")?.toISOString()).toBe("2026-03-01T00:00:00.000Z");
+  });
+});
+
+describe("parseMaxPriority", () => {
+  it("returns undefined when omitted", () => {
+    expect(parseMaxPriority(undefined)).toBeUndefined();
+  });
+
+  it("returns null for invalid values", () => {
+    expect(parseMaxPriority("bad")).toBeNull();
+    expect(parseMaxPriority("6")).toBeNull();
+    expect(parseMaxPriority("-1")).toBeNull();
+  });
+
+  it("parses integers 0–5", () => {
+    expect(parseMaxPriority("0")).toBe(0);
+    expect(parseMaxPriority("5")).toBe(5);
   });
 });

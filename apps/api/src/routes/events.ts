@@ -4,13 +4,14 @@ import type { Env } from "@/env";
 import { getEventFromSupabase, listEventsFromSupabase, SupabaseEventsError } from "@/lib/supabase-events";
 import { fail, ok } from "@/lib/responses";
 
-import { parseFrom, parseLimit, parseOptionalDate } from "./events.utils";
+import { parseFrom, parseLimit, parseMaxPriority, parseOptionalDate } from "./events.utils";
 
 export const eventsRoute = new Hono<{ Bindings: Env }>()
   .get("/", async (c) => {
     const limit = parseLimit(c.req.query("limit"));
     const from = parseFrom(c.req.query("from"));
     const until = parseOptionalDate(c.req.query("until"));
+    const maxPriority = parseMaxPriority(c.req.query("maxPriority"));
 
     if (!from) {
       return fail(c, "invalid_from", "The from query parameter must be a valid ISO date.", 400);
@@ -20,8 +21,20 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
       return fail(c, "invalid_until", "The until query parameter must be a valid ISO date.", 400);
     }
 
+    if (maxPriority === null) {
+      return fail(c, "invalid_max_priority", "maxPriority must be an integer 0–5.", 400);
+    }
+
     try {
-      return ok(c, await listEventsFromSupabase(c.env, { from, limit, ...(until ? { until } : {}) }));
+      return ok(
+        c,
+        await listEventsFromSupabase(c.env, {
+          from,
+          limit,
+          ...(until ? { until } : {}),
+          ...(maxPriority !== undefined ? { maxPriority } : {})
+        })
+      );
     } catch (error) {
       if (error instanceof SupabaseEventsError) {
         return fail(c, "events_unavailable", error.message, error.status === 503 ? 503 : 502);

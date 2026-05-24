@@ -32,13 +32,39 @@ function resolveAllowedOrigin(origin: string, env: Env): string | null {
   const list = env.ALLOWED_ORIGINS;
   if (list) {
     const allowed = list.split(",").map((value) => value.trim()).filter(Boolean);
-    return allowed.includes(origin) ? origin : null;
+    return isOriginAllowed(origin, allowed) ? origin : null;
   }
   if (env.ALLOWED_ORIGIN) {
-    return env.ALLOWED_ORIGIN === origin ? origin : null;
+    return isOriginAllowed(origin, [env.ALLOWED_ORIGIN]) ? origin : null;
   }
   // No env configured: echo the request origin (dev-friendly default).
   return origin;
+}
+
+/** Allow localhost and 127.0.0.1 on the same port (Vite may use either). */
+function isOriginAllowed(origin: string, allowed: string[]): boolean {
+  if (allowed.includes(origin)) {
+    return true;
+  }
+  const alternate = localhost127Alternate(origin);
+  return alternate !== null && allowed.includes(alternate);
+}
+
+function localhost127Alternate(origin: string): string | null {
+  try {
+    const url = new URL(origin);
+    if (url.hostname === "localhost") {
+      url.hostname = "127.0.0.1";
+      return url.origin;
+    }
+    if (url.hostname === "127.0.0.1") {
+      url.hostname = "localhost";
+      return url.origin;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 app.get("/health", (c) =>
