@@ -114,20 +114,27 @@ function TopEventsCarousel({ events }: { events: TodayEventItem[] }) {
       </div>
 
       <div className="flex snap-x gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {events.map((event, index) => (
-          <TopEventCard key={event.event.id} event={event} priority={index === 0} />
+        {events.map((event) => (
+          <TopEventCard key={event.event.id} event={event} displayPriority={event.event.priority} />
         ))}
       </div>
     </section>
   );
 }
 
-function TopEventCard({ event, priority }: { event: TodayEventItem; priority: boolean }) {
+function TopEventCard({ event, displayPriority }: { event: TodayEventItem; displayPriority: number }) {
+  const kickerLabel =
+    displayPriority === 0 ? "Sponsored" : displayPriority === 1 ? "Start here" : event.kicker;
+  const isPromoted = displayPriority === 0;
+
   return (
     <Link
       to="/event/$slug"
       params={{ slug: event.event.slug }}
-      className="group relative min-h-[22rem] w-[min(86vw,28rem)] shrink-0 snap-start overflow-hidden rounded-[1.55rem] bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[24rem]"
+      className={cn(
+        "group relative min-h-[22rem] w-[min(86vw,28rem)] shrink-0 snap-start overflow-hidden rounded-[1.55rem] bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[24rem]",
+        isPromoted && "ring-2 ring-amber-400/70"
+      )}
     >
       {event.heroImage ? (
         <img
@@ -141,7 +148,7 @@ function TopEventCard({ event, priority }: { event: TodayEventItem; priority: bo
       <div className="relative flex min-h-[22rem] flex-col justify-between p-5 text-white sm:min-h-[24rem]">
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full bg-white/16 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] backdrop-blur-md">
-            {priority ? "Start here" : event.kicker}
+            {kickerLabel}
           </span>
           <span className="rounded-full bg-white/16 px-3 py-1.5 text-xs font-bold backdrop-blur-md">
             {event.dateLabel} at {event.timeLabel}

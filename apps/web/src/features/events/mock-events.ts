@@ -184,7 +184,8 @@ export function getMockTodayEvents(): TodayEventItem[] {
         priceMin: 0,
         priceMax: 18,
         isFree: true,
-        ticketUrl: "https://example.com/events/tower-art-hop-afterglow"
+        ticketUrl: "https://example.com/events/tower-art-hop-afterglow",
+        priority: 0
       }),
       venue: venues.warnors,
       heroImage: images.towerGlow,
@@ -209,7 +210,8 @@ export function getMockTodayEvents(): TodayEventItem[] {
         tags: ["live music", "beer garden", "food trucks"],
         priceMin: 12,
         priceMax: 20,
-        ticketUrl: "https://example.com/events/tioga-sequoia-rooftop-jazz"
+        ticketUrl: "https://example.com/events/tioga-sequoia-rooftop-jazz",
+        priority: 1
       }),
       venue: venues.tioga,
       heroImage: images.tiogaJazz,
@@ -311,6 +313,7 @@ function createEvent(input: {
   priceMax: number;
   isFree?: boolean;
   ticketUrl?: string;
+  priority?: number;
 }): Event {
   const createdAt = "2026-04-25T08:00:00.000Z";
   return {
@@ -336,6 +339,7 @@ function createEvent(input: {
     heroImageId: input.heroImage.id,
     galleryImageIds: [input.heroImage.id],
     allArtistIds: [],
+    priority: input.priority ?? 5,
     createdAt,
     updatedAt: createdAt,
     ...(input.ticketUrl ? { ticketUrl: input.ticketUrl, externalUrl: input.ticketUrl } : {})

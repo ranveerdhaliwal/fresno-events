@@ -1,6 +1,7 @@
 import type {
   ApiResponse,
   EventCandidate,
+  CandidateBulkDeleteResponse,
   EventCandidateDetailResponse,
   EventCandidateListResponse,
   NormalizedEvent,
@@ -36,6 +37,7 @@ export interface ApproveBody {
   event?: Partial<NormalizedEvent>;
   notes?: string;
   reviewedBy?: string;
+  priority?: number;
 }
 
 export interface RejectBody {
@@ -56,6 +58,24 @@ export async function rejectCandidate(token: string, id: string, body: RejectBod
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
+  });
+}
+
+export async function deleteCandidate(token: string, id: string, options: { force?: boolean } = {}) {
+  const query = options.force ? "?force=true" : "";
+  return adminFetch<CandidateBulkDeleteResponse>(
+    token,
+    `/review/candidates/${encodeURIComponent(id)}${query}`,
+    { method: "DELETE" }
+  );
+}
+
+export async function deleteCandidates(token: string, ids: string[], options: { force?: boolean } = {}) {
+  const query = options.force ? "?force=true" : "";
+  return adminFetch<CandidateBulkDeleteResponse>(token, `/review/candidates/bulk-delete${query}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids })
   });
 }
 

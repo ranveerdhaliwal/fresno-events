@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "tsc -b --noEmit",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -33,6 +34,7 @@
     "@vitejs/plugin-react": "^5.2.0",
     "tailwindcss": "^4.2.4",
     "typescript": "^6.0.3",
-    "vite": "^7.3.2"
+    "vite": "^7.3.2",
+    "vitest": "^3.2.4"
   }
 }

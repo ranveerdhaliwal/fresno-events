@@ -175,7 +175,7 @@ export function toTodayEventItem(item: EventListItem, index: number): TodayEvent
     timeLabel: formatTime(item.event.startTs),
     dateLabel: formatDate(item.event.startTs),
     saveCount: estimateSaveCount(item.event.id),
-    ...(index === 0 ? { featured: true as const } : {})
+    ...(item.event.priority <= 1 ? { featured: true as const } : {})
   };
 
   return item.heroImage ? { ...base, heroImage: item.heroImage } : base;
@@ -187,8 +187,12 @@ function getApiUrl() {
 }
 
 function getKicker(event: Event, index: number) {
-  if (index === 0) {
-    return "Editor's pick";
+  if (event.priority === 0) {
+    return "Sponsored";
+  }
+
+  if (event.priority === 1) {
+    return "Start here";
   }
 
   if (isTonight(event.startTs)) {

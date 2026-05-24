@@ -32,6 +32,14 @@ export default defineConfig({
     })
   ],
   server: {
-    port: 5173
+    // Explicit IPv4 loopback — `host: true` can listen on IPv6-only on WSL so
+    // 127.0.0.1:5182 refuses while Vite still prints "ready" + Network URLs.
+    host: "127.0.0.1",
+    port: Number(process.env.FRESNO_WEB_PORT ?? 5182),
+    strictPort: true,
+    hmr: {
+      host: "localhost",
+      clientPort: Number(process.env.FRESNO_WEB_PORT ?? 5182)
+    }
   }
 });
