@@ -4,15 +4,15 @@ This is a working reference for how the `ai-discovery` source turns a list of UR
 
 ## The current pipeline
 
-For every URL in `event_sources.config.urls` (rows where `key='ai-discovery'`), one cron run does the following.
+For every URL in [`workers/ingest/src/sources/civic-urls.ts`](../workers/ingest/src/sources/civic-urls.ts) (wired into the `ai-discovery` source in `registry.ts`), one run does the following.
 
 ```mermaid
 flowchart TD
   Start["Cron or POST /trigger fires runIngest"]
-  Loop["For each URL in event_sources.config.urls"]
+  Loop["For each URL in civic-urls.ts"]
   Fetch["fetch(url) with WhatUpFresnoBot UA<br/>12s timeout, 1.5MB cap"]
   Strip["stripHtml: drop script/style/noscript,<br/>strip tags, collapse whitespace,<br/>truncate to 24,000 chars"]
-  LLM["LLM call (Workers AI Llama 3.1 8B default,<br/>Anthropic Claude Haiku fallback)<br/>with strict JSON system prompt"]
+  LLM["LLM call (Workers AI, then Gemini, then Anthropic)<br/>with strict JSON system prompt"]
   Parse["parseJson: tolerate code fences,<br/>brace-match if malformed"]
   Normalize["toNormalizedEvent: validate date,<br/>map category, hash for source_event_id,<br/>tag with 'ai-discovery'"]
   Persist["persistScrapeResult:<br/>upsert into event_candidates<br/>on (source, source_event_id)"]
@@ -33,16 +33,17 @@ flowchart TD
 
 2. **Strip to plain text** — [workers/ingest/src/ai.ts](../workers/ingest/src/ai.ts), `stripHtml`. Regex pass that drops `<script>` / `<style>` / `<noscript>` blocks, then every remaining tag, decodes `&nbsp;`, collapses whitespace. The result is then sliced to **24,000 characters** before being sent to the LLM.
 
-3. **LLM extraction call** — [workers/ingest/src/ai.ts](../workers/ingest/src/ai.ts), `discoverEventsFromHtml`. System prompt asks for strict JSON: `{ events: [{ title, startTs, venueName, ... }] }`. Only events within 50 miles of Fresno in the next 90 days. Backend resolves in this order:
-   - Cloudflare Workers AI binding (`@cf/meta/llama-3.1-8b-instruct`) if present — default in `wrangler.toml`.
-   - `ANTHROPIC_API_KEY` (Claude 3.5 Haiku) as fallback.
-   - Neither configured → source records `last_status='error'` with a clear message and writes zero candidates.
+3. **LLM extraction call** — [workers/ingest/src/ai.ts](../workers/ingest/src/ai.ts), `discoverEventsFromHtml`. System prompt asks for strict JSON: `{ events: [{ title, startTs, venueName, ... }] }`. Only events within 50 miles of Fresno in the next 90 days. Backend resolves via [workers/ingest/src/llm/registry.ts](../workers/ingest/src/llm/registry.ts) (`AI_TEXT_PROVIDER_DISCOVERY` or global `AI_TEXT_PROVIDER`), in this order:
+   - **Workers AI** (`@cf/meta/llama-3.1-8b-instruct`) if the `[ai]` binding is present and selected.
+   - **Gemini** (`GEMINI_API_KEY` or `GOOGLE_API_KEY`, default model `gemini-2.5-flash`).
+   - **Anthropic** (`ANTHROPIC_API_KEY`, Claude 3.5 Haiku).
+   - None available → source records `last_status='error'` and writes zero candidates.
 
 4. **Parse JSON defensively** — [workers/ingest/src/ai.ts](../workers/ingest/src/ai.ts), `parseJson`. Strips ```json``` fences, falls back to a regex brace-match if the LLM added prose. Items that fail the `isPlausibleEvent` shape check (missing title/venue/startTs) are dropped silently.
 
 5. **Normalize** — [workers/ingest/src/scrapers/ai-discovery.ts](../workers/ingest/src/scrapers/ai-discovery.ts), `toNormalizedEvent`. Validates the date is parseable, coerces unknown categories to `community`, generates a stable `source_event_id` as `ai:<hash of title|venue|startTs|sourceUrl>` for dedup, defaults `venueCity='Fresno'`, `currency='USD'`, `timezone='America/Los_Angeles'`. Capped at `maxPerUrl` (default 20) per URL.
 
-6. **Persist** — [workers/ingest/src/candidates.ts](../workers/ingest/src/candidates.ts), `persistScrapeResult`. Upserts into `event_candidates` with `ON CONFLICT (source, source_event_id) DO MERGE`. Initial `confidence_score = 0.7` for AI-discovered candidates (Ticketmaster gets 0.84). Re-runs refresh existing pending-review rows; approved rows are not touched (cancellation detection is a separate refresh job — see [DEPLOY.md](DEPLOY.md) Part H once it ships).
+6. **Persist** — [workers/ingest/src/candidates.ts](../workers/ingest/src/candidates.ts), `persistScrapeResult`. Upserts into `event_candidates` with `ON CONFLICT (source, source_event_id) DO MERGE`. Initial `confidence_score = 0.7` for AI-discovered candidates (Ticketmaster gets 0.84). Re-runs refresh existing pending-review rows; approved rows in `events` are updated by the refresh pass on **dev** ingest (future work; see [INGESTION_OVERHAUL_PLAN.md](INGESTION_OVERHAUL_PLAN.md)).
 
 7. **AI enrichment** — [workers/ingest/src/enrichment.ts](../workers/ingest/src/enrichment.ts) calls `enrichCandidate` from `ai.ts`. Second, smaller LLM call that:
    - Rates `confidence` (0..1), overwriting the 0.7 default.
@@ -57,7 +58,7 @@ So a candidate reaches your admin UI only if the extractor pulled it, the enrich
 
 ## Testing extraction quality
 
-Once the dry-run flag ships:
+Dry-run is available via `pnpm ingest:run --dry-run` (see [LAUNCH_PLAN.md](LAUNCH_PLAN.md)). Until `ai-crawl` ships, use a normal run or edit URLs in Studio:
 
 ```bash
 # tab 1
@@ -67,11 +68,11 @@ pnpm ingest:dev
 pnpm ingest:run --source=ai-discovery --dry-run
 ```
 
-To test a single URL, temporarily edit `event_sources.config.urls` via Supabase Studio or the Supabase MCP, run dry-run, then restore the full list. A single-URL override flag (`--url=https://...`) is reasonable future work but not currently implemented.
+To test a single URL, temporarily edit `civic-urls.ts` (or pass a short list in `registry.ts` while developing), then `pnpm ingest:run --source=ai-discovery --dry-run`. A `--url=` CLI override is reasonable future work.
 
 To see what an actual run produced (real persistence, no dry-run):
 - Live structured logs: `wrangler tail fresno-events-ingest` (deployed) or watch the `pnpm ingest:dev` terminal.
-- Per-source last run + error: `select key, last_run_at, last_status, last_error from public.event_sources where key='ai-discovery';`
+- Per-source runs: `select * from public.ingest_runs where source='ai-discovery' order by started_at desc limit 5;`
 - Per-run metrics: `select * from public.ingest_runs where source='ai-discovery' order by started_at desc limit 5;`
 - The candidates themselves: filter `event_candidates` by `source_url like '<url>%'` or join through `run_id`.
 
