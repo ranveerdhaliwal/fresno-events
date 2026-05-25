@@ -1,9 +1,9 @@
 import type { CoordinatorMode, ScrapeContext, ScrapeResult } from "@fresno-events/shared";
 
-import { enrichRecentCandidates, type EnrichRecentCandidatesOptions, type EnrichmentSummary } from "@/enrichment";
+import { runEnrichmentPipeline, type EnrichRecentCandidatesOptions, type EnrichmentSummary } from "@/enrichment";
 import { persistScrapeResult, type PersistenceResult } from "@/candidates";
 import type { IngestEnv } from "@/env";
-import { listRunnableSources, planIngestRuns, type PlanItem } from "@/planner";
+import { listRunnableSources, planIngestRuns, sortPlanByStalest, type PlanItem } from "@/planner";
 import { resolveScraperRun, findScraper } from "@/registry";
 import { getSupabaseConfig } from "@/sources";
 import {
@@ -60,7 +60,10 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
   if (options.force) {
     planOpts.force = true;
   }
-  const planned = await planIngestRuns(env, planOpts);
+  let planned = await planIngestRuns(env, planOpts);
+  if (!options.sources && supabase) {
+    planned = await sortPlanByStalest(planned, supabase);
+  }
 
   if (planned.length === 0) {
     const hint = options.sources
@@ -124,12 +127,57 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
   }
 
   if (options.dryRun) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_fetch_phase_done",
+        message: "Dry run — no DB writes or enrichment",
+        sources: summaries.map((s) => s.source),
+        total_events_found: summaries.reduce((n, s) => n + s.events_found, 0)
+      })
+    );
+    console.log("[ingest] Fetch phase complete (dry run).");
     return summaries;
   }
 
+  const totalEvents = summaries.reduce((n, s) => n + s.events_found, 0);
+  const totalCandidates = summaries.reduce(
+    (n, s) => n + (s.persistence.persisted === true ? s.persistence.candidates : 0),
+    0
+  );
+
+  console.log(
+    JSON.stringify({
+      event: "ingest_fetch_phase_done",
+      message: "All scraper fetches finished",
+      sources: summaries.map((s) => ({
+        source: s.source,
+        events_found: s.events_found,
+        candidates: s.persistence.persisted === true ? s.persistence.candidates : 0,
+        ok: s.ok
+      })),
+      total_events_found: totalEvents,
+      total_candidates_persisted: totalCandidates
+    })
+  );
+  console.log(
+    `[ingest] Fetch phase complete (${summaries.length} sources, ${totalEvents} events, ${totalCandidates} candidates persisted).`
+  );
+
   if (!options.skipEnrichment) {
     await runPostIngestEnrichment(env);
+  } else {
+    console.log("[ingest] Skipping AI enrichment (--no-enrich).");
   }
+
+  console.log(
+    JSON.stringify({
+      event: "ingest_run_complete",
+      message: "Ingest run finished",
+      sources: summaries.length,
+      skip_enrichment: options.skipEnrichment ?? false
+    })
+  );
+  console.log("[ingest] Run complete.");
 
   return summaries;
 }
@@ -143,18 +191,14 @@ export async function runPostIngestEnrichment(
     return null;
   }
 
-  console.log(JSON.stringify({ event: "ai_enrichment_run_start", dry_run: options.dryRun ?? false }));
-
   try {
-    const limit = options.limit ?? parsePositiveInt(env.MAX_ENRICH_PER_RUN, 25);
-    const enriched = await enrichRecentCandidates(env, supabase, limit, options);
-    if (enriched.processed > 0) {
-      console.log(JSON.stringify({ event: "ai_enrichment", ...enriched }));
-    }
-    console.log(JSON.stringify({ event: "ai_enrichment_run_end", ...enriched }));
-    return enriched;
+    return await runEnrichmentPipeline(env, supabase, {
+      enrichAll: options.enrichAll ?? options.limit === undefined,
+      ...options
+    });
   } catch (error) {
     console.log(JSON.stringify({ event: "ai_enrichment_failed", message: errorMessage(error) }));
+    console.log(`[ingest] AI enrichment failed: ${errorMessage(error)}`);
     return null;
   }
 }

@@ -21,6 +21,16 @@ export function createAiCrawlRunner(env: IngestEnv) {
     const mode: CoordinatorMode = ctx.coordinatorMode ?? "real";
     const seeds = await loadEnabledSeedUrls(env, { lane: "crawl" });
 
+    console.log(
+      JSON.stringify({
+        event: "ai_crawl_scraper_start",
+        mode,
+        seed_count: seeds.length,
+        dry_run: mode === "dry-run"
+      })
+    );
+    console.log(`[ingest] ai-crawl starting (${seeds.length} seeds, mode=${mode}).`);
+
     if (seeds.length === 0) {
       return result(
         ctx,
@@ -35,7 +45,25 @@ export function createAiCrawlRunner(env: IngestEnv) {
     const coordinatorOpts = ctx.signal ? { abortSignal: ctx.signal } : {};
     const { events, errors, metrics, seedMetrics } = await runCoordinator(env, seeds, mode, coordinatorOpts);
 
-    return result(ctx, events, errors, metrics.pagesVisited, started, seedMetrics);
+    const scrapeResult = result(ctx, events, errors, metrics.pagesVisited, started, seedMetrics);
+
+    console.log(
+      JSON.stringify({
+        event: "ai_crawl_scraper_end",
+        mode,
+        events_found: scrapeResult.events.length,
+        errors: scrapeResult.errors.length,
+        pages_visited: metrics.pagesVisited,
+        llm_calls: metrics.llmCalls,
+        duration_ms: scrapeResult.metrics.durationMs,
+        seed_metrics: seedMetrics
+      })
+    );
+    console.log(
+      `[ingest] ai-crawl finished (${scrapeResult.events.length} events, ${metrics.pagesVisited} pages, ${Math.round(scrapeResult.metrics.durationMs / 1000)}s).`
+    );
+
+    return scrapeResult;
   };
 }
 

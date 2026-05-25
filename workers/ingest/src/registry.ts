@@ -5,7 +5,7 @@ import { createAiCrawlRunner } from "@/scrapers/ai-crawl";
 import { createAiDiscoveryRunner } from "@/scrapers/ai-discovery";
 import { civicDiscoveryUrls } from "@/sources/civic-urls";
 import { run as runBandsintown } from "@/scrapers/bandsintown";
-import { run as runDowntownFresno } from "@/scrapers/downtown-fresno-api";
+import { createDowntownFresnoRunner } from "@/scrapers/downtown-fresno-api";
 import { run as runEventbrite } from "@/scrapers/eventbrite";
 import { run as runMilb } from "@/scrapers/milb-api";
 import { run as runSeatGeek } from "@/scrapers/seatgeek";
@@ -21,8 +21,8 @@ export interface RegisteredScraper {
   defaultCadenceMinutes: number;
   /** Per-source options (URLs, radius, etc.) — defined in code, not the database. */
   defaultConfig?: Record<string, unknown>;
-  /** Included when cron runs with no `--source` (still respects cadence). */
-  enabledByDefault: boolean;
+  /** Cron includes this source when due; `manual-only` runs only via explicit `--source` / `--all`. */
+  schedule: "cron" | "manual-only";
   /** Per-source secret env keys this scraper needs. Used for a quick missing-secret message. */
   requiredSecrets?: ReadonlyArray<keyof IngestEnv>;
   /** Static run handler; mutually exclusive with `runFactory`. */
@@ -36,7 +36,7 @@ export const scrapers: RegisteredScraper[] = [
     key: "ticketmaster",
     label: "Ticketmaster Discovery API",
     defaultCadenceMinutes: 360,
-    enabledByDefault: true,
+    schedule: "cron",
     requiredSecrets: ["TICKETMASTER_API_KEY"],
     run: runTicketmaster
   },
@@ -44,7 +44,7 @@ export const scrapers: RegisteredScraper[] = [
     key: "seatgeek",
     label: "SeatGeek API",
     defaultCadenceMinutes: 720,
-    enabledByDefault: false,
+    schedule: "manual-only",
     requiredSecrets: ["SEATGEEK_CLIENT_ID", "SEATGEEK_CLIENT_SECRET"],
     run: runSeatGeek
   },
@@ -52,7 +52,7 @@ export const scrapers: RegisteredScraper[] = [
     key: "eventbrite",
     label: "Eventbrite API",
     defaultCadenceMinutes: 720,
-    enabledByDefault: false,
+    schedule: "manual-only",
     requiredSecrets: ["EVENTBRITE_API_KEY"],
     run: runEventbrite
   },
@@ -60,7 +60,7 @@ export const scrapers: RegisteredScraper[] = [
     key: "bandsintown",
     label: "Bandsintown API",
     defaultCadenceMinutes: 720,
-    enabledByDefault: false,
+    schedule: "manual-only",
     requiredSecrets: ["BANDSINTOWN_APP_ID"],
     run: runBandsintown
   },
@@ -68,7 +68,7 @@ export const scrapers: RegisteredScraper[] = [
     key: "ai-discovery",
     label: "AI discovery (no-API venues)",
     defaultCadenceMinutes: 1440,
-    enabledByDefault: false,
+    schedule: "manual-only",
     defaultConfig: {
       maxPerUrl: 20,
       urls: [...civicDiscoveryUrls]
@@ -79,7 +79,7 @@ export const scrapers: RegisteredScraper[] = [
     key: "ai-crawl",
     label: "AI crawl (Browser Rendering)",
     defaultCadenceMinutes: 1440,
-    enabledByDefault: false,
+    schedule: "cron",
     requiredSecrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
     runFactory: (env) => createAiCrawlRunner(env)
   },
@@ -87,30 +87,29 @@ export const scrapers: RegisteredScraper[] = [
     key: "visit-fresno-api",
     label: "Visit Fresno County (CMS REST)",
     defaultCadenceMinutes: 360,
-    enabledByDefault: false,
+    schedule: "cron",
     requiredSecrets: ["VISIT_FRESNO_API_TOKEN"],
     run: runVisitFresno
   },
   {
     key: "downtown-fresno-api",
-    label: "Downtown Fresno (CityLightStudio BBQ)",
-    defaultCadenceMinutes: 720,
-    enabledByDefault: false,
-    requiredSecrets: ["DOWNTOWN_FRESNO_API_KEY"],
-    run: runDowntownFresno
+    label: "Downtown Fresno (CityLight BBQ + detail BR)",
+    defaultCadenceMinutes: 10080,
+    schedule: "cron",
+    runFactory: (env) => createDowntownFresnoRunner(env)
   },
   {
     key: "milb-api",
     label: "MiLB Fresno Grizzlies (statsapi)",
     defaultCadenceMinutes: 720,
-    enabledByDefault: false,
+    schedule: "cron",
     run: runMilb
   },
   {
     key: "seed-special-url",
     label: "Special-URL HTML parsers",
     defaultCadenceMinutes: 720,
-    enabledByDefault: false,
+    schedule: "cron",
     runFactory: (env) => createSpecialUrlRunner(env)
   }
 ];

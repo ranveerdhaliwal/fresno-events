@@ -1,5 +1,11 @@
 import type { NormalizedEvent, ScrapeResult } from "@fresno-events/shared";
 
+import {
+  contentFingerprint,
+  fingerprintChanged,
+  resolveStatusOnRescrape,
+  type ExistingCandidateRow
+} from "@/candidates/content-fingerprint.utils";
 import type { IngestEnv } from "@/env";
 import { getSupabaseConfig, type SupabaseConfig } from "@/sources";
 
@@ -41,7 +47,12 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
     return { persisted: true, candidates: 0 };
   }
 
+  const existingByKey = await fetchExistingCandidatesForSource(config, result.source);
   const persistStarted = performance.now();
+  let unchanged = 0;
+  let changed = 0;
+  let publishedSynced = 0;
+
   console.log(
     JSON.stringify({
       event: "ingest_persist_start",
@@ -54,7 +65,31 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
 
   for (let offset = 0; offset < uniqueEvents.length; offset += CANDIDATE_UPSERT_BATCH_SIZE) {
     const chunk = uniqueEvents.slice(offset, offset + CANDIDATE_UPSERT_BATCH_SIZE);
-    const rows = await Promise.all(chunk.map((event) => toCandidateRow(result.runId, event)));
+    const rows: Array<Record<string, unknown>> = [];
+
+    for (const event of chunk) {
+      const key = candidateKey(event.source, event.sourceEventId);
+      const existing = existingByKey.get(key);
+      const fp = await contentFingerprint(event);
+      const status = resolveStatusOnRescrape(existing, fp);
+
+      if (existing && !fingerprintChanged(existing, fp)) {
+        unchanged += 1;
+      } else {
+        changed += 1;
+      }
+
+      rows.push(await toCandidateRow(result.runId, event, fp, status, existing));
+
+      if (existing?.matched_event_id) {
+        const synced = await syncPublishedEvent(config, existing.matched_event_id, event, {
+          contentChanged: fingerprintChanged(existing, fp)
+        });
+        if (synced) {
+          publishedSynced += 1;
+        }
+      }
+    }
 
     await supabaseRequest(config, "/rest/v1/event_candidates?on_conflict=source,source_event_id", {
       method: "POST",
@@ -72,6 +107,9 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       source: result.source,
       runId: result.runId,
       candidates: uniqueEvents.length,
+      unchanged,
+      changed,
+      published_events_synced: publishedSynced,
       duration_ms: Math.round(performance.now() - persistStarted)
     })
   );
@@ -88,7 +126,52 @@ function dedupeEventsBySourceId(events: NormalizedEvent[]): NormalizedEvent[] {
   return [...byKey.values()];
 }
 
-async function toCandidateRow(runId: string, event: NormalizedEvent) {
+function candidateKey(source: string, sourceEventId: string) {
+  return `${source}:${sourceEventId}`;
+}
+
+async function fetchExistingCandidatesForSource(
+  config: SupabaseConfig,
+  source: string
+): Promise<Map<string, ExistingCandidateRow>> {
+  const params = new URLSearchParams({
+    select:
+      "id,source,source_event_id,status,content_fingerprint,matched_event_id,reviewed_at,reviewed_by",
+    source: `eq.${source}`,
+    limit: "2000"
+  });
+
+  const response = await fetch(`${config.url}/rest/v1/event_candidates?${params}`, {
+    headers: supabaseHeaders(config)
+  });
+
+  if (!response.ok) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_persist_fetch_existing_failed",
+        source,
+        status: response.status
+      })
+    );
+    return new Map();
+  }
+
+  const rows = (await response.json()) as ExistingCandidateRow[];
+  const map = new Map<string, ExistingCandidateRow>();
+  for (const row of rows) {
+    map.set(candidateKey(row.source, row.source_event_id), row);
+  }
+  return map;
+}
+
+async function toCandidateRow(
+  runId: string,
+  event: NormalizedEvent,
+  fingerprint: string,
+  status: string,
+  existing: ExistingCandidateRow | undefined
+) {
+  const now = new Date().toISOString();
   return {
     run_id: runId,
     source: event.source,
@@ -100,13 +183,73 @@ async function toCandidateRow(runId: string, event: NormalizedEvent) {
     ticket_url: event.ticketUrl ?? null,
     normalized_event: event,
     raw_payload: {},
-    dedupe_hash: await sha256Hex(
-      [event.source, event.sourceEventId, event.title, event.venueName, event.startTs].join("|").toLowerCase()
-    ),
+    content_fingerprint: fingerprint,
+    dedupe_hash: await legacyDedupeHash(event),
     confidence_score: event.source === "ticketmaster" ? 0.84 : 0.7,
-    status: "pending_review",
-    updated_at: new Date().toISOString()
+    status,
+    updated_at: now,
+    ...(existing?.reviewed_at ? { reviewed_at: existing.reviewed_at } : {}),
+    ...(existing?.reviewed_by ? { reviewed_by: existing.reviewed_by } : {}),
+    ...(existing?.matched_event_id ? { matched_event_id: existing.matched_event_id } : {})
   };
+}
+
+/** Legacy dedupe_hash (unique constraint); unchanged algorithm for compatibility. */
+async function legacyDedupeHash(event: NormalizedEvent) {
+  return sha256Hex(
+    [event.source, event.sourceEventId, event.title, event.venueName, event.startTs].join("|").toLowerCase()
+  );
+}
+
+async function syncPublishedEvent(
+  config: SupabaseConfig,
+  eventId: string,
+  normalized: NormalizedEvent,
+  opts: { contentChanged: boolean }
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  const body: Record<string, unknown> = {
+    last_seen_at: now,
+    updated_at: now
+  };
+
+  if (opts.contentChanged) {
+    body.title = normalized.title;
+    body.start_ts = normalized.startTs;
+    body.description_text = normalized.descriptionText ?? null;
+    body.description_html = normalized.descriptionHtml ?? null;
+    body.external_url = normalized.externalUrl ?? null;
+    body.ticket_url = normalized.ticketUrl ?? null;
+    if (normalized.endTs) {
+      body.end_ts = normalized.endTs;
+    }
+    if (normalized.category) {
+      body.category = normalized.category;
+    }
+  }
+
+  const response = await fetch(`${config.url}/rest/v1/events?id=eq.${eventId}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseHeaders(config),
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_published_event_sync_failed",
+        eventId,
+        status: response.status
+      })
+    );
+    return false;
+  }
+
+  return true;
 }
 
 async function sha256Hex(value: string) {
@@ -114,13 +257,19 @@ async function sha256Hex(value: string) {
   return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function supabaseHeaders(config: SupabaseConfig) {
+  return {
+    apikey: config.serviceRoleKey,
+    Authorization: `Bearer ${config.serviceRoleKey}`,
+    Accept: "application/json"
+  };
+}
+
 async function supabaseRequest(config: SupabaseConfig, path: string, init: RequestInit) {
   const response = await fetch(`${config.url}${path}`, {
     ...init,
     headers: {
-      apikey: config.serviceRoleKey,
-      Authorization: `Bearer ${config.serviceRoleKey}`,
-      Accept: "application/json",
+      ...supabaseHeaders(config),
       ...init.headers
     }
   });

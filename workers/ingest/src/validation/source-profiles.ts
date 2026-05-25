@@ -23,8 +23,8 @@ export const SOURCE_VALIDATION_PROFILES: SourceValidationProfile[] = [
   {
     scraperKey: "downtown-fresno-api",
     eventSource: "api:downtownfresno",
-    minEventsWarn: 10,
-    maxErrors: 0
+    minEventsWarn: 5,
+    maxErrors: 40
   },
   {
     scraperKey: "seed-special-url",

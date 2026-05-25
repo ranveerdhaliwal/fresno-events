@@ -15,8 +15,8 @@ crons = ["0 */4 * * *"]
 APP_ENV = "local"
 USER_AGENT = "WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)"
 # Per-run budget caps. Override in production via wrangler vars or .dev.vars.
-MAX_SOURCES_PER_RUN = "8"
-MAX_ENRICH_PER_RUN = "25"
+MAX_SOURCES_PER_RUN = "12"
+MAX_ENRICH_PER_RUN = "50"
 MAX_PAGES_PER_SEED = "30"
 MAX_CRAWL_DEPTH = "3"
 
@@ -38,8 +38,8 @@ name = "fresno-events-ingest-dev"
 [env.dev.vars]
 APP_ENV = "dev"
 USER_AGENT = "WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)"
-MAX_SOURCES_PER_RUN = "8"
-MAX_ENRICH_PER_RUN = "25"
+MAX_SOURCES_PER_RUN = "12"
+MAX_ENRICH_PER_RUN = "50"
 MAX_PAGES_PER_SEED = "30"
 MAX_CRAWL_DEPTH = "3"
 
@@ -61,8 +61,8 @@ name = "fresno-events-ingest"
 [env.prod.vars]
 APP_ENV = "production"
 USER_AGENT = "WhatUpFresnoBot/0.1 (contact: admin@whatupfresno.com)"
-MAX_SOURCES_PER_RUN = "8"
-MAX_ENRICH_PER_RUN = "25"
+MAX_SOURCES_PER_RUN = "12"
+MAX_ENRICH_PER_RUN = "50"
 MAX_PAGES_PER_SEED = "30"
 MAX_CRAWL_DEPTH = "3"
 

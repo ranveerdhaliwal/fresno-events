@@ -1,8 +1,17 @@
-import type { NormalizedEvent } from "@fresno-events/shared";
+import type { EventCategory, NormalizedEvent } from "@fresno-events/shared";
 import { load } from "cheerio";
+
+import type { AiDiscoveryItem } from "@/ai";
 
 const BBQ_ENDPOINT = "https://xapi.citylightstudio.net/_bbq/_bbq_results.php";
 const EVENT_BASE = "https://www.downtownfresno.org";
+
+/** CityLight BBQ widget — public site token (Downtown Fresno org, fid 22). */
+export const DOWNTOWN_FRESNO_FID = "22";
+export const DOWNTOWN_FRESNO_BBQ_KEY = "050243126";
+
+export const DOWNTOWN_DETAIL_URL_CAP = 40;
+export const DOWNTOWN_DETAIL_DELAY_MS = 1_000;
 
 export function fmtBbqWindowDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -23,12 +32,67 @@ export function buildDowntownWindows(now: Date, windowDays = 14, horizonDays = 9
   return windows;
 }
 
-export function buildDowntownFresnoUrl(opts: { apiKey: string; bbqparam: string }): string {
+export function buildDowntownFresnoUrl(bbqparam: string): string {
   const url = new URL(BBQ_ENDPOINT);
-  url.searchParams.set("fid", "22");
-  url.searchParams.set("key", opts.apiKey);
-  url.searchParams.set("bbqparam", opts.bbqparam);
+  url.searchParams.set("fid", DOWNTOWN_FRESNO_FID);
+  url.searchParams.set("key", DOWNTOWN_FRESNO_BBQ_KEY);
+  url.searchParams.set("bbqparam", bbqparam);
   return url.toString();
+}
+
+const ALLOWED_CATEGORIES = new Set<EventCategory>([
+  "music",
+  "comedy",
+  "theater",
+  "sports",
+  "food_drink",
+  "festival",
+  "family",
+  "art",
+  "nightlife",
+  "community",
+  "outdoor",
+  "wellness",
+  "education"
+]);
+
+/** Prefer detail-page LLM fields; keep listing identity (sourceEventId, externalUrl). */
+export function mergeListingWithDetail(
+  listing: NormalizedEvent,
+  detail: AiDiscoveryItem | null
+): NormalizedEvent {
+  if (!detail?.title?.trim() || !detail.venueName?.trim() || !detail.startTs) {
+    return listing;
+  }
+
+  const start = new Date(detail.startTs);
+  if (Number.isNaN(start.getTime())) {
+    return listing;
+  }
+
+  const category: EventCategory =
+    detail.category && ALLOWED_CATEGORIES.has(detail.category as EventCategory)
+      ? (detail.category as EventCategory)
+      : (listing.category ?? "community");
+
+  return {
+    ...listing,
+    title: detail.title.trim(),
+    venueName: detail.venueName.trim(),
+    startTs: start.toISOString(),
+    category,
+    ...(detail.descriptionText?.trim()
+      ? { descriptionText: detail.descriptionText.trim() }
+      : {}),
+    ...(detail.venueAddress?.trim() ? { venueAddress: detail.venueAddress.trim() } : {}),
+    ...(detail.venueCity?.trim() ? { venueCity: detail.venueCity.trim() } : {}),
+    ...(detail.ticketUrl?.trim() ? { ticketUrl: detail.ticketUrl.trim() } : {}),
+    ...(detail.imageUrl?.trim() ? { imageUrl: detail.imageUrl.trim() } : {}),
+    ...(typeof detail.priceMin === "number" ? { priceMin: detail.priceMin } : {}),
+    ...(typeof detail.priceMax === "number" ? { priceMax: detail.priceMax } : {}),
+    ...(listing.externalUrl ? { externalUrl: listing.externalUrl } : {}),
+    ...(!listing.externalUrl && detail.externalUrl ? { externalUrl: detail.externalUrl } : {})
+  };
 }
 
 interface ParsedRow {

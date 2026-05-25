@@ -1,5 +1,5 @@
 import type { IngestEnv } from "@/env";
-import { fetchLastRunStartedAt } from "@/ingest-runs";
+import { fetchIngestRunStatsBySource, fetchLastRunStartedAt } from "@/ingest-runs";
 import { getJsonPromptBackend } from "@/llm/registry";
 import { findScraper, scrapers, type RegisteredScraper } from "@/registry";
 import { getSupabaseConfig, type SupabaseConfig } from "@/sources";
@@ -69,12 +69,14 @@ function planOne(env: IngestEnv, key: string): PlanItem | null {
 
 async function planCronBatch(env: IngestEnv, supabase: SupabaseConfig | null, force: boolean): Promise<PlanItem[]> {
   const plans: PlanItem[] = [];
+  const skipped: Array<{ key: string; reason: string }> = [];
 
   for (const scraper of scrapers) {
-    if (!force && !scraper.enabledByDefault) {
+    if (!force && scraper.schedule === "manual-only") {
       continue;
     }
     if (!canRunScraper(env, scraper)) {
+      skipped.push({ key: scraper.key, reason: "missing_secrets_or_provider" });
       continue;
     }
     if (!force && supabase) {
@@ -87,7 +89,28 @@ async function planCronBatch(env: IngestEnv, supabase: SupabaseConfig | null, fo
     plans.push({ key: scraper.key, config: scraper.defaultConfig ?? {} });
   }
 
+  if (skipped.length > 0) {
+    console.log(JSON.stringify({ event: "ingest_plan_skipped", skipped }));
+  }
+
   return plans;
+}
+
+/** Oldest last-run first so MAX_SOURCES_PER_RUN does not starve infrequent sources. */
+export async function sortPlanByStalest(
+  plans: PlanItem[],
+  supabase: SupabaseConfig | null
+): Promise<PlanItem[]> {
+  if (!supabase || plans.length <= 1) {
+    return plans;
+  }
+
+  const stats = await fetchIngestRunStatsBySource(supabase);
+  return [...plans].sort((a, b) => {
+    const aMs = stats.get(a.key)?.lastRunAt ? new Date(stats.get(a.key)!.lastRunAt!).getTime() : 0;
+    const bMs = stats.get(b.key)?.lastRunAt ? new Date(stats.get(b.key)!.lastRunAt!).getTime() : 0;
+    return aMs - bMs;
+  });
 }
 
 async function isDue(supabase: SupabaseConfig, scraper: RegisteredScraper): Promise<boolean> {
@@ -115,13 +138,32 @@ export function canRunScraper(env: IngestEnv, scraper: RegisteredScraper): boole
   return true;
 }
 
-export function listRunnableSources(env: IngestEnv) {
-  return scrapers.map((scraper) => ({
-    key: scraper.key,
-    label: scraper.label,
-    enabledByDefault: scraper.enabledByDefault,
-    defaultCadenceMinutes: scraper.defaultCadenceMinutes,
-    runnable: canRunScraper(env, scraper),
-    requiredSecrets: scraper.requiredSecrets ?? []
-  }));
+export interface RunnableSourceInfo {
+  key: string;
+  label: string;
+  schedule: RegisteredScraper["schedule"];
+  defaultCadenceMinutes: number;
+  runnable: boolean;
+  requiredSecrets: string[];
+  lastRunAt: string | null;
+  lastEventsFound: number | null;
+}
+
+export async function listRunnableSources(env: IngestEnv): Promise<RunnableSourceInfo[]> {
+  const supabase = getSupabaseConfig(env);
+  const stats = supabase ? await fetchIngestRunStatsBySource(supabase) : new Map();
+
+  return scrapers.map((scraper) => {
+    const runStats = stats.get(scraper.key);
+    return {
+      key: scraper.key,
+      label: scraper.label,
+      schedule: scraper.schedule,
+      defaultCadenceMinutes: scraper.defaultCadenceMinutes,
+      runnable: canRunScraper(env, scraper),
+      requiredSecrets: [...(scraper.requiredSecrets ?? [])],
+      lastRunAt: runStats?.lastRunAt ?? null,
+      lastEventsFound: runStats?.lastEventsFound ?? null
+    };
+  });
 }

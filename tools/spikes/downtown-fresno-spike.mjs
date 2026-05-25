@@ -15,7 +15,7 @@ async function main() {
 
   const url = new URL("https://xapi.citylightstudio.net/_bbq/_bbq_results.php");
   url.searchParams.set("fid", "22");
-  url.searchParams.set("key", "056233126");
+  url.searchParams.set("key", "050243126");
   url.searchParams.set("bbqparam", window);
 
   const res = await fetch(url, {

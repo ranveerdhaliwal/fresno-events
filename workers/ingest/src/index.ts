@@ -25,7 +25,7 @@ export default {
           service: "fresno-events-ingest",
           environment: env.APP_ENV ?? "unknown",
           time: new Date().toISOString(),
-          registered_sources: listRunnableSources(env)
+          registered_sources: await listRunnableSources(env)
         }
       });
     }
