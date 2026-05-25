@@ -1,0 +1,21 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" font-family="&#39;Alfa Slab One&#39;, serif">
+  <defs>
+    
+  </defs>
+
+  
+  <g transform="rotate(-4 70 32)">
+    <rect x="-20" y="22" width="178" height="38" fill="#1A1A1A" opacity="0.18"></rect>
+    <rect x="-20" y="14" width="178" height="38" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.5"></rect>
+    <text x="6" y="44" font-family="&#39;Yellowtail&#39;, cursive" font-size="34" fill="#1A1A1A">what up</text>
+  </g>
+
+  
+  <g transform="translate(150,62)">
+    <text x="4" y="4" font-size="56" fill="#1A1A1A" letter-spacing="1.5">FRESNO</text>
+    <text x="0" y="0" font-size="56" fill="#F4E8D0" stroke="#F4E8D0" stroke-width="4" stroke-linejoin="round" letter-spacing="1.5">FRESNO</text>
+    <text x="0" y="0" font-size="56" fill="#D94F3D" letter-spacing="1.5">FRESNO</text>
+    <text x="0" y="0" font-size="56" fill="none" stroke="#1A1A1A" stroke-width="1.1" letter-spacing="1.5">FRESNO</text>
+  </g>
+</svg>

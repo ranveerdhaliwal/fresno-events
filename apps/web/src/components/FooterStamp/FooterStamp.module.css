@@ -1,0 +1,31 @@
+.stamp {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1.5px dashed rgba(26, 26, 26, 0.25);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.id {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 2px;
+  opacity: 0.5;
+}
+
+.greeting {
+  font-family: var(--font-script);
+  font-size: 28px;
+  color: var(--coral);
+  transform: rotate(-3deg);
+}
+
+@media (max-width: 600px) {
+  .stamp {
+    flex-direction: column;
+    text-align: center;
+  }
+}

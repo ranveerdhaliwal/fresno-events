@@ -1,0 +1,58 @@
+.head {
+  background: var(--ink);
+  color: var(--mustard);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.head h2 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  margin: 0;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+
+.script {
+  font-family: var(--font-script);
+  font-size: 18px;
+  color: var(--cream);
+  margin-right: 6px;
+  transform: rotate(-3deg);
+  display: inline-block;
+  text-transform: none;
+}
+
+.count,
+.num {
+  margin-left: auto;
+  background: var(--coral);
+  color: var(--paper);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-family: var(--font-display);
+  font-size: 11px;
+}
+
+.live {
+  background: var(--coral);
+  color: var(--paper);
+}
+
+.live .count {
+  background: var(--ink);
+  color: var(--mustard);
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  background: var(--mustard);
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  animation: livepulse 1.4s ease-in-out infinite;
+}

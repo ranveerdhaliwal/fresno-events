@@ -1,0 +1,18 @@
+.stripe {
+  height: var(--rainbow-stripe-height);
+  background: var(--rainbow-stripe);
+}
+
+.mobile {
+  height: var(--rainbow-stripe-height-mobile);
+  background: var(--rainbow-stripe-mobile);
+  position: sticky;
+  top: var(--nav-height-mobile);
+  z-index: 15;
+}
+
+@media (min-width: 601px) {
+  .mobile {
+    display: none;
+  }
+}

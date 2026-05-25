@@ -1,0 +1,21 @@
+.strip {
+  display: none;
+  background: var(--linen);
+  border-bottom: var(--border-thin);
+  padding: 10px 16px;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.strip a {
+  color: var(--coral);
+  text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .strip {
+    display: flex;
+  }
+}

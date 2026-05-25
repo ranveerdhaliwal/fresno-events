@@ -1,0 +1,34 @@
+import { Link } from "@tanstack/react-router";
+
+import { PageChrome } from "@/components/PageChrome";
+
+import styles from "./PlaceholderPage.module.css";
+
+export interface PlaceholderPageProps {
+  eyebrow: string;
+  title: string;
+  description: string;
+  actions?: string[];
+}
+
+export function PlaceholderPage({ eyebrow, title, description, actions = [] }: PlaceholderPageProps) {
+  return (
+    <PageChrome>
+    <section className={styles.card} data-testid="placeholder-page">
+      <p className={styles.eyebrow}>{eyebrow}</p>
+      <h1>{title}</h1>
+      <p className={styles.desc}>{description}</p>
+      {actions.length > 0 ? (
+        <div className={styles.actions}>
+          {actions.map((action) => (
+            <span key={action}>{action}</span>
+          ))}
+        </div>
+      ) : null}
+      <Link to="/" className={styles.home}>
+        ← Back to events
+      </Link>
+    </section>
+    </PageChrome>
+  );
+}

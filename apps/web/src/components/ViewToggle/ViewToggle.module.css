@@ -1,0 +1,25 @@
+.toggle {
+  display: flex;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+.toggle button {
+  background: var(--paper);
+  border: 0;
+  padding: 6px 14px;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  letter-spacing: 2px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.active {
+  background: var(--ink);
+  color: var(--mustard);
+}

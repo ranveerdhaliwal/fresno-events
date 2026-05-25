@@ -1,0 +1,37 @@
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--ink);
+  color: var(--mustard);
+  border: 2px solid var(--ink);
+  padding: 14px 18px;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  letter-spacing: 2.5px;
+  box-shadow: var(--shadow-coral-lg);
+  text-decoration: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  width: 100%;
+}
+
+.row:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-coral-hover);
+}
+
+.sub {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: rgba(244, 232, 208, 0.7);
+  text-transform: uppercase;
+}
+
+.arrow {
+  font-family: var(--font-body);
+  font-size: 18px;
+  font-weight: 700;
+}
