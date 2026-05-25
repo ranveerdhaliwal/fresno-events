@@ -1,0 +1,33 @@
+// @vitest-environment node
+import { describe, expect, it } from "vitest";
+
+import { getMockEventList } from "@/services/events.mock";
+
+import { deriveTagline, formatPrice, toEventRowViewModel, toPopularViewModels } from "./event-view-model";
+
+describe("event-view-model", () => {
+  const first = getMockEventList()[0]!;
+
+  it("formats free price", () => {
+    expect(formatPrice({ ...first.event, isFree: true, priceMin: 0, priceMax: 0 })).toBe("Free");
+  });
+
+  it("derives tagline from description", () => {
+    const tagline = deriveTagline(first.event);
+    expect(tagline.length).toBeGreaterThan(0);
+    expect(tagline.length).toBeLessThanOrEqual(80);
+  });
+
+  it("maps row view model with priority", () => {
+    const row = toEventRowViewModel(first);
+    expect(row.slug).toBe(first.event.slug);
+    expect(row.priority).toBe(first.event.priority);
+    expect(row.priceLabel).toBeTruthy();
+  });
+
+  it("ranks popular events by priority", () => {
+    const popular = toPopularViewModels(getMockEventList());
+    expect(popular[0]?.rank).toBe(1);
+    expect(popular.length).toBeLessThanOrEqual(5);
+  });
+});

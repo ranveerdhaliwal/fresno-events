@@ -19,8 +19,8 @@ export default defineConfig({
         name: "What Up Fresno",
         short_name: "What Up Fresno",
         description: "Discover concerts, festivals, food, art, sports, and community events across Fresno and the Central Valley.",
-        theme_color: "#25160f",
-        background_color: "#120f0c",
+        theme_color: "#1A1A1A",
+        background_color: "#F4E8D0",
         display: "standalone",
         start_url: "/",
         icons: []
