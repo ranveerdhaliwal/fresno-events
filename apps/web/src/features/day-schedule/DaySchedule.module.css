@@ -1,0 +1,47 @@
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.detailCol {
+  position: sticky;
+  top: 14px;
+}
+
+.section {
+  margin-bottom: 28px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rowWrap {
+  display: contents;
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--teal);
+  font-weight: 500;
+  padding: 8px 0 16px;
+}
+
+.loading {
+  color: var(--teal);
+  font-weight: 600;
+}
+
+@media (max-width: 1080px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .detailCol {
+    display: none;
+  }
+}

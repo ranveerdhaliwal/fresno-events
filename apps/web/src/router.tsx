@@ -1,27 +1,35 @@
-import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router";
 
-import { AppShell } from "@/components/app-shell";
-import { PlaceholderPage } from "@/components/placeholder-page";
-import { AdminPage } from "@/features/admin/admin-page";
-import { CalendarPage } from "@/features/events/calendar-page";
-import { EventDetailPage } from "@/features/events/event-detail-page";
-import { TodayPage } from "@/features/events/today-page";
+import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { AdminPage } from "@/pages/AdminPage";
+import { DayPage } from "@/pages/DayPage";
+import { EventDetailPage } from "@/pages/EventDetailPage";
+import { HomePage } from "@/pages/HomePage";
 import { queryClient } from "@/lib/query-client";
+import { toIsoDateLocal } from "@/lib/event-time";
 
 const rootRoute = createRootRoute({
-  component: AppShell
+  component: () => <Outlet />
 });
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: TodayPage
+  component: HomePage
 });
 
 const calendarRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/calendar",
-  component: CalendarPage
+  beforeLoad: () => {
+    throw redirect({ to: "/day/$date", params: { date: toIsoDateLocal(new Date()) } });
+  }
+});
+
+const dayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/day/$date",
+  component: DayPage
 });
 
 const exploreRoute = createRoute({
@@ -51,13 +59,8 @@ const mapRoute = createRoute({
 const eventRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/event/$slug",
-  component: EventRoute
+  component: EventDetailPage
 });
-
-function EventRoute() {
-  const { slug } = eventRoute.useParams();
-  return <EventDetailPage slug={slug} />;
-}
 
 const venueRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -114,7 +117,7 @@ const settingsRoute = createRoute({
     <PlaceholderPage
       eyebrow="Settings"
       title="Notifications, digest, and appearance."
-      description="Users will manage category, venue, artist, weekly digest, and light/dark/system preferences here."
+      description="Users will manage category, venue, artist, weekly digest, and notification preferences here."
     />
   )
 });
@@ -128,6 +131,7 @@ const adminRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   calendarRoute,
+  dayRoute,
   exploreRoute,
   mapRoute,
   eventRoute,

@@ -1,0 +1,159 @@
+.section {
+  padding: 28px 32px;
+  border-bottom: 1px solid rgba(26, 26, 26, 0.12);
+}
+
+.loading {
+  padding: 48px 32px;
+  font-weight: 600;
+  color: var(--teal);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.header h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.script {
+  font-family: var(--font-script);
+  font-size: 30px;
+  color: var(--coral);
+  margin-right: -10px;
+  transform: rotate(-3deg);
+  display: inline-block;
+}
+
+.tabsDesktop {
+  display: flex;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+.tab,
+.tabActive {
+  background: transparent;
+  border: 0;
+  padding: 6px 18px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--ink);
+}
+
+.tabActive {
+  background: var(--ink);
+  color: var(--mustard);
+}
+
+.tabsMobile {
+  display: none;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.pill,
+.pillActive {
+  border: var(--border-card);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 2px;
+  background: var(--paper);
+}
+
+.pillActive {
+  background: var(--ink);
+  color: var(--mustard);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 24px;
+  align-items: start;
+}
+
+.grid {
+  display: grid;
+  gap: 18px;
+}
+
+.heroes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.smallRow {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  position: sticky;
+  top: 14px;
+}
+
+@media (max-width: 1080px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .side {
+    position: static;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+}
+
+@media (max-width: 720px) {
+  .heroes,
+  .smallRow {
+    grid-template-columns: 1fr;
+  }
+
+  .side {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .section {
+    padding: 20px 16px;
+  }
+
+  .tabsDesktop {
+    display: none;
+  }
+
+  .tabsMobile {
+    display: flex;
+  }
+
+  .side {
+    display: none;
+  }
+
+  .smallRow {
+    grid-template-columns: 1fr 1fr;
+  }
+}

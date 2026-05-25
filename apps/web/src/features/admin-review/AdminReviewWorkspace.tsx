@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, LogOut, RefreshCcw, ShieldAlert, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -12,30 +11,31 @@ import {
   getCandidate,
   listCandidates,
   rejectCandidate
-} from "./admin-api";
+} from "../admin/admin-api";
 
 import {
   ADMIN_EVENT_CATEGORIES,
   type AdminEventFormState
-} from "./admin-form.types";
-import { formStateToEventPatch, normalizedEventToFormState } from "./admin-form.utils";
+} from "../admin/admin-form.types";
+import { formStateToEventPatch, normalizedEventToFormState } from "../admin/admin-form.utils";
 import {
   clearPriorityOverride,
   effectivePriority,
   groupCandidatesByPriority,
   readPriorityOverrides,
   sortCandidatesForReview,
-  type PriorityGroup,
   writePriorityOverrides
-} from "./admin-priority.utils";
+} from "../admin/admin-priority.utils";
+
+import { CandidateList } from "./CandidateList";
+import styles from "./AdminReviewWorkspace.module.css";
 
 import {
   EVENT_DISPLAY_PRIORITY,
-  getEventDisplayPriorityLabel,
   type EventCandidate,
   type EventCategory
 } from "@fresno-events/shared";
-import { formatPacificDateTimeLabel, formatPacificRelative } from "@/lib/pacific-time";
+import { formatPacificDateTimeLabel } from "@/lib/pacific-time";
 
 const TOKEN_STORAGE_KEY = "wuf:admin_token";
 
@@ -52,7 +52,7 @@ const STATUS_FILTERS: Array<{ value: CandidateStatusFilter; label: string }> = [
   { value: "rejected", label: "Rejected" }
 ];
 
-export function AdminPage() {
+export function AdminReviewWorkspace() {
   const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [statusFilter, setStatusFilter] = useState<CandidateStatusFilter>("pending_review");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -184,12 +184,12 @@ function ReviewWorkspace({
   });
 
   return (
-    <div className="space-y-5 pb-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className={styles.workspace}>
+      <header className={styles.header}>
         <div>
-          <p className="text-xs uppercase tracking-[0.32em] text-amber-300/80">Admin</p>
-          <h1 className="mt-1 text-2xl font-semibold leading-tight md:text-3xl">Review queue</h1>
-          <p className="mt-1 max-w-xl text-sm text-neutral-300">
+          <p className={styles.eyebrow}>Admin</p>
+          <h1 className={styles.title}>Review queue</h1>
+          <p className={styles.subtitle}>
             Triage incoming candidates from the ingest worker. Edit the canonical fields, then approve to publish or
             reject with notes for the source owner.
           </p>
@@ -198,9 +198,7 @@ function ReviewWorkspace({
           <select
             value={statusFilter}
             onChange={(event) => onStatusFilterChange(event.target.value as CandidateStatusFilter)}
-            className={cn(
-              "h-9 cursor-pointer rounded-full border border-neutral-700 bg-neutral-900 px-4 text-sm focus:border-amber-300 focus:outline-none"
-            )}
+            className={styles.select}
           >
             {STATUS_FILTERS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -320,7 +318,7 @@ function ReviewWorkspace({
           />
         </div>
 
-        <section className={cn("rounded-3xl border border-neutral-800 bg-neutral-950/40 p-5", stickyDetailPane)}>
+        <section className={cn(styles.detailPane, stickyDetailPane)}>
           {!activeId ? (
             <EmptyDetail statusFilter={statusFilter} />
           ) : candidateQuery.isLoading ? (
@@ -338,130 +336,6 @@ function ReviewWorkspace({
           ) : null}
         </section>
       </div>
-    </div>
-  );
-}
-
-function CandidateList({
-  groups,
-  activeId,
-  isLoading,
-  statusFilter,
-  onSelect,
-  selectedIds,
-  priorityOverrides,
-  onToggleSelected,
-  onSelectAll
-}: {
-  groups: PriorityGroup[];
-  activeId: string | null;
-  isLoading: boolean;
-  statusFilter: CandidateStatusFilter;
-  onSelect: (id: string) => void;
-  selectedIds: Set<string>;
-  priorityOverrides: Record<string, number>;
-  onToggleSelected: (id: string) => void;
-  onSelectAll: () => void;
-}) {
-  const items = groups.flatMap((group) => group.items);
-  if (isLoading) {
-    return (
-      <div className="rounded-3xl border border-neutral-800 bg-neutral-950/40 p-5 text-sm text-neutral-400">
-        <Loader2 className="size-4 animate-spin" /> Loading candidates...
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="rounded-3xl border border-dashed border-neutral-800 bg-neutral-950/30 p-6 text-sm text-neutral-400">
-        No candidates with status <span className="font-medium text-neutral-200">{statusFilter}</span>.
-      </div>
-    );
-  }
-
-  const allSelected = items.length > 0 && selectedIds.size === items.length;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between rounded-2xl border border-neutral-800 bg-neutral-950/40 px-3 py-2">
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={onSelectAll}
-            className="size-3.5 cursor-pointer rounded border-neutral-600"
-          />
-          Select all on page
-        </label>
-        <span className="text-xs text-neutral-500">{items.length} rows</span>
-      </div>
-      <ul className="space-y-4">
-        {groups.map((group) => (
-          <li key={group.priority}>
-            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-500">
-              Priority {group.priority} · {getEventDisplayPriorityLabel(group.priority)}
-            </p>
-            <ul className="space-y-2">
-              {group.items.map((candidate) => {
-                const isActive = candidate.id === activeId;
-                const isChecked = selectedIds.has(candidate.id);
-                const priority = effectivePriority(candidate, priorityOverrides);
-                const aiSuggested =
-                  candidate.suggestedPriority !== undefined &&
-                  priorityOverrides[candidate.id] === undefined;
-                return (
-                  <li key={candidate.id}>
-                    <div
-                      className={cn(
-                        "flex gap-2 rounded-2xl border p-2 transition",
-                        isActive
-                          ? "border-amber-300/70 bg-amber-300/10"
-                          : "border-neutral-800 bg-neutral-900/40 hover:border-neutral-600"
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => onToggleSelected(candidate.id)}
-                        className="mt-2 size-3.5 shrink-0 cursor-pointer rounded border-neutral-600"
-                        aria-label={`Select ${candidate.title}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => onSelect(candidate.id)}
-                        className={cn("min-w-0 flex-1 px-1 py-1 text-left", btnClickable)}
-                      >
-                        <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-[0.2em] text-neutral-400">
-                          <span className="flex items-center gap-1.5">
-                            <span
-                              className={cn(
-                                "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold",
-                                priority <= 1
-                                  ? "border-amber-400/50 text-amber-200"
-                                  : "border-neutral-600 text-neutral-400"
-                              )}
-                              title={aiSuggested ? "AI suggested" : undefined}
-                            >
-                              P{priority}
-                            </span>
-                            <span className="truncate">{candidate.source}</span>
-                          </span>
-                          <span className="shrink-0">{formatPacificRelative(candidate.startTs)}</span>
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-sm font-medium text-neutral-100">{candidate.title}</p>
-                        <p className="mt-1 line-clamp-1 text-xs text-neutral-400">
-                          {candidate.venueName} · score {(candidate.confidenceScore * 100).toFixed(0)}%
-                        </p>
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
@@ -776,12 +650,7 @@ function TokenGate({ onAuthenticate }: { onAuthenticate: (token: string) => void
   const [value, setValue] = useState("");
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="mx-auto max-w-md space-y-5 rounded-3xl border border-neutral-800 bg-neutral-950/60 p-7"
-    >
+    <div className={styles.tokenGate}>
       <div className="flex items-center gap-3">
         <div className="grid size-10 place-items-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-amber-300">
           <KeyRound className="size-4" />
@@ -822,7 +691,7 @@ function TokenGate({ onAuthenticate }: { onAuthenticate: (token: string) => void
           Connect to review API
         </button>
       </form>
-    </motion.div>
+    </div>
   );
 }
 
@@ -873,8 +742,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const inputClass =
-  "w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:border-amber-300 focus:outline-none";
+const inputClass = styles.input;
 
 function readStoredToken(): string | null {
   try {
