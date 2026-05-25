@@ -1,14 +1,18 @@
 # Supabase
 
-Schema: `migrations/`. Seed data: `seed.sql`.
+Schema: `migrations/`. Seed data: `seed.sql` (runs only on **`pnpm db:reset`**, not on `db:migrate`).
+
+## Daily commands
 
 ```bash
-pnpm db:start
-pnpm db:reset      # migrations + seed
-pnpm db:seed:local # re-apply seed only
-pnpm db:seed       # cloud linked project
-supabase db push   # apply migrations to linked cloud dev
+pnpm db:start          # after reboot — start Docker stack (data usually persists)
+pnpm db:migrate:local  # new migration files only — keeps event_candidates, etc.
+pnpm db:migrations     # what’s applied locally vs linked cloud
+pnpm db:reset          # wipe + all migrations + seed (destructive)
+pnpm db:seed:local     # re-run seed.sql without reset
 ```
+
+Cloud dev: `pnpm db:migrate:cloud-dev` or Supabase MCP — see [docs/DATABASE_ACCESS.md](../docs/DATABASE_ACCESS.md).
 
 Tables: `events`, `event_candidates`, `venues`, `images`, `ingest_runs`, `seed_urls`.
 
