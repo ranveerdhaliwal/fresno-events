@@ -21,7 +21,7 @@ Cron is the same script on a schedule. When you merge ingest changes to `main`, 
 | Run orchestration | [`workers/ingest/src/runner.ts`](../workers/ingest/src/runner.ts) |
 | Manual script | `pnpm ingest:run` → [`scripts/ingest-run.sh`](../scripts/ingest-run.sh) |
 
-There is **no** `event_sources` table. Which sources run on cron is controlled by `enabledByDefault` in the registry. Cadence uses the latest row in `ingest_runs` per source.
+There is **no** `event_sources` table. Each scraper in the registry has `schedule` (`cron` | `manual-only`) and `defaultCadenceMinutes`. Cron runs all `schedule: cron` sources that are **due** (last run in `ingest_runs` + cadence) and **runnable** (required secrets present). `GET /health` on the ingest worker lists `lastRunAt` per source.
 
 ---
 
@@ -54,7 +54,7 @@ pnpm ingest:run --source=ticketmaster,ai-discovery --force
 # Every source that has API keys / AI configured
 pnpm ingest:run --all --force
 
-# Cron-style: only defaults that are due (today: mainly ticketmaster)
+# Cron-style: schedule=cron sources that are due (visit, milb, downtown, ai-crawl, …)
 pnpm ingest:run
 ```
 
@@ -72,19 +72,27 @@ Check raw rows: Supabase Studio http://127.0.0.1:54323 → `event_candidates`, `
 
 ## Sources at a glance
 
-| Key | How it fetches | Needs in `.dev.vars` | On daily cron by default? |
-| --- | --- | --- | --- |
-| `ticketmaster` | Official API | `TICKETMASTER_API_KEY` | Yes |
-| `eventbrite` | Official API | `EVENTBRITE_API_KEY` | No — run manually when you add a key |
-| `seatgeek` | Official API | `SEATGEEK_CLIENT_ID`, `SEATGEEK_CLIENT_SECRET` | No |
-| `bandsintown` | Official API | `BANDSINTOWN_APP_ID` | No |
-| `ai-discovery` | Fetch venue HTML + LLM | `GEMINI_API_KEY` (local) or Workers AI (deployed) | No — legacy; use `ai-crawl` when ready |
-| `ai-crawl` | Browser Rendering `/crawl` + markdown LLM | `CLOUDFLARE_*`, `GEMINI_API_KEY` | No — see [AI_CRAWLER.md](AI_CRAWLER.md) |
+| Key | How it fetches | Needs in `.dev.vars` | Cron schedule | Cadence (typical) |
+| --- | --- | --- | --- | --- |
+| `ticketmaster` | Official API | `TICKETMASTER_API_KEY` | cron | 6h |
+| `visit-fresno-api` | CMS REST | `VISIT_FRESNO_API_TOKEN` | cron | 6h |
+| `milb-api` | statsapi | — | cron | 12h |
+| `downtown-fresno-api` | CityLight BBQ HTML + BR detail `/do/*` | `CLOUDFLARE_*` + LLM for details (BBQ key in code) | cron | 7d |
+| `seed-special-url` | Custom HTML parsers | — | cron | 12h |
+| `ai-crawl` | Browser Rendering `/crawl` + LLM | `CLOUDFLARE_*`, LLM | cron | 24h — [AI_CRAWLER.md](AI_CRAWLER.md) |
+| `eventbrite` | Official API | `EVENTBRITE_API_KEY` | manual-only | — |
+| `seatgeek` | Official API | `SEATGEEK_*` | manual-only | — |
+| `bandsintown` | Official API | `BANDSINTOWN_APP_ID` | manual-only | — |
+| `ai-discovery` | Fetch HTML + LLM (legacy) | LLM | manual-only | — |
+
+`pnpm ingest:run --all --force` runs every **runnable** source, including `manual-only` (ignores `schedule`). Plain `pnpm ingest:run` uses cron rules only.
 
 To add a crawl seed: `INSERT` into `seed_urls` (or Studio).  
 To add a new API source: add a file under `scrapers/` and register it in `registry.ts`.
 
 **Event priority (0–5)** is editorial: set at admin approve time on published `events`, default `5`. Not assigned during ingest.
+
+**Re-scrape behavior:** `event_candidates.content_fingerprint` detects content changes. Unchanged rows keep their review status. Approved rows that changed go to `needs_changes`. Linked published `events` always get `last_seen_at` updated; title/start/description patch when content changed.
 
 ---
 
@@ -92,7 +100,7 @@ To add a new API source: add a file under `scrapers/` and register it in `regist
 
 Not built yet, but the intended model:
 
-- **Daily job** — near-term events only (e.g. next 1–3 months); uses `enabledByDefault` sources.
+- **Daily job** — near-term events only (e.g. next 1–3 months); uses `schedule: cron` sources when due.
 - **Weekly job** — far-future sweep (e.g. 3–24 months); separate schedule or `--sources` list once implemented in scrapers.
 
 Improvements (better errors, date filters, per-site tuning) ship in ingest code; deploy to dev worker, then prod when ready. No database migration required for URL lists.

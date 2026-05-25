@@ -59,11 +59,29 @@ If MCP returns `Unauthorized`, open **Cursor Settings → MCP**, re-authenticate
 
 `pnpm db:start` runs the full local stack in Docker (Postgres, Studio, Kong, Auth, etc.). Requires Docker running.
 
+### After reboot or when Docker was stopped
+
+You do **not** need `pnpm db:reset` when you come back — that would wipe data.
+
+| Situation | What to run |
+| --- | --- |
+| Computer slept / Docker Desktop stopped | `pnpm db:start` (containers were stopped; **data volumes usually still there**) |
+| First time on this machine | `pnpm db:start`, then `pnpm db:reset` or `pnpm db:migrate` |
+| New migration file in repo | `pnpm db:migrate` or `pnpm db:migrate:local` (keeps rows) |
+| Want empty DB + demo seed | `pnpm db:reset` (destructive) |
+
+`pnpm db:stop` stops containers without deleting volumes. `pnpm db:reset` drops the database, reapplies **all** migrations, and runs `seed.sql`.
+
+### Commands
+
 ```bash
-pnpm db:start    # start containers
-pnpm db:reset    # migrations + seed
-pnpm db:status   # local API URL + service_role for .dev.vars
-pnpm db:stop     # stop containers
+pnpm db:start       # start containers (run when Docker is up but stack is down)
+pnpm db:stop        # stop containers (data kept in Docker volumes)
+pnpm db:status      # URLs + service_role for .dev.vars
+pnpm db:migrate     # pending migrations only — uses DEV_TARGET from dev-target.env
+pnpm db:migrate:local
+pnpm db:migrations  # list applied vs supabase/migrations/
+pnpm db:reset       # wipe DB + all migrations + seed (destructive)
 ```
 
 | Service | URL / connection |
@@ -121,10 +139,26 @@ Local Postgres URI is fixed in the script: `postgresql://postgres:postgres@127.0
 
 ## Migrations
 
-| Target | Command |
-| --- | --- |
-| Local | `pnpm db:reset` |
-| Cloud dev | `supabase db push` (linked) or MCP `apply_migration` with approval |
-| Prod | Manual, dev-first — see [LAUNCH_PLAN.md](LAUNCH_PLAN.md) |
-
 Source of truth: `supabase/migrations/*.sql`.
+
+| Goal | Local | Cloud dev |
+| --- | --- | --- |
+| **Apply new migration, keep data** | `pnpm db:migrate:local` (or `pnpm env:local` then `pnpm db:migrate`) | `pnpm db:migrate:cloud-dev` or Supabase MCP `apply_migration` (with approval) |
+| **See what’s applied** | `pnpm db:migrations` or `pnpm db:migrations local` | `pnpm db:migrations cloud-dev` |
+| **Fresh DB + seed** | `pnpm db:reset` only | Do not reset cloud dev casually — use MCP/SQL cleanup per [ingest rules](../.cursor/rules/ingest-operations.mdc) |
+
+`pnpm db:migrate` reads **`DEV_TARGET`** from `dev-target.env`:
+
+- `DEV_TARGET=local` → `supabase migration up --local`
+- `DEV_TARGET=cloud-dev` → `supabase migration up --linked` (requires `supabase link` to dev project)
+- **cloud-prod** is blocked by the script
+
+**Typical workflow**
+
+1. Pull repo with new `supabase/migrations/*.sql`
+2. `pnpm db:start` if local stack is down
+3. `pnpm env:local` && `pnpm db:migrate:local`
+4. Re-run ingest / check Studio
+5. Cloud dev: agent applies same migration via MCP (or you run `pnpm db:migrate:cloud-dev` if CLI is linked)
+
+MCP `list_migrations` compares remote history to the repo; use it before `apply_migration` on cloud dev.

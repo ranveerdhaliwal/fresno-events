@@ -953,7 +953,7 @@ The team submitted a top-to-bottom build guide (sections 0–10). **Verdict: ado
 | `ScraperRun` from `../types` | Use **`@fresno-events/shared`** | Fix import |
 | `BrCrawlRecord.status`: `failed` | CF API uses **`errored`** / **`disallowed`** / **`skipped`** | Match types to §4b spike JSON |
 | `pnpm ingest:run` | Run from **repo root** via [`scripts/ingest-run.sh`](../scripts/ingest-run.sh) | Not only `cd workers/ingest` |
-| Cloud project name | [`DEPLOY.md`](DEPLOY.md) uses `what-up-fresno-dev` | Standardize naming |
+| Cloud project name | Docs use `what-up-fresno-dev` ([LAUNCH_PLAN](LAUNCH_PLAN.md)) | Standardize naming |
 
 ### Dry-run policy — DECIDED
 

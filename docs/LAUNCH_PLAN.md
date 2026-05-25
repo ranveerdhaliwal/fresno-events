@@ -1,6 +1,6 @@
 # What Up Fresno — setup and build plan
 
-**One doc for what you do by hand.** Cloud production deploy details used to live in [DEPLOY.md](DEPLOY.md); that file is now a short redirect. Technical design for the new ingest pipeline is in [INGESTION_OVERHAUL_PLAN.md](INGESTION_OVERHAUL_PLAN.md).
+**One doc for what you do by hand.** Cloud production deploy (API, Pages, bootstrap SPA, promotion) is in **[PROD_DEPLOYMENT_PLAN.md](PROD_DEPLOYMENT_PLAN.md)** — Phase 5 below links there. Ingest pipeline design is in [INGESTION_OVERHAUL_PLAN.md](INGESTION_OVERHAUL_PLAN.md).
 
 ---
 
@@ -23,7 +23,7 @@ flowchart LR
 | **2 — Next** | Agent | Part 1 priority + Part 2 `ai-crawl` (see [INGESTION_OVERHAUL_PLAN.md](INGESTION_OVERHAUL_PLAN.md)) |
 | **3 — Then** | You | Dry-run → real ingest → `event_candidates` in **dev DB** |
 | **4 — Then** | You + agent | `/admin` approve → Today page with real events |
-| **5 — Later** | You | Cloud Workers/Pages prod (not needed for UI work) |
+| **5 — Later** | You | Cloud Workers/Pages prod — see [PROD_DEPLOYMENT_PLAN.md](PROD_DEPLOYMENT_PLAN.md) (not needed for UI work) |
 
 **Prod ingest is off by design.** Scraping runs local or cloud-dev only. Prod website/API is a later step.
 
@@ -300,13 +300,15 @@ pnpm dev:web:cloud-dev
 
 ## Phase 5 — Later (not needed for UI)
 
-When local + cloud dev ingest and review feel good:
+When local + cloud dev ingest and review feel good, follow **[PROD_DEPLOYMENT_PLAN.md](PROD_DEPLOYMENT_PLAN.md)** (checklist + architecture). In short:
 
 - Deploy **dev** API + ingest Workers (`wrangler deploy --env dev`)
 - Deploy **prod** API + Pages only — **no prod ingest**
 - Promote events dev → prod (manual / future automation)
+- Web: static SPA on Pages; optional **home bootstrap JSON** for fast default `/` (filters/dates stay client + API — same SPA, no handoff)
+- Optional: `_headers` for asset caching; `api.whatupfresno.com` + `whatupfresno.com` DNS in Cloudflare dashboard
 
-Historical step-by-step for Cloudflare dashboard, R2, secrets parity, and prod DNS lived in the old DEPLOY.md. Ask to restore a slim **production checklist** when you reach this phase.
+Most Cloudflare/Supabase setup is already in place; use PROD_DEPLOYMENT_PLAN for what is left (prod API, Pages, promotion). Old deploy runbook text, if needed: `git log -- docs/DEPLOY.md` then `git show <commit>:docs/DEPLOY.md`.
 
 ---
 
@@ -332,6 +334,6 @@ Historical step-by-step for Cloudflare dashboard, R2, secrets parity, and prod D
 | [INGESTION_OVERHAUL_PLAN.md](INGESTION_OVERHAUL_PLAN.md) | Architecture, SQL, modules, validation gates, run modes (§5.4 / §5.4a), in-tree docs spec (§12) |
 | [INGEST.md](INGEST.md) | Short ingest operator notes |
 | [AI_DISCOVERY.md](AI_DISCOVERY.md) | Legacy `ai-discovery` (until `ai-crawl` replaces it) |
-| [DEPLOY.md](DEPLOY.md) | Redirect — prod/cloud deep dive deferred |
+| [PROD_DEPLOYMENT_PLAN.md](PROD_DEPLOYMENT_PLAN.md) | **Phase 5** — prod API, Pages, SPA bootstrap, promotion |
 | `<area>/README.md` | After Part 2 lands, each code area (apps/api, apps/web, workers/ingest, packages/shared, supabase, scripts) ships its own README per [INGESTION_OVERHAUL_PLAN.md §12](INGESTION_OVERHAUL_PLAN.md) |
 | [docs/PROMOTION.md](PROMOTION.md) | Future dev → prod event promotion (stub created in Part 2) |
