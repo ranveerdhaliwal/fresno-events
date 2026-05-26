@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
-# Real promote for ai-crawl (Browser Rendering venue seeds).
-#
-#   pnpm ingest:preflight-crawl   # optional — plans targets, no BR jobs
-#   pnpm ingest:promote-crawl
-#
-# Docs: https://developers.cloudflare.com/browser-run/quick-actions/crawl-endpoint/
-# Cancel in-flight job: DELETE .../browser-rendering/crawl/{job_id}
+# Deprecated: ai-crawl + seed_urls removed. Use venue-ingest.
 
 set -euo pipefail
 
@@ -15,16 +9,12 @@ EXTRA=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-enrich) EXTRA+=(--no-enrich) ;;
-    -h|--help)
-      echo "Usage: pnpm ingest:promote-crawl [--no-enrich]" >&2
-      exit 0
-      ;;
     *)
-      echo "Unknown argument: $1" >&2
-      exit 2
+      EXTRA+=("$1")
       ;;
   esac
   shift || true
 done
 
-bash "$REPO_ROOT/scripts/ingest-promote.sh" --source=ai-crawl "${EXTRA[@]}"
+echo "ingest:promote-crawl is deprecated — use pnpm ingest:promote-venues" >&2
+exec bash "$REPO_ROOT/scripts/ingest-promote-venues.sh" "${EXTRA[@]}"

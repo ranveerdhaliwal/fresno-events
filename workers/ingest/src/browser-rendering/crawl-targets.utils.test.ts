@@ -6,21 +6,12 @@ import {
   resolveCrawlTargets,
   shouldLogPoll
 } from "./crawl-targets.utils";
-import type { SeedUrlRow } from "@/seed-urls";
+import type { CrawlSeedInput } from "./crawl-targets.utils";
 
-function seedRow(overrides: Partial<SeedUrlRow> = {}): SeedUrlRow {
+function seedRow(overrides: Partial<CrawlSeedInput> = {}): CrawlSeedInput {
   return {
-    id: "id",
     url: "https://towertheatre.ticketsauce.com/",
-    label: "Tower",
-    enabled: true,
-    lane: "crawl",
     crawl_hints: {},
-    br_crawl_job_id: null,
-    br_crawl_status: null,
-    br_crawl_started_at: null,
-    last_successful_crawl_at: null,
-    events_found_last_run: null,
     ...overrides
   };
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { IngestEnv } from "@/env";
 import { canRunScraper, planIngestRuns } from "@/planner";
@@ -17,10 +17,10 @@ describe("planner", () => {
     const keys = planned.map((p) => p.key);
 
     expect(keys).toContain("ticketmaster");
-    expect(keys).toContain("visit-fresno-api");
-    expect(keys).toContain("milb-api");
+    expect(keys).toContain("venue-ingest");
     expect(keys).not.toContain("seatgeek");
     expect(keys).not.toContain("ai-discovery");
+    expect(keys).not.toContain("visit-fresno-api");
   });
 
   it("--all includes manual-only when runnable", async () => {
@@ -34,9 +34,18 @@ describe("planner", () => {
     expect(planned.map((p) => p.key)).toContain("seatgeek");
   });
 
-  it("downtown-fresno is always runnable without env key", () => {
-    const downtown = scrapers.find((s) => s.key === "downtown-fresno-api");
-    expect(downtown?.schedule).toBe("cron");
-    expect(canRunScraper({} as IngestEnv, downtown!)).toBe(true);
+  it("venue-ingest is cron when BR + visit token configured", () => {
+    const venueIngest = scrapers.find((s) => s.key === "venue-ingest");
+    expect(venueIngest?.schedule).toBe("cron");
+    expect(
+      canRunScraper(
+        {
+          CLOUDFLARE_ACCOUNT_ID: "acc",
+          CLOUDFLARE_API_TOKEN: "tok",
+          VISIT_FRESNO_API_TOKEN: "vf"
+        } as IngestEnv,
+        venueIngest!
+      )
+    ).toBe(true);
   });
 });

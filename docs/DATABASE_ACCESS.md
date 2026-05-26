@@ -6,7 +6,7 @@ How humans and Cursor agents should reach Postgres in this repo.
 | --- | --- | --- |
 | **Cloud dev** | Queries, cleanup, migrations on hosted dev data | Supabase MCP (OAuth) |
 | **Local Docker** | Ingest iteration before cloud, schema reset | `pnpm db:*` + Docker/`psql` |
-| **Workers** | Runtime API/ingest reads/writes | `.dev.vars` (`SUPABASE_URL` + `service_role`) — not MCP |
+| **Workers** | Runtime API/ingest reads/writes | Generated `.dev.vars` from `dev-target.env` (`pnpm env:<target>`) — not MCP |
 
 **Do not** point MCP or ingest at **prod** unless explicitly requested.
 
@@ -44,7 +44,7 @@ Example prompts: row counts per table, stale `event_candidates`, latest `ingest_
 
 | Credential | Used by | Purpose |
 | --- | --- | --- |
-| `service_role` in `apps/api/.dev.vars`, `workers/ingest/.dev.vars` | Wrangler at runtime | App reads/writes via Supabase REST |
+| `service_role` in `dev-target.env` → generated `.dev.vars` | Wrangler at runtime | App reads/writes via Supabase REST |
 | Supabase MCP OAuth | Cursor agent | Ad-hoc SQL, migrations, logs |
 
 `service_role` does **not** go in `mcp.json`. MCP does **not** replace `.dev.vars` for Workers.
@@ -77,7 +77,7 @@ You do **not** need `pnpm db:reset` when you come back — that would wipe data.
 ```bash
 pnpm db:start       # start containers (run when Docker is up but stack is down)
 pnpm db:stop        # stop containers (data kept in Docker volumes)
-pnpm db:status      # URLs + service_role for .dev.vars
+pnpm db:status      # URLs + service_role for dev-target.env
 pnpm db:migrate     # pending migrations only — uses DEV_TARGET from dev-target.env
 pnpm db:migrate:local
 pnpm db:migrations  # list applied vs supabase/migrations/
@@ -88,7 +88,7 @@ pnpm db:reset       # wipe DB + all migrations + seed (destructive)
 | --- | --- |
 | Postgres | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
 | REST API | `http://127.0.0.1:54321` → `SUPABASE_URL` in `.dev.vars` |
-| Studio | http://127.0.0.1:54323 |
+| Studio | http://127.0.0.1:54423 (see `supabase status`; was 54323 — often blocked on WSL/Windows) |
 | Inbucket | http://127.0.0.1:54324 |
 
 `project_id` in `supabase/config.toml` is `what-up-fresno` → DB container name is typically `supabase_db_what-up-fresno`.
@@ -108,6 +108,20 @@ docker exec supabase_db_what-up-fresno psql -U postgres -d postgres -c \
 
 If `pnpm db:status` fails, check Docker first; local stack must be running.
 
+### Local Studio “connection refused” (127.0.0.1:54323)
+
+`supabase status` may still print port **54323**, but on WSL/Windows that port is often in an **excluded port range** and never binds (check: `ss -tln | grep 54323` — empty means Studio is unreachable).
+
+This repo sets **`[studio] port = 54423`** in `supabase/config.toml`. After changing ports or Postgres major version:
+
+```bash
+supabase stop
+supabase start
+supabase status   # use the Studio URL shown here
+```
+
+If Postgres fails to start after bumping `major_version` to match cloud dev (17), either remove the old volume or run `pnpm db:reset` (wipes local data).
+
 ### Optional: VS Code PostgreSQL extension
 
 See [.vscode/POSTGRES.md](../.vscode/POSTGRES.md) for manual SQL in the editor. Agents usually use Docker exec or MCP instead.
@@ -121,19 +135,26 @@ See [.vscode/POSTGRES.md](../.vscode/POSTGRES.md) for manual SQL in the editor. 
 | `http://127.0.0.1:54321` | Local Docker |
 | `https://mrfkpvbvgzbtcutulfnc.supabase.co` | Cloud dev |
 
-Ingest + API `.dev.vars` should match: both local or both cloud dev when testing end-to-end.
+Use one `DEV_TARGET` in `dev-target.env` and `pnpm env:<target>` so API + ingest `.dev.vars` stay aligned.
 
 ---
 
-## Push local review data to cloud dev
+## Push local data to cloud dev
 
-After `pnpm ingest:promote-apis`, enrich, and review locally:
+After ingest, enrich, and approve locally:
 
 1. Add `SUPABASE_DB_PASSWORD_CLOUD_DEV` to `dev-target.env` (Supabase Dashboard → **Database** password, not the service role key).
-2. `pnpm db:push-cloud-dev --yes` — dumps local `ingest_runs` + `event_candidates`, replaces cloud dev copies.
-3. `pnpm env:cloud-dev` and restart `pnpm dev:api` so `/admin` reads the cloud queue.
+2. Link cloud dev if needed: `supabase link --project-ref mrfkpvbvgzbtcutulfnc`
+3. **`pnpm review:bulk-approve`** — approve all `pending_review` candidates locally (one API call), or use `/admin` → **Approve selected** / **Approve all pending**.
+4. **`pnpm db:push-cloud-dev --confirm`** — runs `supabase migration up --linked` on cloud dev, then **truncates and replaces** cloud dev tables with your local copy: `images`, `venues`, `events`, `event_candidates`, `ingest_runs`.
 
-Local Postgres URI is fixed in the script: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
+`--confirm` is required so the script cannot wipe cloud dev by accident (`--yes` is a deprecated alias). If any candidates fail to approve, re-run `pnpm review:bulk-approve`.
+
+5. `pnpm env:cloud-dev` and restart `pnpm dev:api` so `/admin` reads cloud data.
+
+Local dump uses the Supabase Docker container (`pg_dump` inside `supabase_db_*`); cloud restore needs `psql` on your PATH (or Docker). Install if missing: `sudo apt install postgresql-client` (WSL/Ubuntu).
+
+**WSL + `Network is unreachable` on cloud push:** Direct `db.<ref>.supabase.co` is **IPv6-only**. WSL often cannot reach IPv6. The push script uses the **session pooler** (IPv4) from `supabase/.temp/pooler-url` after `supabase link`, or `SUPABASE_DB_POOLER_HOST_CLOUD_DEV` from Dashboard → Connect → Session pooler.
 
 ---
 
@@ -162,3 +183,12 @@ Source of truth: `supabase/migrations/*.sql`.
 5. Cloud dev: agent applies same migration via MCP (or you run `pnpm db:migrate:cloud-dev` if CLI is linked)
 
 MCP `list_migrations` compares remote history to the repo; use it before `apply_migration` on cloud dev.
+
+### Migration version mismatch (CLI vs cloud dev)
+
+If `pnpm db:push-cloud-dev` or `pnpm db:migrate:cloud-dev` fails with **Remote migration versions not found in local migrations directory** (e.g. `20260524033349`), cloud dev was migrated via MCP with a different timestamp than the repo file. The repo filename must match the remote `version` in `supabase_migrations.schema_migrations`.
+
+1. Pull latest repo (includes `20260524033349_event_candidates_suggested_priority.sql`).
+2. `pnpm db:migrate:cloud-dev` — applies any pending migrations (`seed_urls` audit, `content_fingerprint`, `images.storage_key` unique, etc.).
+3. If **local** `supabase migration up` complains about `20260524000000`, run once: `pnpm db:repair:local-migration-version` (rewrites local history only; no DDL).
+4. `pnpm db:push-cloud-dev --confirm`

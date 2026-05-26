@@ -45,11 +45,74 @@
   border-radius: 999px;
 }
 
+/* Same split as DaySchedule / UpcomingEvents */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.listCol {
+  max-height: calc(100dvh - 13rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.detailCol {
+  position: sticky;
+  top: 14px;
+}
+
 .detailPane {
   background: var(--paper);
   border: var(--border-card);
   box-shadow: var(--shadow-lg);
   padding: 20px;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulkBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--linen);
+  border: var(--border-card);
+  box-shadow: var(--shadow-xs);
+}
+
+.message {
+  margin-bottom: 12px;
+  padding: 10px 16px;
+  font-size: 14px;
+  border: var(--border-card);
+  background: var(--paper);
+  box-shadow: var(--shadow-xs);
+}
+
+@media (max-width: 1080px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .listCol {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .detailCol {
+    position: static;
+  }
 }
 
 .tokenGate {

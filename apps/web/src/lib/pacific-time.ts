@@ -34,6 +34,12 @@ export function getPacificDateTimeParts(instant: Date): PacificDateTimeParts {
 }
 
 /** Downtown-fresno and similar scrapers use noon UTC as an all-day sentinel. */
+/** Visit Fresno `eventDate` uses `…T06:59:59.000Z`, which shows as 11:59 PM Pacific. */
+export function isVisitFresnoEndOfDayUtc(iso: string): boolean {
+  const d = new Date(iso);
+  return !Number.isNaN(d.getTime()) && d.getUTCHours() === 6 && d.getUTCMinutes() === 59;
+}
+
 export function isUtcNoonAllDaySentinel(iso: string): boolean {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) {
@@ -44,6 +50,9 @@ export function isUtcNoonAllDaySentinel(iso: string): boolean {
 
 export function isAllDayPacificStart(iso: string): boolean {
   if (isUtcNoonAllDaySentinel(iso)) {
+    return true;
+  }
+  if (isVisitFresnoEndOfDayUtc(iso)) {
     return true;
   }
   const d = new Date(iso);

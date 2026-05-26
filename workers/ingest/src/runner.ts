@@ -40,9 +40,11 @@ export interface RunOptions {
   force?: boolean;
   dryRun?: boolean;
   resumeJobs?: boolean;
+  /** Venue keys for venue-ingest (e.g. tower-theatre, save-mart). */
+  venueFilter?: string[];
   /** When true, skip post-ingest AI enrichment (caller may run it via `waitUntil`). */
   skipEnrichment?: boolean;
-  /** Propagates to scrapers; ai-crawl cancels in-flight Browser Rendering jobs on abort. */
+  /** Propagates to scrapers (abort signal). */
   signal?: AbortSignal;
 }
 
@@ -107,6 +109,9 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
   }
   if (options.signal) {
     runCtx.signal = options.signal;
+  }
+  if (options.venueFilter?.length) {
+    runCtx.venueFilter = options.venueFilter;
   }
 
   for (let i = 0; i < cappedPlan.length; i += 1) {
@@ -215,6 +220,7 @@ interface RunOneContext {
   supabase: ReturnType<typeof getSupabaseConfig>;
   dryRun?: boolean;
   resumeJobs?: boolean;
+  venueFilter?: string[];
   signal?: AbortSignal;
 }
 
@@ -264,12 +270,17 @@ async function runOne(
     })
   );
 
+  const scrapeConfig: Record<string, unknown> = { ...plan.config };
+  if (ctx.venueFilter?.length && plan.key === "venue-ingest") {
+    scrapeConfig.venues = ctx.venueFilter;
+  }
+
   const scrapeContext: ScrapeContext = {
     runId,
     now: ctx.now,
     userAgent: ctx.userAgent,
     secrets: extractSecrets(env, scraper.requiredSecrets ?? []),
-    config: plan.config,
+    config: scrapeConfig,
     coordinatorMode: resolveCoordinatorMode(ctx),
     ...(ctx.signal ? { signal: ctx.signal } : {})
   };
@@ -302,7 +313,13 @@ async function runOne(
       runId,
       events_found: result.events.length,
       errors: result.errors.length,
-      persistence: { persisted: false, reason: "Dry run — no database writes." },
+      persistence: {
+        persisted: false,
+        reason:
+          plan.key === "venue-ingest"
+            ? "Dry run — no candidates; venue_ingest_runs updated for debug."
+            : "Dry run — no database writes."
+      },
       duration_ms: Math.round(performance.now() - started),
       ok: validation.ok,
       validation,

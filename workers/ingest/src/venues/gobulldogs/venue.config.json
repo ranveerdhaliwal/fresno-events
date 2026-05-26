@@ -1,0 +1,9 @@
+{
+  "key": "gobulldogs",
+  "label": "Fresno State Athletics",
+  "enabled": true,
+  "strategy": "html_parse",
+  "listingUrl": "https://gobulldogs.com/calendar",
+  "sourceHostname": "gobulldogs.com",
+  "extractorVariant": "default"
+}

@@ -11,6 +11,7 @@ import {
   type EventCandidateListResponse,
   type EventCandidateStatus,
   parseLineup,
+  type CandidateBulkApproveResponse,
   type CandidateBulkDeleteResponse,
   type EventCategory,
   type NormalizedEvent,
@@ -21,6 +22,16 @@ import type { Env } from "@/env";
 import { toEventSource } from "@/lib/event-source";
 import { mirrorImageToR2 } from "@/lib/images";
 import { fail, ok } from "@/lib/responses";
+import { logError, logStructured } from "@/lib/structured-log";
+import {
+  chunkIds,
+  mergeBulkApproveResults,
+  parseBulkApproveAllLimit,
+  parseBulkApproveIds,
+  partitionCandidatesForApprove,
+  resolveBulkApprovePriority,
+  validateBulkApproveIdCount
+} from "@/routes/review-approve.utils";
 import { partitionCandidatesForDelete } from "@/routes/review-delete.utils";
 
 const validCandidateStatuses: EventCandidateStatus[] = ["pending_review", "approved", "rejected", "needs_changes", "duplicate"];
@@ -101,26 +112,73 @@ reviewRoute
         return fail(c, "candidate_not_found", "That event candidate could not be found.", 404);
       }
 
-      const normalized = mergeNormalizedEvent(candidate.normalizedEvent, body.event);
-      const priority = parseApprovePriority(body);
-      const venue = await upsertVenue(c.env, normalized);
-
-      const heroImage = normalized.imageUrl
-        ? await mirrorImageWithLogging(c.env, normalized.imageUrl, normalized.title)
-        : null;
-
-      const event = await upsertEvent(c.env, candidate, normalized, venue.id, heroImage?.id ?? null, priority);
-      const updated = await updateCandidate(c.env, candidate.id, {
-        status: "approved",
-        review_notes: typeof body.notes === "string" ? body.notes : candidate.reviewNotes ?? null,
-        reviewed_by: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin",
-        reviewed_at: new Date().toISOString(),
-        matched_event_id: event.id
+      const result = await approveCandidateCore(c.env, candidate, {
+        eventOverride: body.event,
+        priority: parseApprovePriority(body),
+        notes: typeof body.notes === "string" ? body.notes : undefined,
+        reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin"
       });
 
-      return ok<ReviewDecisionResponse>(c, { candidate: updated ?? candidate, event });
+      return ok<ReviewDecisionResponse>(c, result);
     } catch (error) {
       return handleReviewError(c, error, "Review candidate could not be approved.");
+    }
+  })
+  .post("/candidates/bulk-approve", async (c) => {
+    const body = await readJsonBody(c.req.raw);
+    const ids = parseBulkApproveIds(body.ids);
+
+    if (!ids) {
+      return fail(c, "invalid_request", "ids must be a non-empty array.", 400);
+    }
+
+    const countError = validateBulkApproveIdCount(ids);
+    if (countError) {
+      return fail(c, "invalid_request", countError, 400);
+    }
+
+    try {
+      const explicitPriority = parseOptionalApprovePriority(body.priority);
+      const result = await approveCandidatesByIds(c.env, ids, {
+        priority: explicitPriority,
+        notes: typeof body.notes === "string" ? body.notes : undefined,
+        reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin"
+      });
+      return ok<CandidateBulkApproveResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Candidates could not be approved.");
+    }
+  })
+  .post("/candidates/bulk-approve-all", async (c) => {
+    const body = await readJsonBody(c.req.raw);
+    const status = toCandidateStatus(typeof body.status === "string" ? body.status : undefined) ?? "pending_review";
+
+    if (status !== "pending_review") {
+      return fail(c, "invalid_request", "bulk-approve-all only supports status pending_review.", 400);
+    }
+
+    try {
+      const explicitPriority = parseOptionalApprovePriority(body.priority);
+      const limit = parseBulkApproveAllLimit(body.limit);
+      const candidates = await listAllCandidatesByStatus(c.env, status, limit);
+      const ids = candidates.map((candidate) => candidate.id);
+      const chunks = chunkIds(ids);
+      const parts: CandidateBulkApproveResponse[] = [];
+
+      for (const chunk of chunks) {
+        parts.push(
+          await approveCandidatesByIds(c.env, chunk, {
+            priority: explicitPriority,
+            notes: typeof body.notes === "string" ? body.notes : undefined,
+            reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin",
+            prefetched: candidates
+          })
+        );
+      }
+
+      return ok<CandidateBulkApproveResponse>(c, mergeBulkApproveResults(parts));
+    } catch (error) {
+      return handleReviewError(c, error, "Candidates could not be approved.");
     }
   })
   .delete("/candidates/:id", async (c) => {
@@ -274,6 +332,176 @@ async function getCandidate(env: Env, id: string) {
   return rows[0] ? mapCandidateRow(rows[0]) : null;
 }
 
+interface ApproveCandidateOptions {
+  eventOverride?: unknown;
+  priority?: number;
+  notes?: string | undefined;
+  reviewedBy?: string | undefined;
+}
+
+async function approveCandidateCore(
+  env: Env,
+  candidate: EventCandidate,
+  options: ApproveCandidateOptions
+): Promise<ReviewDecisionResponse> {
+  if (candidate.status !== "pending_review") {
+    throw new ReviewRouteError(`Candidate ${candidate.id} is not pending review.`, 400);
+  }
+
+  const normalized = mergeNormalizedEvent(candidate.normalizedEvent, options.eventOverride);
+  const priority =
+    options.priority !== undefined
+      ? options.priority
+      : resolveBulkApprovePriority(candidate);
+  const venue = await upsertVenue(env, normalized);
+
+  const heroImage = normalized.imageUrl
+    ? await mirrorImageWithLogging(env, normalized.imageUrl, normalized.title)
+    : null;
+
+  const event = await upsertEvent(env, candidate, normalized, venue.id, heroImage?.id ?? null, priority);
+  const updated = await updateCandidate(env, candidate.id, {
+    status: "approved",
+    review_notes: options.notes ?? candidate.reviewNotes ?? null,
+    reviewed_by: options.reviewedBy ?? "admin",
+    reviewed_at: new Date().toISOString(),
+    matched_event_id: event.id
+  });
+
+  return { candidate: updated ?? candidate, event };
+}
+
+interface BulkApproveRunOptions {
+  priority?: number | undefined;
+  notes?: string | undefined;
+  reviewedBy?: string | undefined;
+  prefetched?: EventCandidate[] | undefined;
+}
+
+async function approveCandidatesByIds(
+  env: Env,
+  ids: string[],
+  options: BulkApproveRunOptions
+): Promise<CandidateBulkApproveResponse> {
+  const uniqueIds = [...new Set(ids)];
+  const candidateById = new Map(
+    (options.prefetched ?? []).map((candidate) => [candidate.id, candidate] as const)
+  );
+  const missingIds = uniqueIds.filter((id) => !candidateById.has(id));
+
+  if (missingIds.length > 0) {
+    const params = new URLSearchParams({
+      select: candidateSelect,
+      id: `in.(${missingIds.join(",")})`
+    });
+    const rows = await supabaseRequest<SupabaseCandidateRow[]>(env, `/rest/v1/event_candidates?${params}`);
+    for (const row of rows) {
+      const mapped = mapCandidateRow(row);
+      candidateById.set(mapped.id, mapped);
+    }
+  }
+
+  const statusRows = uniqueIds.flatMap((id) => {
+    const candidate = candidateById.get(id);
+    return candidate ? [{ id, status: candidate.status }] : [];
+  });
+  const { toApprove, skipped } = partitionCandidatesForApprove(uniqueIds, statusRows);
+
+  let approved = 0;
+  const failed: CandidateBulkApproveResponse["failed"] = [];
+
+  for (const id of toApprove) {
+    const candidate = candidateById.get(id);
+    if (!candidate) {
+      continue;
+    }
+
+    try {
+      const priority =
+        options.priority !== undefined
+          ? options.priority
+          : resolveBulkApprovePriority(candidate);
+      await approveCandidateCore(env, candidate, {
+        priority,
+        notes: options.notes,
+        reviewedBy: options.reviewedBy
+      });
+      approved += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failed.push({ id, message });
+      logError("bulk_approve_item_failed", error, {
+        candidate_id: id,
+        title: candidate.title,
+        source: candidate.source,
+        source_event_id: candidate.sourceEventId
+      });
+    }
+  }
+
+  if (failed.length > 0 || approved > 0) {
+    logStructured("bulk_approve_batch_done", {
+      approved,
+      skipped: skipped.length,
+      failed: failed.length,
+      failed_ids: failed.map((f) => f.id)
+    });
+  }
+
+  return { approved, skipped, failed };
+}
+
+async function listAllCandidatesByStatus(
+  env: Env,
+  status: EventCandidateStatus,
+  maxLimit?: number
+): Promise<EventCandidate[]> {
+  const pageSize = 500;
+  const all: EventCandidate[] = [];
+  let offset = 0;
+
+  while (true) {
+    const params = new URLSearchParams({
+      select: candidateSelect,
+      status: `eq.${status}`,
+      order: "created_at.asc",
+      limit: String(pageSize),
+      offset: String(offset)
+    });
+    const rows = await supabaseRequest<SupabaseCandidateRow[]>(env, `/rest/v1/event_candidates?${params}`);
+
+    if (rows.length === 0) {
+      break;
+    }
+
+    all.push(...rows.map(mapCandidateRow));
+
+    if (maxLimit !== undefined && all.length >= maxLimit) {
+      return all.slice(0, maxLimit);
+    }
+
+    if (rows.length < pageSize) {
+      break;
+    }
+
+    offset += pageSize;
+  }
+
+  return all;
+}
+
+function parseOptionalApprovePriority(value: unknown): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "number" || !Number.isInteger(value) || value < EVENT_PRIORITY_MIN || value > EVENT_PRIORITY_MAX) {
+    throw new ReviewRouteError("priority must be an integer 0–5.", 400);
+  }
+
+  return value;
+}
+
 async function updateCandidate(env: Env, id: string, patch: CandidatePatch) {
   const params = new URLSearchParams({ id: `eq.${id}` });
   const rows = await supabaseRequest<SupabaseCandidateRow[]>(env, `/rest/v1/event_candidates?${params}`, {
@@ -336,6 +564,20 @@ async function upsertEvent(
   heroImageId: string | null,
   priority: number
 ): Promise<Event> {
+  // Title-only slugs truncate to 80 chars and can collide; candidate id makes slug unique.
+  const slug = slugify(`${normalized.title}-${candidate.id.slice(0, 8)}`);
+  return await postApprovedEvent(env, candidate, normalized, venueId, heroImageId, priority, slug);
+}
+
+async function postApprovedEvent(
+  env: Env,
+  candidate: EventCandidate,
+  normalized: NormalizedEvent,
+  venueId: string,
+  heroImageId: string | null,
+  priority: number,
+  slug: string
+): Promise<Event> {
   const now = new Date().toISOString();
   const sourceRefs = compactRecord({
     candidate_id: candidate.id,
@@ -350,7 +592,7 @@ async function upsertEvent(
       Prefer: "resolution=merge-duplicates,return=representation"
     },
     body: JSON.stringify({
-      slug: slugify(`${normalized.title}-${normalized.startTs.slice(0, 10)}`),
+      slug,
       source: normalized.source,
       source_event_id: normalized.sourceEventId,
       source_refs: sourceRefs,
@@ -408,7 +650,12 @@ async function supabaseRequest<T>(env: Env, path: string, init: RequestInit = {}
 
   if (!response.ok) {
     const body = await response.text();
-    throw new ReviewRouteError(`Supabase review query failed with ${response.status}: ${body}`, response.status === 401 ? 503 : 502);
+    const err = new ReviewRouteError(
+      `Supabase review query failed with ${response.status}: ${body}`,
+      response.status === 401 ? 503 : 502
+    );
+    logError("supabase_review_request_failed", err, { path, status: response.status });
+    throw err;
   }
 
   return await response.json() as T;
@@ -561,16 +808,18 @@ async function mirrorImageWithLogging(env: Env, imageUrl: string, altText: strin
   try {
     return await mirrorImageToR2(env, imageUrl, altText);
   } catch (error) {
-    console.log(JSON.stringify({
-      event: "image_mirror_failed",
-      image_url: imageUrl,
-      message: error instanceof Error ? error.message : String(error)
-    }));
+    logError("image_mirror_failed", error, { image_url: imageUrl });
     return null;
   }
 }
 
 function handleReviewError(c: Parameters<typeof fail>[0], error: unknown, fallbackMessage: string) {
+  logError("review_route_error", error, {
+    path: c.req.path,
+    method: c.req.method,
+    fallback_message: fallbackMessage
+  });
+
   if (error instanceof ReviewRouteError) {
     return fail(c, "review_unavailable", error.message, error.status === 503 ? 503 : 502);
   }

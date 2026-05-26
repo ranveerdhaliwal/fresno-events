@@ -19,6 +19,7 @@ FORCE="false"
 DRY_RUN="false"
 RESUME_JOBS="false"
 NO_ENRICH="false"
+VENUE=""
 
 usage() {
   sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
@@ -35,6 +36,8 @@ while [[ $# -gt 0 ]]; do
     --dry-run) DRY_RUN="true" ;;
     --resume-jobs) RESUME_JOBS="true" ;;
     --no-enrich) NO_ENRICH="true" ;;
+    --venue=*) VENUE="${1#*=}" ;;
+    --venue) shift; VENUE="${1:-}" ;;
     --port=*) PORT="${1#*=}" ;;
     --port) shift; PORT="${1:-8788}" ;;
     -h|--help)
@@ -79,6 +82,9 @@ if [[ "$NO_ENRICH" == "true" ]]; then
 fi
 if [[ -n "$SOURCE" ]]; then
   QUERY="source=${SOURCE}&$QUERY"
+fi
+if [[ -n "$VENUE" ]]; then
+  QUERY="${QUERY}&venue=${VENUE}"
 fi
 URL="http://127.0.0.1:${PORT}/trigger?${QUERY}"
 

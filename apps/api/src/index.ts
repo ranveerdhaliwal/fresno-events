@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
-
 import type { Env } from "@/env";
 import { ok } from "@/lib/responses";
+import { pacificRequestLogger } from "@/lib/structured-log";
 import { artistsRoute } from "@/routes/artists";
 import { eventsRoute } from "@/routes/events";
 import { imagesRoute } from "@/routes/images";
@@ -15,7 +14,7 @@ import { venuesRoute } from "@/routes/venues";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("*", logger());
+app.use("*", pacificRequestLogger());
 app.use(
   "*",
   cors({

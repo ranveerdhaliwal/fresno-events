@@ -7,6 +7,7 @@ import {
   buildVisitFresnoDateRanges,
   buildVisitFresnoUrl,
   extractVisitFresnoDocs,
+  parseVisitFresnoStartTs,
   toNormalizedEvent,
   visitFresnoTotalCount
 } from "./visit-fresno-api.utils";
@@ -36,6 +37,26 @@ describe("visit-fresno-api.utils", () => {
     expect(url).toContain("plugins_events_events_by_date");
     expect(url).toContain("token=test-token");
     expect(url).toContain("json=");
+  });
+
+  it("parseVisitFresnoStartTs uses startTime instead of 06:59:59 sentinel", () => {
+    const raw = readFileSync(fixturePath, "utf8");
+    const parsed = VisitFresnoResponseSchema.parse(JSON.parse(raw));
+    const doc = extractVisitFresnoDocs(parsed).find((d) => d.startTime?.startsWith("19:"));
+    expect(doc).toBeDefined();
+
+    const startIso = parseVisitFresnoStartTs(doc!);
+    expect(startIso).toBeTruthy();
+
+    const pacificHour = Number(
+      new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: "America/Los_Angeles"
+      }).format(new Date(startIso!))
+    );
+    expect(pacificHour).toBe(19);
+    expect(pacificHour).not.toBe(23);
   });
 
   it("maps fixture docs to NormalizedEvent", () => {

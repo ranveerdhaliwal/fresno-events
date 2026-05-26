@@ -1,0 +1,8 @@
+{
+  "key": "milb-grizzlies",
+  "label": "MiLB Fresno Grizzlies (statsapi)",
+  "enabled": true,
+  "strategy": "api",
+  "listingUrl": "https://www.milb.com/fresno",
+  "eventSource": "api:milb"
+}

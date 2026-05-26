@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Real promote for API / special-url sources (no Browser Rendering).
+# Real promote for API venue modules (visit, downtown, milb) via venue-ingest.
 #
 #   pnpm ingest:preflight-apis    # optional dry-run first
 #   pnpm ingest:promote-apis
@@ -8,7 +8,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APIS="visit-fresno-api,downtown-fresno-api,milb-api,seed-special-url"
 EXTRA=()
 
 while [[ $# -gt 0 ]]; do
@@ -26,4 +25,7 @@ while [[ $# -gt 0 ]]; do
   shift || true
 done
 
-bash "$REPO_ROOT/scripts/ingest-promote.sh" --source="$APIS" "${EXTRA[@]}"
+bash "$REPO_ROOT/scripts/ingest-promote.sh" \
+  --source=venue-ingest \
+  --venue=visit-fresno-county,downtown-fresno,milb-grizzlies \
+  "${EXTRA[@]}"

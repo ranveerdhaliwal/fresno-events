@@ -40,6 +40,12 @@ export default defineConfig({
     hmr: {
       host: "localhost",
       clientPort: Number(process.env.FRESNO_WEB_PORT ?? 5182)
+    },
+    proxy: {
+      "/images": {
+        target: `http://127.0.0.1:${process.env.FRESNO_API_PORT ?? 8790}`,
+        changeOrigin: true
+      }
     }
   }
 });

@@ -94,6 +94,9 @@ export function summarizeEnrichmentDelta(
   if (normalizedEventPatched) {
     dbFields.push("normalized_event");
   }
+  if (titleChanged) {
+    dbFields.push("title");
+  }
   if (opts.autoReject) {
     dbFields.push("status", "reviewed_by", "reviewed_at");
   }

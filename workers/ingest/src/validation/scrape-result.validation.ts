@@ -1,6 +1,9 @@
 import type { ScrapeResult } from "@fresno-events/shared";
 
-import type { SourceValidationProfile } from "./source-profiles";
+import {
+  VENUE_EVENT_SOURCE_WARN_THRESHOLDS,
+  type SourceValidationProfile
+} from "./source-profiles";
 
 export interface ValidationIssue {
   code: string;
@@ -60,7 +63,21 @@ export function validateScrapeResult(
     }
   }
 
-  if (profile?.minEventsWarn !== undefined && result.events.length < profile.minEventsWarn) {
+  if (profile?.multiSource) {
+    const bySource = new Map<string, number>();
+    for (const event of result.events) {
+      bySource.set(event.source, (bySource.get(event.source) ?? 0) + 1);
+    }
+    for (const [source, min] of Object.entries(VENUE_EVENT_SOURCE_WARN_THRESHOLDS)) {
+      const count = bySource.get(source) ?? 0;
+      if (count < min) {
+        soft.push({
+          code: "low_event_count_by_source",
+          message: `source=${source} events=${count} below min=${min}`
+        });
+      }
+    }
+  } else if (profile?.minEventsWarn !== undefined && result.events.length < profile.minEventsWarn) {
     soft.push({
       code: "low_event_count",
       message: `events=${result.events.length} below minEventsWarn=${profile.minEventsWarn}`

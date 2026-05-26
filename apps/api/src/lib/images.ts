@@ -1,4 +1,5 @@
 import type { Env } from "@/env";
+import { logError } from "@/lib/structured-log";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 8_000;
@@ -116,26 +117,88 @@ interface ImageInsert {
 }
 
 async function upsertImageRow(env: Env, row: ImageInsert): Promise<MirroredImage> {
-  const params = new URLSearchParams({
-    select: "id,storage_key,cdn_url",
-    on_conflict: "storage_key"
-  });
-
-  const rows = await supabaseRequest<MirroredImage[]>(env, `/rest/v1/images?${params}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=representation"
-    },
-    body: JSON.stringify(row)
-  });
-
-  const stored = rows[0];
-  if (!stored) {
-    throw new Error("Image upsert returned no rows.");
+  const existingByKey = await findImageByStorageKey(env, row.storage_key);
+  if (existingByKey) {
+    return existingByKey;
   }
 
-  return stored;
+  try {
+    const params = new URLSearchParams({
+      select: "id,storage_key,cdn_url",
+      on_conflict: "storage_key"
+    });
+
+    const rows = await supabaseRequest<MirroredImage[]>(env, `/rest/v1/images?${params}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation"
+      },
+      body: JSON.stringify(row)
+    });
+
+    const stored = rows[0];
+    if (!stored) {
+      throw new Error("Image upsert returned no rows.");
+    }
+
+    return stored;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("42P10") && !message.includes("ON CONFLICT")) {
+      throw error;
+    }
+
+    const inserted = await insertImageRow(env, row);
+    if (inserted) {
+      return inserted;
+    }
+
+    const raced = await findImageByStorageKey(env, row.storage_key);
+    if (raced) {
+      return raced;
+    }
+
+    logError("image_upsert_failed", error, { storage_key: row.storage_key, source_url: row.source_url });
+    throw error;
+  }
+}
+
+async function findImageByStorageKey(env: Env, storageKey: string): Promise<MirroredImage | null> {
+  const params = new URLSearchParams({
+    select: "id,storage_key,cdn_url",
+    storage_key: `eq.${storageKey}`,
+    limit: "1"
+  });
+
+  const rows = await supabaseRequest<MirroredImage[]>(env, `/rest/v1/images?${params}`);
+  return rows[0] ?? null;
+}
+
+async function insertImageRow(env: Env, row: ImageInsert): Promise<MirroredImage | null> {
+  const params = new URLSearchParams({
+    select: "id,storage_key,cdn_url"
+  });
+
+  try {
+    const rows = await supabaseRequest<MirroredImage[]>(env, `/rest/v1/images?${params}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify(row)
+    });
+
+    return rows[0] ?? null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("23505") || message.includes("duplicate key")) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 async function supabaseRequest<T>(env: Env, path: string, init: RequestInit = {}): Promise<T> {

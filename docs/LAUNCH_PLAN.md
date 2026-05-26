@@ -58,7 +58,7 @@ pnpm db:status   # copy API URL + service_role key
 
 | Service | URL |
 |---------|-----|
-| Studio | http://127.0.0.1:54323 |
+| Studio | http://127.0.0.1:54423 |
 | REST API | http://127.0.0.1:54321 |
 | Postgres | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
 
@@ -118,43 +118,19 @@ The ingest worker's LLM registry (`workers/ingest/src/llm/registry.ts`) tries Wo
 
 ### 1.7 Env files
 
-Copy examples and fill (never commit real secrets):
+**Single source of truth:** repo-root `dev-target.env` (copy from `dev-target.env.example`). Never commit real secrets.
 
 ```bash
-cp workers/ingest/.dev.vars.example workers/ingest/.dev.vars
-cp apps/api/.dev.vars.example apps/api/.dev.vars
+cp dev-target.env.example dev-target.env
+# Fill Supabase *_LOCAL / *_CLOUD_DEV, ADMIN_REVIEW_TOKEN, ALLOWED_ORIGINS, ingest keys (see example)
+pnpm env:local    # or pnpm env:cloud-dev — regenerates apps/api + workers/ingest .dev.vars
 ```
 
-Each `.dev.vars` file only needs the keys that file's worker actually reads. **Do not paste BR / LLM keys into `apps/api/.dev.vars`** — the API worker doesn't touch them.
+`apps/api/.dev.vars` and `workers/ingest/.dev.vars` are **auto-generated** — edit `dev-target.env` only. **Do not put BR / LLM keys in `dev-target.env` sections meant for API** — those keys live under the ingest section in the example file.
 
-**`workers/ingest/.dev.vars`** (ingest worker — needs DB write + BR + LLM):
+`ADMIN_REVIEW_TOKEN` is set once in `dev-target.env` and copied to both workers. Ingest uses it for `POST /trigger`; the API uses it for `/review/*`; `scripts/ingest-run.sh` reads it from the generated `workers/ingest/.dev.vars`.
 
-```
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_SERVICE_ROLE_KEY=<from pnpm db:status>
-ADMIN_REVIEW_TOKEN=<pick any long random string>
-GEMINI_API_KEY=<your key>            # or ANTHROPIC_API_KEY=, or rely on Workers AI binding
-CLOUDFLARE_ACCOUNT_ID=<account id>   # required for Part 2 ai-crawl
-CLOUDFLARE_API_TOKEN=<BR token>      # required for Part 2 ai-crawl
-```
-
-**`apps/api/.dev.vars`** (public API + admin review — needs DB read/write only):
-
-```
-ALLOWED_ORIGIN=http://localhost:5173
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_SERVICE_ROLE_KEY=<from pnpm db:status>
-ADMIN_REVIEW_TOKEN=<same value as ingest>
-```
-
-`ADMIN_REVIEW_TOKEN` must match across both files — ingest uses it to gate `POST /trigger`, the API uses it to gate `/review/*`, and `scripts/ingest-run.sh` reads it from `workers/ingest/.dev.vars`.
-
-**For UI work on cloud dev data** (recommended after first ingest): swap **only** the Supabase pair in **both** files:
-
-```
-SUPABASE_URL=https://<ref>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<cloud service_role>
-```
+**For UI work on cloud dev data:** `pnpm env:cloud-dev` (fills both `.dev.vars` from `SUPABASE_URL_CLOUD_DEV` + key), then restart `pnpm dev:api` and `pnpm ingest:dev`.
 
 **Web app** — create `apps/web/.env.local`:
 

@@ -1,0 +1,12 @@
+{
+  "key": "big-fresno-fair",
+  "label": "Big Fresno Fair",
+  "enabled": true,
+  "strategy": "scroll_listing_then_detail",
+  "listingUrl": "https://www.bigfresnofair.com/events",
+  "detailUrlCap": 40,
+  "llmCallCap": 60,
+  "sourceHostname": "www.bigfresnofair.com",
+  "extractorVariant": "festival",
+  "seriesId": "series:bigfresnofair:2026"
+}

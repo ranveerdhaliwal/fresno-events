@@ -10,6 +10,7 @@ import { FooterStamp } from "@/components/FooterStamp";
 import { StickyCtaBar } from "@/components/StickyCtaBar";
 import { ContextStrip } from "@/components/ContextStrip";
 import { deriveTagline, formatPrice, toEventRowViewModel } from "@/lib/event-view-model";
+import { resolveMediaUrl } from "@/lib/media-url";
 import { formatCountdownLabel, formatEventDate, formatShortTime, toIsoDateLocal } from "@/lib/event-time";
 import { paletteKeyForCategory, gradientForPalette } from "@/lib/image-palette";
 import type { EventDetailResult } from "@/services/events.types";
@@ -20,7 +21,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
   const { detail } = data;
   const { event, venue, heroImage } = detail;
   const paletteKey = paletteKeyForCategory(event.category, event.id);
-  const imageUrl = heroImage?.cdnUrl ?? null;
+  const imageUrl = resolveMediaUrl(heroImage?.cdnUrl ?? null);
   const tagline = deriveTagline(event);
   const dayIso = toIsoDateLocal(new Date(event.startTs));
   const whatToKnow = event.tags.length > 0 ? event.tags : null;

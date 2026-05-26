@@ -56,7 +56,7 @@ export async function countPendingEnrichment(
   const params = new URLSearchParams({
     select: "id,review_notes,normalized_event,suggested_priority,confidence_score",
     status: "eq.pending_review",
-    limit: "2000"
+    limit: "1000"
   });
 
   if (sourceFilter) {
@@ -226,6 +226,9 @@ export async function enrichRecentCandidates(
       const enrichedNormalized = applyEnrichment(row.normalized_event, enrichment);
       if (enrichedNormalized) {
         patch.normalized_event = enrichedNormalized;
+      }
+      if (delta.title_changed) {
+        patch.title = delta.title_after;
       }
 
       const doneLog = {
@@ -400,6 +403,7 @@ function applyEnrichment(
 }
 
 interface CandidatePatch {
+  title?: string;
   confidence_score?: number;
   suggested_priority?: number;
   review_notes?: string | null;
@@ -440,7 +444,8 @@ async function supabaseFetch<T>(supabase: SupabaseConfig, path: string): Promise
   });
 
   if (!response.ok) {
-    throw new Error(`Supabase request ${path} failed: ${response.status}`);
+    const body = await response.text();
+    throw new Error(`Supabase request ${path} failed: ${response.status} ${body}`);
   }
 
   return (await response.json()) as T;

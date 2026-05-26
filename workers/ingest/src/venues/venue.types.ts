@@ -1,0 +1,62 @@
+import type { NormalizedEvent, ScrapeError } from "@fresno-events/shared";
+import { z } from "zod";
+
+export const venueStrategySchema = z.enum([
+  "listing_then_detail",
+  "month_windows_then_detail",
+  "scroll_listing_then_detail",
+  "html_parse",
+  "api"
+]);
+
+export type VenueStrategy = z.infer<typeof venueStrategySchema>;
+
+export const extractorVariantSchema = z.enum(["default", "festival", "headline_only"]);
+
+export const venueConfigSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  enabled: z.boolean(),
+  strategy: venueStrategySchema,
+  listingUrl: z.string().url(),
+  detailUrlCap: z.number().int().positive().optional(),
+  llmCallCap: z.number().int().positive().optional(),
+  allowedExternalHosts: z.array(z.string().min(1)).optional(),
+  sourceHostname: z.string().min(1).optional(),
+  extractorVariant: extractorVariantSchema.optional(),
+  seriesId: z.string().optional(),
+  monthWindows: z.number().int().positive().max(18).optional(),
+  conditionalDetail: z.boolean().optional(),
+  /** NormalizedEvent.source for strategy=api (e.g. api:visitfresnocounty). */
+  eventSource: z.string().min(1).optional()
+});
+
+export type VenueConfig = z.infer<typeof venueConfigSchema>;
+
+export interface VenueRunDebug {
+  listingUrls?: string[];
+  detailUrls?: string[];
+  detailUrlsPlanned?: number;
+  llmCalls?: number;
+  errors?: string[];
+  note?: string;
+}
+
+export interface VenueRunResult {
+  events: NormalizedEvent[];
+  errors: ScrapeError[];
+  listingUrlsFound: number;
+  detailUrlsVisited: number;
+  llmCalls: number;
+  debug: VenueRunDebug;
+  brCrawlJobId?: string | null;
+  brCrawlStatus?: string | null;
+}
+
+export interface VenueRunContext {
+  ingestRunId: string;
+  dryRun: boolean;
+  userAgent: string;
+  signal?: AbortSignal;
+  venueFilter?: string[];
+}

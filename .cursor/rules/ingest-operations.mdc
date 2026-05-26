@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Ingest operations (cloud dev)
 
-**Target:** Controlled by repo-root `dev-target.env` (`DEV_TARGET=local|cloud-dev|cloud-prod`). Run `pnpm env:status` before writes. Cloud dev = `what-up-fresno-dev` (`mrfkpvbvgzbtcutulfnc`). Never delete or bulk-modify **prod** unless the user explicitly requests prod.
+**Target:** Repo-root `dev-target.env` (`DEV_TARGET=local|cloud-dev|cloud-prod`). Run `pnpm env:<target>` after edits (regenerates `.dev.vars`); `pnpm env:status` before writes. Cloud dev = `what-up-fresno-dev` (`mrfkpvbvgzbtcutulfnc`). Never delete or bulk-modify **prod** unless the user explicitly requests prod.
 
 **Tables:** `event_candidates` (review queue), `ingest_runs` (run metadata), `events` (only after admin approve).
 
@@ -48,6 +48,6 @@ Source values: `api:visitfresnocounty`, `api:milb`, `api:downtownfresno`.
 
 Defined in `workers/ingest/src/validation/source-profiles.ts`. Hard fail: duplicate `sourceEventId` in batch, missing fields, too many scrape errors. Soft warn: low event count.
 
-Batch dry-run for visit/downtown/milb/seed-special-url: `pnpm ingest:preflight-apis`.
+Batch dry-run for API venues (visit/downtown/milb): `pnpm ingest:preflight-apis` (venue-ingest filter). Crawl venues: `pnpm ingest:preflight-venues`.
 
 Emergency bypass: `INGEST_SKIP_VALIDATION=true` (must log `ingest_validation_skipped`).

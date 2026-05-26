@@ -13,6 +13,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${INGEST_PORT:-8788}"
 SOURCE=""
+VENUE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -20,6 +21,8 @@ while [[ $# -gt 0 ]]; do
     --source) shift; SOURCE="${1:-}" ;;
     --all) SOURCE="all" ;;
     --port=*) PORT="${1#*=}" ;;
+    --venue=*) VENUE="${1#*=}" ;;
+    --venue) shift; VENUE="${1:-}" ;;
     -h|--help)
       echo "Usage: pnpm ingest:preflight --source=<key>[,<key>...] | --all" >&2
       exit 0
@@ -76,7 +79,11 @@ for KEY in "${SOURCES[@]}"; do
     fi
   fi
 
-  TRIGGER_URL="http://127.0.0.1:${PORT}/trigger?source=${KEY}&force=true&dry_run=true"
+  VENUE_QUERY=""
+  if [[ -n "$VENUE" ]]; then
+    VENUE_QUERY="&venue=${VENUE}"
+  fi
+  TRIGGER_URL="http://127.0.0.1:${PORT}/trigger?source=${KEY}&force=true&dry_run=true${VENUE_QUERY}"
   echo "POST $TRIGGER_URL" >&2
   RESP="$(ingest_curl_json POST "$TRIGGER_URL")"
 

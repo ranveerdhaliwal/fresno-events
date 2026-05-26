@@ -1,6 +1,5 @@
 import { usesShallowCrawl, type ParsedCrawlHints } from "@/browser-rendering/crawl-targets.utils";
 import type { IngestEnv } from "@/env";
-import type { SeedUrlRow } from "@/seed-urls";
 import type { BrCrawlRequestBody } from "@/browser-rendering/types";
 
 export { usesShallowCrawl };
@@ -29,9 +28,13 @@ function parsePositiveInt(value: string | undefined, fallback: number) {
 }
 
 export function buildCrawlRequest(
-  seed: SeedUrlRow,
   env: IngestEnv,
-  opts: { targetUrl: string; hints: ParsedCrawlHints; isWindowUrl?: boolean }
+  opts: {
+    targetUrl: string;
+    hints: ParsedCrawlHints;
+    isWindowUrl?: boolean;
+    modifiedSince?: string | null;
+  }
 ): BrCrawlRequestBody {
   const shallow = usesShallowCrawl(opts.hints);
   const limit = shallow
@@ -53,8 +56,8 @@ export function buildCrawlRequest(
       includeExternalLinks: false,
       includeSubdomains: false
     },
-    ...(!opts.isWindowUrl && seed.last_successful_crawl_at
-      ? { modifiedSince: Math.floor(new Date(seed.last_successful_crawl_at).getTime() / 1000) }
+    ...(!opts.isWindowUrl && opts.modifiedSince
+      ? { modifiedSince: Math.floor(new Date(opts.modifiedSince).getTime() / 1000) }
       : {})
   };
 }

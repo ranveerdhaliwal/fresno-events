@@ -1,6 +1,10 @@
-import type { SeedUrlRow } from "@/seed-urls";
-
 export type CrawlProvider = "ticketsauce" | "listing_page" | "festival" | "headline_only";
+
+/** Input for crawl target resolution (formerly seed_urls rows). */
+export interface CrawlSeedInput {
+  url: string;
+  crawl_hints: Record<string, unknown>;
+}
 
 export interface ParsedCrawlHints {
   provider: CrawlProvider;
@@ -108,7 +112,7 @@ export function buildTicketsauceMonthUrls(
   return targets;
 }
 
-export function resolveCrawlTargets(seed: SeedUrlRow, now: Date = new Date()): {
+export function resolveCrawlTargets(seed: CrawlSeedInput, now: Date = new Date()): {
   hints: ParsedCrawlHints;
   targets: CrawlTarget[];
 } {

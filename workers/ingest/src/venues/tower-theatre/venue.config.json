@@ -1,0 +1,12 @@
+{
+  "key": "tower-theatre",
+  "label": "Tower Theatre",
+  "enabled": true,
+  "strategy": "listing_then_detail",
+  "listingUrl": "https://towertheatre.ticketsauce.com/",
+  "detailUrlCap": 40,
+  "llmCallCap": 50,
+  "allowedExternalHosts": [],
+  "sourceHostname": "towertheatre.ticketsauce.com",
+  "extractorVariant": "default"
+}

@@ -9,11 +9,14 @@ max_rows = 1000
 
 [db]
 port = 54322
-major_version = 15
+# Match cloud dev (what-up-fresno-dev). After changing: supabase stop && supabase start
+# If Postgres fails to start on an existing volume, run: pnpm db:reset (wipes local data).
+major_version = 17
 
 [studio]
 enabled = true
-port = 54323
+# 54323 is often blocked on WSL/Windows (excluded port range); use 54423 if Studio won't load.
+port = 54423
 
 [inbucket]
 enabled = true

@@ -1,0 +1,12 @@
+{
+  "key": "rainbow-ballroom",
+  "label": "Rainbow Ballroom",
+  "enabled": true,
+  "strategy": "scroll_listing_then_detail",
+  "listingUrl": "https://www.rainbowballroom.com/blog-grid",
+  "detailUrlCap": 40,
+  "llmCallCap": 50,
+  "allowedExternalHosts": ["eventmania.com", "www.eventmania.com"],
+  "sourceHostname": "www.rainbowballroom.com",
+  "extractorVariant": "default"
+}

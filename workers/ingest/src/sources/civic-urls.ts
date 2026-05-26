@@ -1,6 +1,6 @@
 /**
  * Venue URLs for ai-discovery (legacy HTML + LLM).
- * Avoid URLs already covered by API scrapers or ai-crawl seed_urls.
+ * Avoid URLs already covered by venue-ingest modules.
  */
 export const civicDiscoveryUrls = [
   { url: "https://www.cityoffresno.gov/parks/events/", label: "City of Fresno Parks" },

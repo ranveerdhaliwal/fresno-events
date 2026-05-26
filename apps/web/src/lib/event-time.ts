@@ -1,13 +1,20 @@
+import { isAllDayPacificStart } from "@/lib/pacific-time";
+
 const TIME_ZONE = "America/Los_Angeles";
 
 export type DayPeriod = "live" | "morning" | "afternoon" | "evening";
 
 export function formatShortTime(value: string | Date): string {
+  const iso = typeof value === "string" ? value : value.toISOString();
+  if (isAllDayPacificStart(iso)) {
+    return "All day";
+  }
+
   const formatted = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
     timeZone: TIME_ZONE
-  }).format(typeof value === "string" ? new Date(value) : value);
+  }).format(new Date(iso));
   return formatted.replace(":00", "");
 }
 

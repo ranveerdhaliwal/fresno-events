@@ -1,0 +1,13 @@
+{
+  "key": "save-mart",
+  "label": "Save Mart Center",
+  "enabled": true,
+  "strategy": "month_windows_then_detail",
+  "listingUrl": "https://www.savemartcenter.com/events-tickets/?bounds=false&view=list&sort=date",
+  "monthWindows": 6,
+  "detailUrlCap": 40,
+  "llmCallCap": 60,
+  "allowedExternalHosts": ["savemartcenter.com", "www.savemartcenter.com"],
+  "sourceHostname": "www.savemartcenter.com",
+  "extractorVariant": "default"
+}

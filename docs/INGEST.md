@@ -66,7 +66,7 @@ pnpm dev
 
 Open http://localhost:5182/admin → approve candidates → browse http://localhost:5182.
 
-Check raw rows: Supabase Studio http://127.0.0.1:54323 → `event_candidates`, `ingest_runs`.
+Check raw rows: Supabase Studio http://127.0.0.1:54423 → `event_candidates`, `ingest_runs`.
 
 ---
 

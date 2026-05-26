@@ -54,20 +54,21 @@ Local dev uses dedicated ports (not Vite’s default `5173`) so other apps can k
 | Web (Vite) | http://localhost:5182 |
 | API (Wrangler) | http://127.0.0.1:8790 (`GET /health` smoke test) |
 
-For local Worker env (Supabase URL, service role, `ADMIN_REVIEW_TOKEN`, `ALLOWED_ORIGIN`), copy [apps/api/.dev.vars.example](apps/api/.dev.vars.example) to `apps/api/.dev.vars` and set `ALLOWED_ORIGIN` to match `scripts/dev-ports.env`. Then `curl -s "http://127.0.0.1:8790/events?from=2026-01-01T00:00:00.000Z&until=2027-01-01T00:00:00.000Z&limit=5"` should return `ok: true` when the database has rows in range.
+For local Worker env, use repo-root `dev-target.env` (see below). Then `curl -s "http://127.0.0.1:8790/events?from=2026-01-01T00:00:00.000Z&until=2027-01-01T00:00:00.000Z&limit=5"` should return `ok: true` when the database has rows in range.
 
 ## Local vs cloud Supabase (`dev-target.env`)
 
-Ingest and the review API both read `SUPABASE_URL` from their `.dev.vars` files. Those must stay in sync. Use one toggle file at the repo root instead of editing URLs by hand.
+**One file for all local dev secrets:** `dev-target.env`. `apps/api/.dev.vars` and `workers/ingest/.dev.vars` are auto-generated — do not edit them by hand.
 
 **Setup (once):**
 
 ```bash
 cp dev-target.env.example dev-target.env
-# Fill SUPABASE_URL_* and SUPABASE_SERVICE_ROLE_KEY_* for local (pnpm db:status) and cloud dev
+# Fill Supabase keys, ADMIN_REVIEW_TOKEN, ALLOWED_ORIGINS, ingest API keys (see example file)
+pnpm env:local   # or env:cloud-dev — regenerates both .dev.vars
 ```
 
-**Switch target** (writes the active URL + service role into `apps/api/.dev.vars` and `workers/ingest/.dev.vars`):
+**Switch target** (regenerates `apps/api/.dev.vars` and `workers/ingest/.dev.vars` from `dev-target.env`):
 
 | Command | Database |
 | --- | --- |
@@ -87,7 +88,7 @@ ingest:run / ingest:promote / ingest:enrich  →  workers/ingest SUPABASE_URL  �
 
 Local and cloud are **separate sandboxes**. Candidates and events on local do not appear on cloud and vice versa. `pnpm db:reset` only affects local. Cloud may still have rows from earlier runs when you switch to `env:cloud-dev`.
 
-Worker secrets: copy [apps/api/.dev.vars.example](apps/api/.dev.vars.example) and [workers/ingest/.dev.vars.example](workers/ingest/.dev.vars.example) if missing. `ADMIN_REVIEW_TOKEN` must match in both files.
+Worker secrets: set everything in `dev-target.env`, then `pnpm env:<target>`. First run backfills missing keys from existing `.dev.vars` if you migrated from the old layout.
 
 ## Database access
 
@@ -110,7 +111,7 @@ After reset, the Supabase CLI prints local credentials. Use the `service_role` k
 | --- | --- | --- |
 | Postgres | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` | DBeaver, Beekeeper Studio, TablePlus, `psql` |
 | REST API | `http://127.0.0.1:54321` | Used by the Worker via `SUPABASE_URL` |
-| Studio | `http://127.0.0.1:54323` | Browser-based table viewer + SQL editor |
+| Studio | `http://127.0.0.1:54423` | Browser-based table viewer + SQL editor (`supabase status` for actual port) |
 | Inbucket | `http://127.0.0.1:54324` | Local email outbox for auth flows |
 
 For DBeaver/Beekeeper, create a Postgres connection with host `127.0.0.1`, port `54322`, database `postgres`, user `postgres`, password `postgres`. The `event_candidates`, `ingest_runs`, `events`, `venues`, and `images` tables live in the `public` schema.
@@ -230,7 +231,7 @@ pnpm ingest:enrich --limit=50          # if you used --no-enrich on promote
 pnpm dev:api                           # open http://127.0.0.1:5182/admin
 ```
 
-Check data in Studio (http://127.0.0.1:54323 when on local). For cloud dev, use `pnpm env:cloud-dev`, restart workers, run the same ingest commands, and use the Supabase dashboard or MCP — local Studio will not show cloud rows.
+Check data in Studio (http://127.0.0.1:54423 when on local — run `supabase status` if the port changed). For cloud dev, use `pnpm env:cloud-dev`, restart workers, run the same ingest commands, and use the Supabase dashboard or MCP — local Studio will not show cloud rows.
 
 Validation can be bypassed in an emergency with `INGEST_SKIP_VALIDATION=true` in `workers/ingest/.dev.vars` (logged; avoid for normal use).
 
@@ -246,7 +247,7 @@ Validation can be bypassed in an emergency with `INGEST_SKIP_VALIDATION=true` in
 
 **Supabase target**
 
-- `pnpm env:local` / `pnpm env:cloud-dev` / `pnpm env:cloud-prod` — sync URL + key to API + ingest `.dev.vars`
+- `pnpm env:local` / `pnpm env:cloud-dev` / `pnpm env:cloud-prod` — regenerate API + ingest `.dev.vars` from `dev-target.env`
 - `pnpm env:status` — show active target
 
 **Database**

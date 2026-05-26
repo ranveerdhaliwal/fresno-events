@@ -1,6 +1,7 @@
 import type {
   ApiResponse,
   EventCandidate,
+  CandidateBulkApproveResponse,
   CandidateBulkDeleteResponse,
   EventCandidateDetailResponse,
   EventCandidateListResponse,
@@ -76,6 +77,31 @@ export async function deleteCandidates(token: string, ids: string[], options: { 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ids })
+  });
+}
+
+export interface BulkApproveBody {
+  ids?: string[];
+  notes?: string;
+  reviewedBy?: string;
+  priority?: number;
+  status?: "pending_review";
+  limit?: number;
+}
+
+export async function bulkApproveCandidates(token: string, ids: string[], body: Omit<BulkApproveBody, "ids"> = {}) {
+  return adminFetch<CandidateBulkApproveResponse>(token, "/review/candidates/bulk-approve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, ids })
+  });
+}
+
+export async function bulkApproveAllPending(token: string, body: Omit<BulkApproveBody, "ids"> = {}) {
+  return adminFetch<CandidateBulkApproveResponse>(token, "/review/candidates/bulk-approve-all", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "pending_review", ...body })
   });
 }
 

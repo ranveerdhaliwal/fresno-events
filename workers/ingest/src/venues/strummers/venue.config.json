@@ -1,0 +1,11 @@
+{
+  "key": "strummers",
+  "label": "Strummers",
+  "enabled": true,
+  "strategy": "listing_then_detail",
+  "listingUrl": "https://www.strummersclub.com/shows",
+  "detailUrlCap": 40,
+  "llmCallCap": 50,
+  "sourceHostname": "www.strummersclub.com",
+  "extractorVariant": "default"
+}

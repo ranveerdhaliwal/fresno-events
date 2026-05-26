@@ -37,10 +37,17 @@ export default {
       }
 
       const sources = url.searchParams.get("source") ?? url.searchParams.get("sources") ?? undefined;
+      const venueParam = url.searchParams.get("venue") ?? undefined;
       const force = url.searchParams.get("force") === "true";
       const dryRun = url.searchParams.get("dry_run") === "true";
       const resumeJobs = url.searchParams.get("resume_jobs") === "true";
       const skipEnrichment = url.searchParams.get("no_enrich") === "true" || url.searchParams.get("skip_enrichment") === "true";
+      const venueFilter = venueParam
+        ? venueParam
+            .split(",")
+            .map((part) => part.trim())
+            .filter(Boolean)
+        : undefined;
 
       if (dryRun && resumeJobs) {
         return jsonResponse(
@@ -61,7 +68,8 @@ export default {
         resumeJobs,
         skipEnrichment: true,
         signal: req.signal,
-        ...(sources ? { sources } : {})
+        ...(sources ? { sources } : {}),
+        ...(venueFilter?.length ? { venueFilter } : {})
       });
       for (const summary of summaries) {
         console.log(JSON.stringify({ event: "ingest_run", trigger: "manual", ...summary }));

@@ -29,7 +29,7 @@ export function toNormalizedEventFromDiscovery(
   item: AiDiscoveryItem,
   pageUrl: string,
   seedUrl: string,
-  tag: "ai-discovery" | "ai-crawl",
+  tag: "ai-discovery" | "ai-crawl" | "venue-ingest",
   extras: DiscoveryNormalizeExtras = {}
 ): NormalizedEvent | null {
   if (!item.title.trim() || !item.venueName.trim() || !item.startTs) {

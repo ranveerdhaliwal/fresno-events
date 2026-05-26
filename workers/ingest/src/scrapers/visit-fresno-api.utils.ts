@@ -1,5 +1,9 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 
+import {
+  instantFromPacificLocal,
+  isVisitFresnoEndOfDayUtc
+} from "@/lib/pacific-instant.utils";
 import type { VisitFresnoDoc, VisitFresnoResponse } from "./visit-fresno-api.types";
 
 const ENDPOINT =
@@ -89,9 +93,47 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function parseVisitFresnoWallClock(dateYmd: string, timeHms: string): string | null {
+  const segments = timeHms.split(":");
+  const hour = segments[0]?.padStart(2, "0");
+  const minute = (segments[1] ?? "00").padStart(2, "0");
+  const second = (segments[2] ?? "00").padStart(2, "0");
+  if (!hour || !/^\d{4}-\d{2}-\d{2}$/.test(dateYmd)) {
+    return null;
+  }
+
+  const pacificIso = `${dateYmd}T${hour}:${minute}:${second}-07:00`;
+  const parsed = new Date(pacificIso);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+/** Parse Visit Fresno `eventDate` + optional `startTime` (avoids 11:59 PM PT sentinel). */
+export function parseVisitFresnoStartTs(raw: VisitFresnoDoc): string | null {
+  const eventDate = raw.dates.eventDate;
+  if (!eventDate) {
+    return null;
+  }
+
+  const dateYmd = eventDate.slice(0, 10);
+  const startTime = raw.startTime?.trim();
+  if (startTime) {
+    const wall = parseVisitFresnoWallClock(dateYmd, startTime);
+    if (wall) {
+      return wall;
+    }
+  }
+
+  if (isVisitFresnoEndOfDayUtc(eventDate)) {
+    return instantFromPacificLocal(dateYmd, "12:00");
+  }
+
+  const parsed = new Date(eventDate);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 export function toNormalizedEvent(raw: VisitFresnoDoc): NormalizedEvent | null {
-  const startTs = raw.dates.eventDate;
-  if (!raw.title || !startTs) {
+  const startIso = parseVisitFresnoStartTs(raw);
+  if (!raw.title || !startIso) {
     return null;
   }
 
@@ -109,7 +151,7 @@ export function toNormalizedEvent(raw: VisitFresnoDoc): NormalizedEvent | null {
     title: raw.title,
     venueName,
     venueCity: raw.city?.trim() || "Fresno",
-    startTs: new Date(startTs).toISOString(),
+    startTs: startIso,
     ...(venueAddress ? { venueAddress } : {}),
     ...(descriptionText ? { descriptionText } : {}),
     ...(externalUrl ? { externalUrl } : {}),

@@ -6,6 +6,8 @@ import { cn } from "@/lib/cn";
 import {
   AdminApiError,
   approveCandidate,
+  bulkApproveAllPending,
+  bulkApproveCandidates,
   type CandidateStatusFilter,
   deleteCandidates,
   getCandidate,
@@ -39,10 +41,6 @@ import { formatPacificDateTimeLabel } from "@/lib/pacific-time";
 
 const TOKEN_STORAGE_KEY = "wuf:admin_token";
 
-/** List scrolls in its column; detail stays sticky with no inner scrollbar. */
-const listScrollPane =
-  "max-h-[calc(100dvh-13rem)] overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]";
-const stickyDetailPane = "lg:sticky lg:top-24 lg:z-10 lg:self-start";
 const btnClickable = "cursor-pointer disabled:cursor-not-allowed";
 
 const STATUS_FILTERS: Array<{ value: CandidateStatusFilter; label: string }> = [
@@ -105,6 +103,7 @@ function ReviewWorkspace({
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
+  const [approveMessage, setApproveMessage] = useState<string | null>(null);
   const [priorityOverrides, setPriorityOverrides] = useState<Record<string, number>>(() =>
     readPriorityOverrides()
   );
@@ -135,6 +134,7 @@ function ReviewWorkspace({
   useEffect(() => {
     setSelectedIds(new Set());
     setDeleteMessage(null);
+    setApproveMessage(null);
   }, [statusFilter]);
 
   const handleAfterDecision = (candidateId?: string) => {
@@ -151,6 +151,28 @@ function ReviewWorkspace({
       writePriorityOverrides(next);
       return next;
     });
+  };
+
+  const formatBulkApproveMessage = (result: {
+    approved: number;
+    skipped: Array<{ reason: string }>;
+    failed: Array<{ id: string; message: string }>;
+  }) => {
+    const parts = [`Approved ${result.approved}.`];
+    if (result.skipped.length > 0) {
+      parts.push(`${result.skipped.length} skipped.`);
+    }
+    if (result.failed.length > 0) {
+      parts.push(`${result.failed.length} failed — refresh and retry.`);
+      for (const item of result.failed.slice(0, 3)) {
+        const detail = item.message.length > 120 ? `${item.message.slice(0, 120)}…` : item.message;
+        parts.push(`${item.id}: ${detail}`);
+      }
+      if (result.failed.length > 3) {
+        parts.push(`(+${result.failed.length - 3} more — see API logs: bulk_approve_item_failed)`);
+      }
+    }
+    return parts.join(" ");
   };
 
   const deleteMutation = useMutation({
@@ -177,6 +199,34 @@ function ReviewWorkspace({
     }
   });
 
+  const approveSelectedMutation = useMutation({
+    mutationFn: (ids: string[]) =>
+      bulkApproveCandidates(token, ids, { reviewedBy: "admin-bulk-ui" }),
+    onSuccess: (result) => {
+      setApproveMessage(formatBulkApproveMessage(result));
+      setSelectedIds(new Set());
+      handleAfterDecision();
+    },
+    onError: (error: unknown) => {
+      setApproveMessage(error instanceof AdminApiError ? error.message : "Bulk approve failed.");
+    }
+  });
+
+  const approveAllMutation = useMutation({
+    mutationFn: () => bulkApproveAllPending(token, { reviewedBy: "admin-bulk-ui" }),
+    onSuccess: (result) => {
+      setApproveMessage(formatBulkApproveMessage(result));
+      setSelectedIds(new Set());
+      handleAfterDecision();
+    },
+    onError: (error: unknown) => {
+      setApproveMessage(error instanceof AdminApiError ? error.message : "Approve all failed.");
+    }
+  });
+
+  const bulkActionPending =
+    deleteMutation.isPending || approveSelectedMutation.isPending || approveAllMutation.isPending;
+
   const candidateQuery = useQuery({
     queryKey: ["admin", "candidate", activeId, token],
     queryFn: () => (activeId ? getCandidate(token, activeId) : Promise.resolve(null)),
@@ -194,7 +244,7 @@ function ReviewWorkspace({
             reject with notes for the source owner.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={styles.headerActions}>
           <select
             value={statusFilter}
             onChange={(event) => onStatusFilterChange(event.target.value as CandidateStatusFilter)}
@@ -206,6 +256,33 @@ function ReviewWorkspace({
               </option>
             ))}
           </select>
+          {statusFilter === "pending_review" ? (
+            <button
+              type="button"
+              disabled={bulkActionPending || candidatesQuery.isLoading}
+              onClick={() => {
+                const count = items.length;
+                if (
+                  window.confirm(
+                    `Approve all pending candidates in the database? (Listed: ${count} on this page.) Uses suggested priority per row.`
+                  )
+                ) {
+                  approveAllMutation.mutate();
+                }
+              }}
+              className={cn(
+                "inline-flex h-9 items-center gap-1 rounded-full border border-emerald-500/60 bg-emerald-950/40 px-4 text-sm text-emerald-100 hover:border-emerald-400",
+                btnClickable
+              )}
+            >
+              {approveAllMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="size-3.5" />
+              )}
+              Approve all pending
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => candidatesQuery.refetch()}
@@ -233,18 +310,42 @@ function ReviewWorkspace({
         <ErrorBanner error={candidatesQuery.error} />
       ) : null}
 
-      {deleteMessage ? (
-        <p className="rounded-2xl border border-neutral-700 bg-neutral-900/60 px-4 py-2 text-sm text-neutral-200">
-          {deleteMessage}
-        </p>
-      ) : null}
+      {approveMessage ? <p className={styles.message}>{approveMessage}</p> : null}
+
+      {deleteMessage ? <p className={styles.message}>{deleteMessage}</p> : null}
 
       {selectedIds.size > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-rose-500/40 bg-rose-950/30 px-4 py-3">
+        <div className={styles.bulkBar}>
           <span className="text-sm text-neutral-200">{selectedIds.size} selected</span>
+          {statusFilter === "pending_review" ? (
+            <button
+              type="button"
+              disabled={bulkActionPending}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Approve ${selectedIds.size} selected candidate(s)? Uses each row's suggested priority.`
+                  )
+                ) {
+                  approveSelectedMutation.mutate([...selectedIds]);
+                }
+              }}
+              className={cn(
+                "inline-flex h-8 items-center gap-1 rounded-full border border-emerald-500/60 bg-emerald-950/40 px-3 text-sm text-emerald-100 hover:border-emerald-400",
+                btnClickable
+              )}
+            >
+              {approveSelectedMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="size-3.5" />
+              )}
+              Approve selected
+            </button>
+          ) : null}
           <button
             type="button"
-            disabled={deleteMutation.isPending}
+            disabled={bulkActionPending}
             onClick={() => {
               if (window.confirm(`Delete ${selectedIds.size} candidate(s)? This cannot be undone.`)) {
                 deleteMutation.mutate({ ids: [...selectedIds], force: false });
@@ -259,7 +360,7 @@ function ReviewWorkspace({
           </button>
           <button
             type="button"
-            disabled={deleteMutation.isPending}
+            disabled={bulkActionPending}
             onClick={() => {
               if (
                 window.confirm(
@@ -286,8 +387,8 @@ function ReviewWorkspace({
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:items-start">
-        <div className={listScrollPane}>
+      <div className={styles.split}>
+        <div className={styles.listCol}>
           <CandidateList
           groups={priorityGroups}
           activeId={activeId}
@@ -318,7 +419,8 @@ function ReviewWorkspace({
           />
         </div>
 
-        <section className={cn(styles.detailPane, stickyDetailPane)}>
+        <div className={styles.detailCol}>
+          <section className={styles.detailPane}>
           {!activeId ? (
             <EmptyDetail statusFilter={statusFilter} />
           ) : candidateQuery.isLoading ? (
@@ -334,7 +436,8 @@ function ReviewWorkspace({
               onAfterDecision={handleAfterDecision}
             />
           ) : null}
-        </section>
+          </section>
+        </div>
       </div>
     </div>
   );

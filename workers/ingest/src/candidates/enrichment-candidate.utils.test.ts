@@ -81,6 +81,7 @@ describe("enrichment-candidate.utils", () => {
     expect(delta.category_changed).toBe(true);
     expect(delta.tags_added).toContain("live");
     expect(delta.db_fields).toContain("normalized_event");
+    expect(delta.db_fields).toContain("title");
     expect(delta.status_change).toBeNull();
   });
 

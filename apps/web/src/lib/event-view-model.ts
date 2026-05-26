@@ -2,6 +2,7 @@ import type { Event, EventListItem } from "@fresno-events/shared";
 import { clampEventPriority } from "@fresno-events/shared";
 
 import { formatEventDate, formatShortTime, isTonight, isWeekend, toIsoDateLocal } from "@/lib/event-time";
+import { resolveMediaUrl } from "@/lib/media-url";
 import { gradientForPalette, paletteKeyForCategory, type ImagePaletteKey } from "@/lib/image-palette";
 
 export type FeaturedBadge = "tonight" | "weekend" | "huge" | "default";
@@ -147,7 +148,7 @@ export function toEventRowViewModel(item: EventListItem, now = new Date()): Even
     priority,
     paletteKey,
     paletteGradient: gradientForPalette(paletteKey),
-    imageUrl: heroImage?.cdnUrl ?? null,
+    imageUrl: resolveMediaUrl(heroImage?.cdnUrl ?? null),
     isFree: Boolean(event.isFree),
     isLive: false,
     featuredBadge: deriveFeaturedBadge(event, now)
@@ -172,7 +173,7 @@ export function toFeatureCardViewModel(item: EventListItem, now = new Date()): F
     badge: deriveFeaturedBadge(event, now),
     paletteKey,
     paletteGradient: gradientForPalette(paletteKey),
-    imageUrl: heroImage?.cdnUrl ?? null,
+    imageUrl: resolveMediaUrl(heroImage?.cdnUrl ?? null),
     isFree: Boolean(event.isFree)
   };
 }

@@ -1,4 +1,5 @@
-import type { SupabaseConfig } from "@/sources";
+import type { IngestEnv } from "@/env";
+import { getSupabaseConfig, type SupabaseConfig } from "@/sources";
 
 export interface IngestRunSourceStats {
   lastRunAt: string | null;
@@ -67,10 +68,89 @@ export async function fetchIngestRunStatsBySource(
   return out;
 }
 
-function supabaseHeaders(config: SupabaseConfig) {
+function supabaseHeaders(config: SupabaseConfig, prefer?: string) {
   return {
     apikey: config.serviceRoleKey,
     Authorization: `Bearer ${config.serviceRoleKey}`,
-    Accept: "application/json"
+    Accept: "application/json",
+    ...(prefer ? { Prefer: prefer } : {})
   };
+}
+
+/** Upsert parent row so venue_ingest_* FKs succeed before persistScrapeResult (or on dry-run). */
+export async function ensureIngestRunStarted(
+  env: IngestEnv,
+  opts: { runId: string; source: string; dryRun?: boolean }
+): Promise<void> {
+  const config = getSupabaseConfig(env);
+  if (!config) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const response = await fetch(`${config.url}/rest/v1/ingest_runs?on_conflict=id`, {
+    method: "POST",
+    headers: {
+      ...supabaseHeaders(config, "resolution=merge-duplicates,return=minimal"),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      id: opts.runId,
+      source: opts.source,
+      status: opts.dryRun ? "dry_run" : "running",
+      started_at: new Date().toISOString(),
+      events_found: 0,
+      errors_count: 0,
+      metrics: {}
+    })
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`ingest_runs upsert failed (${response.status}): ${body}`);
+  }
+}
+
+/** Close ingest_runs on dry-run (real runs still use persistScrapeResult). */
+export async function finishIngestRunRecord(
+  env: IngestEnv,
+  opts: {
+    runId: string;
+    source: string;
+    eventsFound: number;
+    errorsCount: number;
+    metrics: Record<string, unknown>;
+    dryRun: boolean;
+  }
+): Promise<void> {
+  const config = getSupabaseConfig(env);
+  if (!config) {
+    return;
+  }
+
+  const status =
+    opts.dryRun
+      ? "dry_run"
+      : opts.errorsCount > 0
+        ? "completed_with_errors"
+        : "completed";
+
+  const response = await fetch(`${config.url}/rest/v1/ingest_runs?id=eq.${opts.runId}`, {
+    method: "PATCH",
+    headers: {
+      ...supabaseHeaders(config, "return=minimal"),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      status,
+      events_found: opts.eventsFound,
+      errors_count: opts.errorsCount,
+      metrics: opts.metrics,
+      finished_at: new Date().toISOString()
+    })
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`ingest_runs patch failed (${response.status}): ${body}`);
+  }
 }

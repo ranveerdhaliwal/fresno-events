@@ -59,7 +59,8 @@ case "$TARGET" in
   local)
     ensure_local_stack
     echo "Applying pending migrations to local Postgres (existing rows kept)…"
-    run_supabase migration up --local
+    echo "If you see 'Remote migration versions not found', run once: pnpm db:repair:local-migration-version"
+    run_supabase migration up --local --include-all
     echo ""
     echo "Migration history (local):"
     run_supabase migration list --local

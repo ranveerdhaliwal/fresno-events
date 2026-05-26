@@ -232,6 +232,8 @@ export interface ScrapeSeedMetric {
   url: string;
   label?: string | null;
   eventsFound: number;
+  /** Present for venue-ingest per-venue metrics. */
+  venueKey?: string;
 }
 
 export interface ScrapeResult {
@@ -304,4 +306,12 @@ export type CandidateDeleteSkipReason = "approved" | "not_found";
 export interface CandidateBulkDeleteResponse {
   deleted: number;
   skipped: Array<{ id: string; reason: CandidateDeleteSkipReason }>;
+}
+
+export type CandidateApproveSkipReason = "not_found" | "not_pending" | "already_approved";
+
+export interface CandidateBulkApproveResponse {
+  approved: number;
+  skipped: Array<{ id: string; reason: CandidateApproveSkipReason }>;
+  failed: Array<{ id: string; message: string }>;
 }

@@ -1,0 +1,8 @@
+{
+  "key": "visit-fresno-county",
+  "label": "Visit Fresno County (CMS REST)",
+  "enabled": true,
+  "strategy": "api",
+  "listingUrl": "https://www.visitfresnocounty.com",
+  "eventSource": "api:visitfresnocounty"
+}
