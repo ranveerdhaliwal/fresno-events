@@ -8,6 +8,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./dist/index.js"
+    },
+    "./occurrence": {
+      "types": "./src/occurrence.ts",
+      "import": "./dist/occurrence.js"
     }
   },
   "scripts": {

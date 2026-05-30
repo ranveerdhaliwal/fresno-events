@@ -40,8 +40,23 @@ export type SeedLane = "api" | "special_url" | "crawl" | "manual";
 
 export type { LineupEntry } from "./lineup.js";
 export { LineupEntrySchema, LineupSchema, parseLineup } from "./lineup.js";
+export {
+  computeOccurrenceFingerprints,
+  computeOccurrenceKey,
+  computeUrlKey,
+  normalizeTitle,
+  normalizeVenue,
+  sourcePriorityRank,
+  type OccurrenceFingerprints
+} from "./occurrence.js";
 
-export type EventCandidateStatus = "pending_review" | "approved" | "rejected" | "needs_changes" | "duplicate";
+export type EventCandidateStatus =
+  | "awaiting_enrichment"
+  | "pending_review"
+  | "approved"
+  | "rejected"
+  | "needs_changes"
+  | "duplicate";
 
 export const EVENT_PRIORITY_MIN = 0;
 export const EVENT_PRIORITY_MAX = 5;
@@ -234,6 +249,18 @@ export interface ScrapeSeedMetric {
   eventsFound: number;
   /** Present for venue-ingest per-venue metrics. */
   venueKey?: string;
+  /** event_candidates.source for strategy=api venues. */
+  eventSource?: string;
+  /** Dry-run listing discovery: detail pages that would be scraped on promote. */
+  detailUrlsPlanned?: number;
+  /** True when eventsFound is a dry-run plan, not parsed events. */
+  dryRunPlan?: boolean;
+  /** Listing page(s) scraped or planned (preflight summary). */
+  listingUrls?: string[];
+  /** Detail page URLs discovered (capped in worker). */
+  detailUrls?: string[];
+  /** Parsed events with links (API / listing scrape in dry-run). */
+  eventLinks?: Array<{ title: string; url: string; startTs?: string }>;
 }
 
 export interface ScrapeResult {
@@ -244,6 +271,8 @@ export interface ScrapeResult {
   metrics: {
     pagesVisited: number;
     durationMs: number;
+    /** Venue-ingest persisted and enriched each venue inside the scraper run. */
+    venuePersistPerVenue?: boolean;
   };
   seedMetrics?: ScrapeSeedMetric[];
 }
@@ -260,6 +289,16 @@ export interface IngestRunRecord {
   errorsCount: number;
   metrics: Record<string, unknown>;
   createdAt: string;
+}
+
+export interface LinkedEventCandidate {
+  id: string;
+  source: EventSource;
+  sourceEventId: string;
+  title: string;
+  status: EventCandidateStatus;
+  sourceUrl?: string;
+  ticketUrl?: string;
 }
 
 export interface EventCandidate {
@@ -283,6 +322,8 @@ export interface EventCandidate {
   reviewedAt?: string;
   reviewedBy?: string;
   matchedEventId?: string;
+  occurrenceId: string;
+  canonicalCandidateId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -290,10 +331,39 @@ export interface EventCandidate {
 export interface EventCandidateListResponse {
   items: EventCandidate[];
   generatedAt: string;
+  offset?: number;
+  limit?: number;
+}
+
+export type ContentDiffField =
+  | "title"
+  | "startTs"
+  | "endTs"
+  | "venueName"
+  | "venueCity"
+  | "venueAddress"
+  | "descriptionText"
+  | "ticketUrl"
+  | "externalUrl"
+  | "category";
+
+export interface ContentDiffEntry {
+  field: ContentDiffField;
+  label: string;
+  before: string | null;
+  after: string | null;
+}
+
+export interface ContentDiffSummary {
+  changedFields: ContentDiffField[];
+  entries: ContentDiffEntry[];
 }
 
 export interface EventCandidateDetailResponse {
   candidate: EventCandidate;
+  linkedCandidates?: LinkedEventCandidate[];
+  publishedEvent?: Event;
+  contentDiff?: ContentDiffSummary;
 }
 
 export interface ReviewDecisionResponse {
@@ -313,5 +383,17 @@ export type CandidateApproveSkipReason = "not_found" | "not_pending" | "already_
 export interface CandidateBulkApproveResponse {
   approved: number;
   skipped: Array<{ id: string; reason: CandidateApproveSkipReason }>;
+  failed: Array<{ id: string; message: string }>;
+}
+
+export type CandidateApproveChangesSkipReason =
+  | "not_found"
+  | "not_needs_changes"
+  | "missing_matched_event"
+  | "already_approved";
+
+export interface CandidateBulkApproveChangesResponse {
+  approved: number;
+  skipped: Array<{ id: string; reason: CandidateApproveChangesSkipReason }>;
   failed: Array<{ id: string; message: string }>;
 }
