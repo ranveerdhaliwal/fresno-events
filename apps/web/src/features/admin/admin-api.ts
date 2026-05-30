@@ -1,6 +1,7 @@
 import type {
   ApiResponse,
   EventCandidate,
+  CandidateBulkApproveChangesResponse,
   CandidateBulkApproveResponse,
   CandidateBulkDeleteResponse,
   EventCandidateDetailResponse,
@@ -24,10 +25,42 @@ export class AdminApiError extends Error {
   }
 }
 
+export function isAdminAuthError(error: unknown): error is AdminApiError {
+  return error instanceof AdminApiError && error.status === 401;
+}
+
+/** Lightweight check that the token is accepted by the review API. */
+export async function verifyAdminToken(token: string): Promise<void> {
+  await listCandidates(token, "pending_review", { limit: 1 });
+}
+
 export type CandidateStatusFilter = EventCandidate["status"];
 
-export async function listCandidates(token: string, status: CandidateStatusFilter) {
-  return adminFetch<EventCandidateListResponse>(token, `/review/candidates?status=${encodeURIComponent(status)}&limit=100`);
+export type ReviewQueueTab = "new" | "updates" | "approved" | "rejected";
+
+export function reviewTabToStatus(tab: ReviewQueueTab): CandidateStatusFilter {
+  switch (tab) {
+    case "new":
+      return "pending_review";
+    case "updates":
+      return "needs_changes";
+    case "approved":
+      return "approved";
+    case "rejected":
+      return "rejected";
+  }
+}
+
+export async function listCandidates(
+  token: string,
+  status: CandidateStatusFilter,
+  opts?: { limit?: number; offset?: number }
+) {
+  const params = new URLSearchParams({ status, limit: String(opts?.limit ?? 100) });
+  if (opts?.offset) {
+    params.set("offset", String(opts.offset));
+  }
+  return adminFetch<EventCandidateListResponse>(token, `/review/candidates?${params}`);
 }
 
 export async function getCandidate(token: string, id: string) {
@@ -102,6 +135,30 @@ export async function bulkApproveAllPending(token: string, body: Omit<BulkApprov
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status: "pending_review", ...body })
+  });
+}
+
+export async function approveCandidateChanges(token: string, id: string, body: ApproveBody) {
+  return adminFetch<ReviewDecisionResponse>(token, `/review/candidates/${encodeURIComponent(id)}/approve-changes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+}
+
+export async function bulkApproveChanges(token: string, ids: string[], body: Omit<BulkApproveBody, "ids"> = {}) {
+  return adminFetch<CandidateBulkApproveChangesResponse>(token, "/review/candidates/bulk-approve-changes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, ids })
+  });
+}
+
+export async function bulkApproveChangesAll(token: string, body: Omit<BulkApproveBody, "ids"> = {}) {
+  return adminFetch<CandidateBulkApproveChangesResponse>(token, "/review/candidates/bulk-approve-changes-all", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
   });
 }
 

@@ -70,6 +70,23 @@
   border: var(--border-card);
   box-shadow: var(--shadow-lg);
   padding: 20px;
+  min-height: calc(100dvh - 13rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.detailPanePlaceholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: calc(100dvh - 13rem - 40px);
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink);
+  opacity: 0.55;
 }
 
 .headerActions {

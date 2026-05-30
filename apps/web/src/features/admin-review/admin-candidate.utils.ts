@@ -65,6 +65,6 @@ function deriveCandidateFlag(
   if (priority === 1) return "HUGE";
   if (aiSuggested) return "AI";
   if (status === "pending_review") return "REVIEW";
-  if (status === "needs_changes") return "CHANGES";
+  if (status === "needs_changes") return "UPDATE";
   return status.replace(/_/g, " ").toUpperCase();
 }
