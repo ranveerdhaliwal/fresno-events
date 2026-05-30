@@ -12,6 +12,7 @@ import {
   type EventCandidateStatus,
   parseLineup,
   type CandidateBulkApproveResponse,
+  type CandidateBulkApproveChangesResponse,
   type CandidateBulkDeleteResponse,
   type EventCategory,
   type NormalizedEvent,
@@ -33,8 +34,28 @@ import {
   validateBulkApproveIdCount
 } from "@/routes/review-approve.utils";
 import { partitionCandidatesForDelete } from "@/routes/review-delete.utils";
+import {
+  chunkApproveChangesIds,
+  mergeBulkApproveChangesResults,
+  parseBulkApproveChangesIds,
+  partitionCandidatesForApproveChanges,
+  validateBulkApproveChangesIdCount
+} from "@/routes/review-approve-changes.utils";
+import { buildContentDiff } from "@/routes/review-diff.utils";
+import {
+  buildAlternatesFromCandidates,
+  mergeSourceRefsWithAlternates,
+  toLinkedCandidate
+} from "@/routes/review-occurrence.utils";
 
-const validCandidateStatuses: EventCandidateStatus[] = ["pending_review", "approved", "rejected", "needs_changes", "duplicate"];
+const validCandidateStatuses: EventCandidateStatus[] = [
+  "awaiting_enrichment",
+  "pending_review",
+  "approved",
+  "rejected",
+  "needs_changes",
+  "duplicate"
+];
 
 export const reviewRoute = new Hono<{ Bindings: Env }>();
 
@@ -52,18 +73,25 @@ reviewRoute
   .get("/candidates", async (c) => {
     const status = toCandidateStatus(c.req.query("status")) ?? "pending_review";
     const limit = parseLimit(c.req.query("limit"));
+    const offset = parseOffset(c.req.query("offset"));
     const params = new URLSearchParams({
       select: candidateSelect,
       status: `eq.${status}`,
       order: "created_at.desc",
-      limit: String(limit)
+      limit: String(limit),
+      offset: String(offset)
     });
+    if (status === "pending_review") {
+      params.set("canonical_candidate_id", "is.null");
+    }
 
     try {
       const rows = await supabaseRequest<SupabaseCandidateRow[]>(c.env, `/rest/v1/event_candidates?${params}`);
       return ok<EventCandidateListResponse>(c, {
         items: rows.map(mapCandidateRow),
-        generatedAt: new Date().toISOString()
+        generatedAt: new Date().toISOString(),
+        offset,
+        limit
       });
     } catch (error) {
       return handleReviewError(c, error, "Review candidates could not be loaded.");
@@ -77,7 +105,28 @@ reviewRoute
         return fail(c, "candidate_not_found", "That event candidate could not be found.", 404);
       }
 
-      return ok<EventCandidateDetailResponse>(c, { candidate });
+      let publishedEvent: Event | undefined;
+      let contentDiff: EventCandidateDetailResponse["contentDiff"];
+
+      if (candidate.matchedEventId) {
+        const published = await getPublishedEventForReview(c.env, candidate.matchedEventId);
+        if (published) {
+          publishedEvent = published.event;
+          if (candidate.status === "needs_changes") {
+            contentDiff = buildContentDiff(published.diffSource, candidate.normalizedEvent) ?? undefined;
+          }
+        }
+      }
+
+      const siblings = await fetchCandidatesByOccurrenceId(c.env, candidate.occurrenceId, candidate.id);
+      const linkedCandidates = siblings.map(toLinkedCandidate);
+
+      return ok<EventCandidateDetailResponse>(c, {
+        candidate,
+        ...(linkedCandidates.length > 0 ? { linkedCandidates } : {}),
+        ...(publishedEvent ? { publishedEvent } : {}),
+        ...(contentDiff ? { contentDiff } : {})
+      });
     } catch (error) {
       return handleReviewError(c, error, "Review candidate could not be loaded.");
     }
@@ -181,6 +230,84 @@ reviewRoute
       return handleReviewError(c, error, "Candidates could not be approved.");
     }
   })
+  .post("/candidates/:id/approve-changes", async (c) => {
+    const body = await readJsonBody(c.req.raw);
+
+    try {
+      const candidate = await getCandidate(c.env, c.req.param("id"));
+
+      if (!candidate) {
+        return fail(c, "candidate_not_found", "That event candidate could not be found.", 404);
+      }
+
+      const result = await approveChangesCore(
+        c.env,
+        candidate,
+        buildApproveCandidateOptions({
+          eventOverride: body.event,
+          priority: parseOptionalApprovePriority(body.priority),
+          notes: typeof body.notes === "string" ? body.notes : undefined,
+          reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin"
+        })
+      );
+
+      return ok<ReviewDecisionResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Candidate changes could not be approved.");
+    }
+  })
+  .post("/candidates/bulk-approve-changes", async (c) => {
+    const body = await readJsonBody(c.req.raw);
+    const ids = parseBulkApproveChangesIds(body.ids);
+
+    if (!ids) {
+      return fail(c, "invalid_request", "ids must be a non-empty array.", 400);
+    }
+
+    const countError = validateBulkApproveChangesIdCount(ids);
+    if (countError) {
+      return fail(c, "invalid_request", countError, 400);
+    }
+
+    try {
+      const explicitPriority = parseOptionalApprovePriority(body.priority);
+      const result = await approveChangesByIds(c.env, ids, {
+        priority: explicitPriority,
+        notes: typeof body.notes === "string" ? body.notes : undefined,
+        reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin"
+      });
+      return ok<CandidateBulkApproveChangesResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Candidate changes could not be approved.");
+    }
+  })
+  .post("/candidates/bulk-approve-changes-all", async (c) => {
+    const body = await readJsonBody(c.req.raw);
+
+    try {
+      const explicitPriority = parseOptionalApprovePriority(body.priority);
+      const limit = parseBulkApproveAllLimit(body.limit);
+      const candidates = await listAllCandidatesByStatus(c.env, "needs_changes", limit);
+      const ids = candidates.map((candidate) => candidate.id);
+      const chunks = chunkApproveChangesIds(ids);
+      const parts: CandidateBulkApproveChangesResponse[] = [];
+
+      for (const chunk of chunks) {
+        parts.push(
+          await approveChangesByIds(c.env, chunk, {
+            priority: explicitPriority,
+            notes: typeof body.notes === "string" ? body.notes : undefined,
+            reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin",
+            prefetched: candidates
+          })
+        );
+      }
+
+      return ok<CandidateBulkApproveChangesResponse>(c, mergeBulkApproveChangesResults(parts));
+    } catch (error) {
+      return handleReviewError(c, error, "Candidate changes could not be approved.");
+    }
+  })
   .delete("/candidates/:id", async (c) => {
     const force = c.req.query("force") === "true";
 
@@ -258,6 +385,8 @@ const candidateSelect = [
   "reviewed_at",
   "reviewed_by",
   "matched_event_id",
+  "occurrence_id",
+  "canonical_candidate_id",
   "created_at",
   "updated_at"
 ].join(",");
@@ -339,6 +468,28 @@ interface ApproveCandidateOptions {
   reviewedBy?: string | undefined;
 }
 
+function buildApproveCandidateOptions(input: {
+  eventOverride?: unknown;
+  priority?: number | undefined;
+  notes?: string | undefined;
+  reviewedBy?: string | undefined;
+}): ApproveCandidateOptions {
+  const options: ApproveCandidateOptions = {};
+  if (input.eventOverride !== undefined) {
+    options.eventOverride = input.eventOverride;
+  }
+  if (input.priority !== undefined) {
+    options.priority = input.priority;
+  }
+  if (input.notes !== undefined) {
+    options.notes = input.notes;
+  }
+  if (input.reviewedBy !== undefined) {
+    options.reviewedBy = input.reviewedBy;
+  }
+  return options;
+}
+
 async function approveCandidateCore(
   env: Env,
   candidate: EventCandidate,
@@ -348,18 +499,77 @@ async function approveCandidateCore(
     throw new ReviewRouteError(`Candidate ${candidate.id} is not pending review.`, 400);
   }
 
-  const normalized = mergeNormalizedEvent(candidate.normalizedEvent, options.eventOverride);
+  if (candidate.canonicalCandidateId) {
+    throw new ReviewRouteError(
+      `Candidate ${candidate.id} is linked to another source; approve the primary row instead.`,
+      400
+    );
+  }
+
   const priority =
     options.priority !== undefined
       ? options.priority
       : resolveBulkApprovePriority(candidate);
-  const venue = await upsertVenue(env, normalized);
 
-  const heroImage = normalized.imageUrl
-    ? await mirrorImageWithLogging(env, normalized.imageUrl, normalized.title)
-    : null;
+  const siblings = await fetchCandidatesByOccurrenceId(env, candidate.occurrenceId, candidate.id);
 
-  const event = await upsertEvent(env, candidate, normalized, venue.id, heroImage?.id ?? null, priority);
+  const { event } = await publishCandidateToEvent(env, candidate, {
+    eventOverride: options.eventOverride,
+    priority,
+    reviewedBy: options.reviewedBy ?? "admin",
+    siblings
+  });
+
+  const updated = await updateCandidate(env, candidate.id, {
+    status: "approved",
+    review_notes: options.notes ?? candidate.reviewNotes ?? null,
+    reviewed_by: options.reviewedBy ?? "admin",
+    reviewed_at: new Date().toISOString(),
+    matched_event_id: event.id
+  });
+
+  await linkOccurrenceSiblings(env, candidate.occurrenceId, event.id, candidate.id);
+
+  return { candidate: updated ?? candidate, event };
+}
+
+async function approveChangesCore(
+  env: Env,
+  candidate: EventCandidate,
+  options: ApproveCandidateOptions
+): Promise<ReviewDecisionResponse> {
+  if (candidate.status !== "needs_changes") {
+    throw new ReviewRouteError(`Candidate ${candidate.id} is not needs_changes.`, 400);
+  }
+
+  if (candidate.canonicalCandidateId) {
+    throw new ReviewRouteError(
+      `Candidate ${candidate.id} is linked to another source; update the primary row instead.`,
+      400
+    );
+  }
+
+  if (!candidate.matchedEventId) {
+    throw new ReviewRouteError(`Candidate ${candidate.id} has no linked published event.`, 400);
+  }
+
+  const published = await getPublishedEventForReview(env, candidate.matchedEventId);
+  if (!published) {
+    throw new ReviewRouteError(`Published event ${candidate.matchedEventId} could not be found.`, 404);
+  }
+
+  const priority =
+    options.priority !== undefined
+      ? options.priority
+      : (published.event.priority ?? EVENT_PRIORITY_DEFAULT);
+
+  const { event } = await publishCandidateToEvent(env, candidate, {
+    eventOverride: options.eventOverride,
+    priority,
+    reviewedBy: options.reviewedBy ?? "admin",
+    existingSlug: published.event.slug
+  });
+
   const updated = await updateCandidate(env, candidate.id, {
     status: "approved",
     review_notes: options.notes ?? candidate.reviewNotes ?? null,
@@ -369,6 +579,136 @@ async function approveCandidateCore(
   });
 
   return { candidate: updated ?? candidate, event };
+}
+
+interface PublishCandidateOptions {
+  eventOverride?: unknown;
+  priority: number;
+  reviewedBy: string;
+  existingSlug?: string;
+  siblings?: EventCandidate[];
+}
+
+async function publishCandidateToEvent(
+  env: Env,
+  candidate: EventCandidate,
+  options: PublishCandidateOptions
+): Promise<{ event: Event; normalized: NormalizedEvent }> {
+  const normalized = mergeNormalizedEvent(candidate.normalizedEvent, options.eventOverride);
+  const venue = await upsertVenue(env, normalized);
+
+  const heroImage = normalized.imageUrl
+    ? await mirrorImageWithLogging(env, normalized.imageUrl, normalized.title)
+    : null;
+
+  const siblings = options.siblings ?? [];
+  const existingByOccurrence = await getScheduledEventByOccurrenceId(env, candidate.occurrenceId);
+
+  const event = existingByOccurrence
+    ? await patchApprovedEvent(
+        env,
+        existingByOccurrence,
+        candidate,
+        normalized,
+        venue.id,
+        heroImage?.id ?? null,
+        options.priority,
+        siblings
+      )
+    : await upsertEvent(
+        env,
+        candidate,
+        normalized,
+        venue.id,
+        heroImage?.id ?? null,
+        options.priority,
+        options.existingSlug,
+        siblings
+      );
+
+  return { event, normalized };
+}
+
+interface BulkApproveChangesRunOptions {
+  priority?: number | undefined;
+  notes?: string | undefined;
+  reviewedBy?: string | undefined;
+  prefetched?: EventCandidate[] | undefined;
+}
+
+async function approveChangesByIds(
+  env: Env,
+  ids: string[],
+  options: BulkApproveChangesRunOptions
+): Promise<CandidateBulkApproveChangesResponse> {
+  const uniqueIds = [...new Set(ids)];
+  const candidateById = new Map(
+    (options.prefetched ?? []).map((candidate) => [candidate.id, candidate] as const)
+  );
+  const missingIds = uniqueIds.filter((id) => !candidateById.has(id));
+
+  if (missingIds.length > 0) {
+    const params = new URLSearchParams({
+      select: candidateSelect,
+      id: `in.(${missingIds.join(",")})`
+    });
+    const rows = await supabaseRequest<SupabaseCandidateRow[]>(env, `/rest/v1/event_candidates?${params}`);
+    for (const row of rows) {
+      const mapped = mapCandidateRow(row);
+      candidateById.set(mapped.id, mapped);
+    }
+  }
+
+  const statusRows = uniqueIds.flatMap((id) => {
+    const candidate = candidateById.get(id);
+    return candidate
+      ? [{ id, status: candidate.status, matched_event_id: candidate.matchedEventId ?? null }]
+      : [];
+  });
+  const { toApprove, skipped } = partitionCandidatesForApproveChanges(uniqueIds, statusRows);
+
+  let approved = 0;
+  const failed: CandidateBulkApproveChangesResponse["failed"] = [];
+
+  for (const id of toApprove) {
+    const candidate = candidateById.get(id);
+    if (!candidate) {
+      continue;
+    }
+
+    try {
+      await approveChangesCore(
+        env,
+        candidate,
+        buildApproveCandidateOptions({
+          priority: options.priority,
+          notes: options.notes,
+          reviewedBy: options.reviewedBy
+        })
+      );
+      approved += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failed.push({ id, message });
+      logError("bulk_approve_changes_item_failed", error, {
+        candidate_id: id,
+        title: candidate.title,
+        source: candidate.source,
+        source_event_id: candidate.sourceEventId
+      });
+    }
+  }
+
+  if (failed.length > 0 || approved > 0) {
+    logStructured("bulk_approve_changes_batch_done", {
+      approved,
+      skipped: skipped.length,
+      failed: failed.length,
+      failed_ids: failed.map((f) => f.id)
+    });
+  }
+
+  return { approved, skipped, failed };
 }
 
 interface BulkApproveRunOptions {
@@ -468,6 +808,9 @@ async function listAllCandidatesByStatus(
       limit: String(pageSize),
       offset: String(offset)
     });
+    if (status === "pending_review") {
+      params.set("canonical_candidate_id", "is.null");
+    }
     const rows = await supabaseRequest<SupabaseCandidateRow[]>(env, `/rest/v1/event_candidates?${params}`);
 
     if (rows.length === 0) {
@@ -562,11 +905,12 @@ async function upsertEvent(
   normalized: NormalizedEvent,
   venueId: string,
   heroImageId: string | null,
-  priority: number
+  priority: number,
+  existingSlug?: string,
+  siblings: EventCandidate[] = []
 ): Promise<Event> {
-  // Title-only slugs truncate to 80 chars and can collide; candidate id makes slug unique.
-  const slug = slugify(`${normalized.title}-${candidate.id.slice(0, 8)}`);
-  return await postApprovedEvent(env, candidate, normalized, venueId, heroImageId, priority, slug);
+  const slug = existingSlug ?? slugify(`${normalized.title}-${candidate.id.slice(0, 8)}`);
+  return await postApprovedEvent(env, candidate, normalized, venueId, heroImageId, priority, slug, siblings);
 }
 
 async function postApprovedEvent(
@@ -576,15 +920,19 @@ async function postApprovedEvent(
   venueId: string,
   heroImageId: string | null,
   priority: number,
-  slug: string
+  slug: string,
+  siblings: EventCandidate[] = []
 ): Promise<Event> {
   const now = new Date().toISOString();
-  const sourceRefs = compactRecord({
-    candidate_id: candidate.id,
-    run_id: candidate.runId,
-    source_url: candidate.sourceUrl,
-    image_url: normalized.imageUrl
-  });
+  const sourceRefs = mergeSourceRefsWithAlternates(
+    compactRecord({
+      candidate_id: candidate.id,
+      run_id: candidate.runId,
+      source_url: candidate.sourceUrl,
+      image_url: normalized.imageUrl
+    }),
+    buildAlternatesFromCandidates(candidate, siblings)
+  );
   const rows = await supabaseRequest<SupabaseEventRow[]>(env, "/rest/v1/events?on_conflict=source,source_event_id", {
     method: "POST",
     headers: {
@@ -620,6 +968,7 @@ async function postApprovedEvent(
       confidence_score: candidate.confidenceScore,
       last_seen_at: now,
       priority,
+      occurrence_id: candidate.occurrenceId,
       series_id: normalized.seriesId ?? null,
       series_name: normalized.seriesName ?? null,
       lineup: normalized.lineup ?? null,
@@ -694,8 +1043,140 @@ function mapCandidateRow(row: SupabaseCandidateRow): EventCandidate {
     ...(row.review_notes ? { reviewNotes: row.review_notes } : {}),
     ...(row.reviewed_at ? { reviewedAt: row.reviewed_at } : {}),
     ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
-    ...(row.matched_event_id ? { matchedEventId: row.matched_event_id } : {})
+    ...(row.matched_event_id ? { matchedEventId: row.matched_event_id } : {}),
+    occurrenceId: row.occurrence_id,
+    ...(row.canonical_candidate_id ? { canonicalCandidateId: row.canonical_candidate_id } : {})
   };
+}
+
+async function fetchCandidatesByOccurrenceId(
+  env: Env,
+  occurrenceId: string,
+  excludeId?: string
+): Promise<EventCandidate[]> {
+  const params = new URLSearchParams({
+    select: candidateSelect,
+    occurrence_id: `eq.${occurrenceId}`,
+    order: "source.asc",
+    limit: "50"
+  });
+
+  const rows = await supabaseRequest<SupabaseCandidateRow[]>(env, `/rest/v1/event_candidates?${params}`);
+  return rows
+    .filter((row) => row.id !== excludeId)
+    .map(mapCandidateRow);
+}
+
+async function getScheduledEventByOccurrenceId(env: Env, occurrenceId: string): Promise<SupabaseEventRow | null> {
+  const params = new URLSearchParams({
+    select: [
+      "id",
+      "slug",
+      "source",
+      "source_event_id",
+      "source_refs",
+      "title",
+      "description_html",
+      "description_text",
+      "venue_id",
+      "start_ts",
+      "end_ts",
+      "timezone",
+      "category",
+      "subcategories",
+      "tags",
+      "price_min",
+      "price_max",
+      "currency",
+      "is_free",
+      "ticket_url",
+      "external_url",
+      "dedupe_hash",
+      "confidence_score",
+      "last_seen_at",
+      "priority",
+      "occurrence_id",
+      "series_id",
+      "series_name",
+      "lineup",
+      "created_at",
+      "updated_at"
+    ].join(","),
+    occurrence_id: `eq.${occurrenceId}`,
+    status: "eq.scheduled",
+    limit: "1"
+  });
+
+  const rows = await supabaseRequest<SupabaseEventRow[]>(env, `/rest/v1/events?${params}`);
+  return rows[0] ?? null;
+}
+
+async function patchApprovedEvent(
+  env: Env,
+  existing: SupabaseEventRow,
+  candidate: EventCandidate,
+  normalized: NormalizedEvent,
+  venueId: string,
+  heroImageId: string | null,
+  priority: number,
+  siblings: EventCandidate[]
+): Promise<Event> {
+  const now = new Date().toISOString();
+  const mergedRefs = mergeSourceRefsWithAlternates(
+    toStringRecord(existing.source_refs),
+    buildAlternatesFromCandidates(candidate, siblings)
+  );
+
+  const params = new URLSearchParams({ id: `eq.${existing.id}` });
+  const rows = await supabaseRequest<SupabaseEventRow[]>(env, `/rest/v1/events?${params}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      source_refs: mergedRefs,
+      title: normalized.title,
+      description_html: normalized.descriptionHtml ?? null,
+      description_text: normalized.descriptionText ?? null,
+      venue_id: venueId,
+      start_ts: normalized.startTs,
+      end_ts: normalized.endTs ?? null,
+      ticket_url: normalized.ticketUrl ?? null,
+      external_url: normalized.externalUrl ?? candidate.sourceUrl ?? null,
+      hero_image_id: heroImageId,
+      priority,
+      occurrence_id: candidate.occurrenceId,
+      last_seen_at: now,
+      updated_at: now
+    })
+  });
+
+  const row = rows[0];
+  if (!row) {
+    throw new ReviewRouteError("Event patch did not return a row.");
+  }
+
+  return mapEventRow(row);
+}
+
+async function linkOccurrenceSiblings(env: Env, occurrenceId: string, eventId: string, primaryId: string) {
+  const params = new URLSearchParams({
+    occurrence_id: `eq.${occurrenceId}`,
+    id: `neq.${primaryId}`
+  });
+
+  await supabaseRequest(env, `/rest/v1/event_candidates?${params}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({
+      matched_event_id: eventId,
+      updated_at: new Date().toISOString()
+    })
+  });
 }
 
 function mapEventRow(row: SupabaseEventRow): Event {
@@ -766,7 +1247,80 @@ function parseLimit(value: string | undefined) {
     return 50;
   }
 
-  return Math.min(Math.max(Math.trunc(parsed), 1), 100);
+  return Math.min(Math.max(Math.trunc(parsed), 1), 200);
+}
+
+function parseOffset(value: string | undefined) {
+  const parsed = Number(value ?? 0);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return Math.min(Math.trunc(parsed), 5000);
+}
+
+async function getPublishedEventForReview(env: Env, eventId: string) {
+  const params = new URLSearchParams({
+    select: [
+      "id",
+      "slug",
+      "source",
+      "source_event_id",
+      "source_refs",
+      "title",
+      "description_html",
+      "description_text",
+      "venue_id",
+      "start_ts",
+      "end_ts",
+      "timezone",
+      "category",
+      "subcategories",
+      "tags",
+      "price_min",
+      "price_max",
+      "currency",
+      "is_free",
+      "ticket_url",
+      "external_url",
+      "dedupe_hash",
+      "confidence_score",
+      "last_seen_at",
+      "priority",
+      "series_id",
+      "series_name",
+      "lineup",
+      "created_at",
+      "updated_at",
+      "venue:venues(name,city,address)"
+    ].join(","),
+    id: `eq.${eventId}`,
+    limit: "1"
+  });
+
+  const rows = await supabaseRequest<SupabaseEventWithVenueRow[]>(env, `/rest/v1/events?${params}`);
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+
+  const event = mapEventRow(row);
+  return {
+    event,
+    diffSource: {
+      title: row.title,
+      startTs: row.start_ts,
+      ...(row.end_ts ? { endTs: row.end_ts } : {}),
+      ...(row.description_text ? { descriptionText: row.description_text } : {}),
+      ...(row.ticket_url ? { ticketUrl: row.ticket_url } : {}),
+      ...(row.external_url ? { externalUrl: row.external_url } : {}),
+      category: row.category,
+      ...(row.venue?.name ? { venueName: row.venue.name } : {}),
+      ...(row.venue?.city ? { venueCity: row.venue.city } : {}),
+      ...(row.venue?.address ? { venueAddress: row.venue.address } : {})
+    }
+  };
 }
 
 async function readJsonBody(request: Request) {
@@ -821,7 +1375,8 @@ function handleReviewError(c: Parameters<typeof fail>[0], error: unknown, fallba
   });
 
   if (error instanceof ReviewRouteError) {
-    return fail(c, "review_unavailable", error.message, error.status === 503 ? 503 : 502);
+    const status = error.status === 503 ? 503 : error.status === 400 ? 400 : error.status === 404 ? 404 : 502;
+    return fail(c, "review_unavailable", error.message, status);
   }
 
   return fail(c, "review_unavailable", fallbackMessage, 502);
@@ -855,6 +1410,8 @@ interface SupabaseCandidateRow {
   reviewed_at: string | null;
   reviewed_by: string | null;
   matched_event_id: string | null;
+  occurrence_id: string;
+  canonical_candidate_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -876,7 +1433,7 @@ interface SupabaseEventRow {
   start_ts: string;
   end_ts: string | null;
   timezone: string | null;
-  category: string | null;
+  category: string;
   subcategories: string[] | null;
   tags: string[] | null;
   price_min: number | string | null;
@@ -884,10 +1441,10 @@ interface SupabaseEventRow {
   currency: string | null;
   is_free: boolean | null;
   ticket_url: string | null;
+  external_url: string | null;
   status: string | null;
   gallery_image_ids: string[] | null;
   all_artist_ids: string[] | null;
-  external_url: string | null;
   dedupe_hash: string | null;
   confidence_score: number | null;
   last_seen_at: string | null;
@@ -895,6 +1452,14 @@ interface SupabaseEventRow {
   series_id: string | null;
   series_name: string | null;
   lineup: unknown;
+  occurrence_id: string | null;
   created_at: string;
   updated_at: string;
+  venue?: {
+    name: string;
+    city: string;
+    address: string | null;
+  } | null;
 }
+
+type SupabaseEventWithVenueRow = SupabaseEventRow;

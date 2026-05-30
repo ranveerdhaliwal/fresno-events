@@ -6,7 +6,8 @@ import type { Env } from "@/env";
 function createMockExecutionContext(): ExecutionContext {
   return {
     waitUntil: vi.fn(),
-    passThroughOnException: vi.fn()
+    passThroughOnException: vi.fn(),
+    props: {}
   };
 }
 
