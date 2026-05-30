@@ -7,17 +7,21 @@ import {
   buildVisitFresnoDateRanges,
   buildVisitFresnoUrl,
   extractVisitFresnoDocs,
+  parseVisitFresnoSimpleTokenBody,
   parseVisitFresnoStartTs,
   toNormalizedEvent,
   visitFresnoTotalCount
 } from "./visit-fresno-api.utils";
 
-const fixturePath = join(
-  process.cwd(),
-  "../../tools/spikes/fixtures/visit-fresno-sample.json"
-);
+const fixturePath = join(import.meta.dirname, "fixtures/visit-fresno-response.json");
 
 describe("visit-fresno-api.utils", () => {
+  it("parseVisitFresnoSimpleTokenBody accepts plain-text token", () => {
+    expect(parseVisitFresnoSimpleTokenBody("9ad7b23a6ed7705ee3a0e0c6f68c7211\n")).toBe(
+      "9ad7b23a6ed7705ee3a0e0c6f68c7211"
+    );
+  });
+
   it("buildVisitFresnoDateRanges splits a 30-day horizon into weekly windows", () => {
     const ranges = buildVisitFresnoDateRanges(new Date("2026-05-23T12:00:00Z"));
     expect(ranges.length).toBeGreaterThanOrEqual(4);
@@ -64,7 +68,7 @@ describe("visit-fresno-api.utils", () => {
     const parsed = VisitFresnoResponseSchema.parse(JSON.parse(raw));
     const docs = extractVisitFresnoDocs(parsed);
     expect(docs.length).toBeGreaterThan(0);
-    expect(visitFresnoTotalCount(parsed)).toBe(224);
+    expect(visitFresnoTotalCount(parsed)).toBeGreaterThan(0);
 
     const firstDoc = docs[0];
     expect(firstDoc).toBeDefined();

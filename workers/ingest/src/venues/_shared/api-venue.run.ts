@@ -10,8 +10,31 @@ export async function runApiVenue(
   ctx: VenueRunContext,
   scraper: ScraperRun
 ): Promise<VenueRunResult> {
+  console.log(
+    JSON.stringify({
+      event: "venue_ingest",
+      venue_key: config.key,
+      step: "api_venue_start",
+      dry_run: ctx.dryRun,
+      lane: "direct",
+      event_source: config.eventSource ?? null
+    })
+  );
+
   const scrapeCtx = buildVenueScrapeContext(env, ctx);
   const result = await scraper(scrapeCtx);
+
+  console.log(
+    JSON.stringify({
+      event: "venue_ingest",
+      venue_key: config.key,
+      step: "api_venue_done",
+      dry_run: ctx.dryRun,
+      events_found: result.events.length,
+      errors: result.errors.length,
+      duration_ms: result.metrics.durationMs
+    })
+  );
 
   return {
     events: result.events,

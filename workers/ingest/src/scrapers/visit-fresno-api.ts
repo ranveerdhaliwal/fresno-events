@@ -7,6 +7,7 @@ import {
   buildVisitFresnoDateRanges,
   buildVisitFresnoUrl,
   extractVisitFresnoDocs,
+  resolveVisitFresnoApiToken,
   toNormalizedEvent,
   visitFresnoTotalCount
 } from "./visit-fresno-api.utils";
@@ -18,18 +19,23 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
   const started = performance.now();
   const errors: ScrapeError[] = [];
   const events: ScrapeResult["events"] = [];
-  const token = ctx.secrets.VISIT_FRESNO_API_TOKEN?.trim();
+  const token = await resolveVisitFresnoApiToken({
+    userAgent: ctx.userAgent,
+    fallbackToken: ctx.secrets.VISIT_FRESNO_API_TOKEN,
+    ...(ctx.signal ? { signal: ctx.signal } : {})
+  });
 
   if (!token) {
     return finish(ctx, started, events, [
       {
         source: "visit-fresno-api",
-        message: "VISIT_FRESNO_API_TOKEN is not configured.",
+        message: "Visit Fresno API token could not be fetched from get_simple_token.",
         recoverable: true
       }
     ], 0);
   }
 
+  log({ step: "token_ready", source: "get_simple_token" });
   const limit = 50;
   const ranges = buildVisitFresnoDateRanges(ctx.now);
   let pages = 0;

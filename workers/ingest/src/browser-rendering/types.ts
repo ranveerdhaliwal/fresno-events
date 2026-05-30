@@ -17,6 +17,7 @@ export interface BrCrawlRecord {
   url: string;
   status: string;
   markdown?: string;
+  html?: string;
 }
 
 export interface BrCrawlJob {

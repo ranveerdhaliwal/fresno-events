@@ -1,9 +1,46 @@
 import type { ScrapeContext, ScrapeError, ScrapeResult } from "@fresno-events/shared";
 
+import { persistAndEnrichVenueEvents } from "@/candidates/persist-and-enrich-venue";
 import type { IngestEnv } from "@/env";
 import { ensureIngestRunStarted, finishIngestRunRecord } from "@/ingest-runs";
 import { finishVenueRun, startVenueRun, type VenueRunStatus } from "@/venue-ingest-state";
 import { loadEnabledVenues, runVenue } from "@/venues/registry";
+
+/** Max URLs in preflight JSON (full list still in venue_ingest_runs.debug). */
+const PREFLIGHT_LINK_CAP = 2000;
+
+function capPreflightLinks(urls: string[]): string[] {
+  return [...new Set(urls.filter((u) => u.startsWith("http")))].slice(0, PREFLIGHT_LINK_CAP);
+}
+
+function buildPreflightSeedLinks(
+  config: { listingUrl: string },
+  venueResult: { events: ScrapeResult["events"]; debug: { listingUrls?: string[]; detailUrls?: string[] } }
+): Pick<NonNullable<ScrapeResult["seedMetrics"]>[number], "listingUrls" | "detailUrls" | "eventLinks"> {
+  const listingUrls = capPreflightLinks(
+    venueResult.debug.listingUrls?.length ? venueResult.debug.listingUrls : [config.listingUrl]
+  );
+  const detailFromDebug = capPreflightLinks(venueResult.debug.detailUrls ?? []);
+  const eventLinks = venueResult.events
+    .filter((e) => e.externalUrl?.startsWith("http"))
+    .slice(0, PREFLIGHT_LINK_CAP)
+    .map((e) => ({
+      title: e.title,
+      url: e.externalUrl!,
+      startTs: e.startTs
+    }));
+
+  const detailUrls =
+    detailFromDebug.length > 0
+      ? detailFromDebug
+      : capPreflightLinks(eventLinks.map((e) => e.url));
+
+  return {
+    ...(listingUrls.length > 0 ? { listingUrls } : {}),
+    ...(detailUrls.length > 0 ? { detailUrls } : {}),
+    ...(eventLinks.length > 0 ? { eventLinks } : {})
+  };
+}
 
 function parseVenueFilter(config: Record<string, unknown>): string[] | undefined {
   const raw = config.venues;
@@ -39,6 +76,7 @@ export function createVenueIngestRunner(env: IngestEnv) {
     const allEvents: ScrapeResult["events"] = [];
     const seedMetrics: NonNullable<ScrapeResult["seedMetrics"]> = [];
     let pagesVisited = 0;
+    let venuePersistPerVenue = false;
 
     console.log(
       JSON.stringify({
@@ -90,6 +128,15 @@ export function createVenueIngestRunner(env: IngestEnv) {
     for (const config of venues) {
       let venueRunId: string | null = null;
       try {
+        console.log(
+          JSON.stringify({
+            event: "venue_ingest_venue_start",
+            venue_key: config.key,
+            strategy: config.strategy,
+            dry_run: dryRun
+          })
+        );
+
         venueRunId = await startVenueRun(env, config.key, ctx.runId, dryRun);
         const venueResult = await runVenue(env, config, {
           ingestRunId: ctx.runId,
@@ -102,6 +149,24 @@ export function createVenueIngestRunner(env: IngestEnv) {
         pagesVisited += venueResult.listingUrlsFound + venueResult.detailUrlsVisited;
         allEvents.push(...venueResult.events);
         errors.push(...venueResult.errors);
+
+        if (!dryRun && venueResult.events.length > 0) {
+          const sourceFilter =
+            config.eventSource ??
+            venueResult.events.find((e) => e.source)?.source ??
+            `venue-ingest:${config.key}`;
+          try {
+            await persistAndEnrichVenueEvents(env, ctx.runId, venueResult.events, sourceFilter);
+            venuePersistPerVenue = true;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            errors.push({
+              source: `venue-ingest:${config.key}`,
+              message: `Persist/enrich failed: ${message}`,
+              recoverable: false
+            });
+          }
+        }
 
         const status: VenueRunStatus = dryRun
           ? "dry_run"
@@ -120,11 +185,20 @@ export function createVenueIngestRunner(env: IngestEnv) {
           brCrawlStatus: venueResult.brCrawlStatus ?? null
         });
 
+        const detailUrlsPlanned = venueResult.debug.detailUrlsPlanned ?? venueResult.events.length;
+        const reportCount =
+          dryRun && venueResult.events.length === 0 ? detailUrlsPlanned : venueResult.events.length;
+        const dryRunPlan = dryRun && venueResult.events.length === 0 && detailUrlsPlanned > 0;
+
         seedMetrics.push({
           url: config.listingUrl,
           label: config.label,
-          eventsFound: venueResult.events.length,
-          venueKey: config.key
+          eventsFound: reportCount,
+          venueKey: config.key,
+          ...(config.eventSource ? { eventSource: config.eventSource } : {}),
+          ...(dryRun && detailUrlsPlanned > 0 ? { detailUrlsPlanned } : {}),
+          ...(dryRunPlan ? { dryRunPlan: true } : {}),
+          ...buildPreflightSeedLinks(config, venueResult)
         });
 
         console.log(
@@ -160,7 +234,15 @@ export function createVenueIngestRunner(env: IngestEnv) {
       }
     }
 
-    const scrapeResult = result(ctx, allEvents, errors, pagesVisited, started, seedMetrics);
+    const scrapeResult = result(
+      ctx,
+      allEvents,
+      errors,
+      pagesVisited,
+      started,
+      seedMetrics,
+      venuePersistPerVenue
+    );
 
     if (dryRun) {
       try {
@@ -208,14 +290,19 @@ function result(
   errors: ScrapeError[],
   pagesVisited: number,
   started: number,
-  seedMetrics: NonNullable<ScrapeResult["seedMetrics"]>
+  seedMetrics: NonNullable<ScrapeResult["seedMetrics"]>,
+  venuePersistPerVenue = false
 ): ScrapeResult {
   return {
     source: "venue-ingest",
     runId: ctx.runId,
     events,
     errors,
-    metrics: { pagesVisited, durationMs: Math.round(performance.now() - started) },
+    metrics: {
+      pagesVisited,
+      durationMs: Math.round(performance.now() - started),
+      ...(venuePersistPerVenue ? { venuePersistPerVenue: true } : {})
+    },
     seedMetrics
   };
 }

@@ -5,6 +5,7 @@ import { renderUrlToMarkdown } from "@/browser-rendering/render-page";
 import type { IngestEnv } from "@/env";
 import { getJsonPromptBackend } from "@/llm/registry";
 import type { VenueConfig, VenueRunContext, VenueRunResult } from "@/venues/venue.types";
+import { resolveDetailMode } from "@/venues/venue-profile.utils";
 
 import {
   discoverDetailUrlsFromListingMarkdown,
@@ -91,6 +92,7 @@ export async function runListingThenDetailPipeline(
 
     if (useBrListing) {
       if (dryRun) {
+        const urlsBefore = allDetailUrls.size;
         try {
           const html = await fetchListingHtml(listingUrl, ctx.userAgent, ctx.signal);
           for (const url of discoverDetailUrls(html, listingUrl, config)) {
@@ -106,7 +108,40 @@ export async function runListingThenDetailPipeline(
             recoverable: true
           });
         }
-        log({ step: "listing_plan", listingUrl, render: "br_markdown" });
+
+        if (allDetailUrls.size === urlsBefore) {
+          const rendered = await renderUrlToMarkdown(
+            env,
+            listingUrl,
+            ctx.signal ? { signal: ctx.signal } : {}
+          );
+          if ("error" in rendered) {
+            errors.push({
+              source: sourceKey,
+              url: listingUrl,
+              message: `BR listing discovery: ${rendered.error}`,
+              recoverable: true
+            });
+            log({ step: "listing_plan_br_failed", listingUrl, error: rendered.error });
+          } else {
+            for (const url of discoverDetailUrlsFromListingMarkdown(
+              rendered.markdown,
+              listingUrl,
+              config
+            )) {
+              if (hostAllowed(url, config)) {
+                allDetailUrls.add(url);
+              }
+            }
+            log({
+              step: "listing_plan_br",
+              listingUrl,
+              detailUrlsAdded: allDetailUrls.size - urlsBefore
+            });
+          }
+        } else {
+          log({ step: "listing_plan", listingUrl, render: "plain_fetch" });
+        }
         continue;
       }
 
@@ -172,7 +207,11 @@ export async function runListingThenDetailPipeline(
     }
   }
 
-  const detailUrls = [...allDetailUrls].slice(0, detailCap);
+  const detailMode = resolveDetailMode(config);
+  const detailUrls =
+    detailMode === "none" || detailMode === "api_embedded"
+      ? []
+      : [...allDetailUrls].filter((url) => hostAllowed(url, config)).slice(0, detailCap);
 
   if (dryRun) {
     log({

@@ -3,7 +3,10 @@
   "label": "Fresno State Athletics",
   "enabled": true,
   "strategy": "html_parse",
+  "ingestLane": "browser",
   "listingUrl": "https://gobulldogs.com/calendar",
   "sourceHostname": "gobulldogs.com",
-  "extractorVariant": "default"
+  "extractorVariant": "default",
+  "listingDiscovery": "br_if_empty",
+  "detailMode": "br_llm"
 }

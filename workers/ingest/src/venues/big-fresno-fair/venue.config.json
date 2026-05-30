@@ -8,5 +8,7 @@
   "llmCallCap": 60,
   "sourceHostname": "www.bigfresnofair.com",
   "extractorVariant": "festival",
-  "seriesId": "series:bigfresnofair:2026"
+  "seriesId": "series:bigfresnofair:2026",
+  "listingDiscovery": "br_if_empty",
+  "detailMode": "plain_html"
 }

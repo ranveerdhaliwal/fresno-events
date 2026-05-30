@@ -2,6 +2,7 @@ import type { IngestEnv } from "@/env";
 import { getJsonPromptBackend } from "@/llm/registry";
 import { runIngest, runPostIngestEnrichment } from "@/runner";
 import { listRunnableSources } from "@/planner";
+import { INGEST_VALIDATION_POLICY } from "@/validation";
 
 export default {
   async scheduled(_controller: ScheduledController, env: IngestEnv, ctx: ExecutionContext): Promise<void> {
@@ -24,6 +25,7 @@ export default {
         data: {
           service: "fresno-events-ingest",
           environment: env.APP_ENV ?? "unknown",
+          validation_policy: INGEST_VALIDATION_POLICY,
           time: new Date().toISOString(),
           registered_sources: await listRunnableSources(env)
         }
@@ -36,7 +38,7 @@ export default {
         return jsonResponse({ ok: false, error: auth }, auth.status);
       }
 
-      const sources = url.searchParams.get("source") ?? url.searchParams.get("sources") ?? undefined;
+      const sourcesParam = url.searchParams.get("source") ?? url.searchParams.get("sources") ?? undefined;
       const venueParam = url.searchParams.get("venue") ?? undefined;
       const force = url.searchParams.get("force") === "true";
       const dryRun = url.searchParams.get("dry_run") === "true";
@@ -48,6 +50,7 @@ export default {
             .map((part) => part.trim())
             .filter(Boolean)
         : undefined;
+      const sources = sourcesParam ?? (venueFilter?.length ? "venue-ingest" : undefined);
 
       if (dryRun && resumeJobs) {
         return jsonResponse(

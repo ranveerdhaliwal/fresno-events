@@ -1,8 +1,10 @@
 {
   "key": "downtown-fresno",
-  "label": "Downtown Fresno (CityLight BBQ + detail BR)",
+  "label": "Downtown Fresno",
   "enabled": true,
   "strategy": "api",
   "listingUrl": "https://www.downtownfresno.org",
-  "eventSource": "api:downtownfresno"
+  "eventSource": "api:downtownfresno",
+  "detailMode": "plain_html",
+  "listingDiscovery": "plain"
 }

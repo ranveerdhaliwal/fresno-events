@@ -4,8 +4,12 @@
 # Prerequisite: pnpm ingest:dev in another terminal.
 #
 # Examples:
-#   pnpm ingest:preflight --source=visit-fresno-api
-#   pnpm ingest:preflight --source=visit-fresno-api,milb-api
+#   pnpm ingest:preflight --venue=strummers
+#   pnpm ingest:preflight --venue=tower-theatre,save-mart
+#   pnpm ingest:preflight --source=venue-ingest          # all enabled venues
+#   pnpm ingest:preflight-direct
+#   pnpm ingest:preflight-browser
+#   pnpm ingest:preflight-all
 #   pnpm ingest:preflight --all
 
 set -euo pipefail
@@ -24,7 +28,8 @@ while [[ $# -gt 0 ]]; do
     --venue=*) VENUE="${1#*=}" ;;
     --venue) shift; VENUE="${1:-}" ;;
     -h|--help)
-      echo "Usage: pnpm ingest:preflight --source=<key>[,<key>...] | --all" >&2
+      echo "Usage: pnpm ingest:preflight --venue=<key>[,<key>...] | --source=<key> | --all" >&2
+      echo "  --venue alone implies --source=venue-ingest (API vs crawl is per venue config)." >&2
       exit 0
       ;;
     *)
@@ -35,17 +40,20 @@ while [[ $# -gt 0 ]]; do
   shift || true
 done
 
+# shellcheck source=scripts/ingest-lib.sh
+source "$REPO_ROOT/scripts/ingest-lib.sh"
+ingest_apply_venue_source_defaults || exit $?
+
 if [[ -z "$SOURCE" ]]; then
-  echo "--source=<key> or --all is required" >&2
+  echo "One of --venue=<key>, --source=<key>, or --all is required." >&2
+  echo "  e.g. pnpm ingest:preflight --venue=strummers" >&2
   exit 2
 fi
 
-# shellcheck source=scripts/ingest-lib.sh
-source "$REPO_ROOT/scripts/ingest-lib.sh"
 ingest_load_admin_token
 
 HEALTH_URL="http://127.0.0.1:${PORT}/health"
-echo "GET $HEALTH_URL" >&2
+ingest_log "GET $HEALTH_URL"
 HEALTH="$(ingest_curl_json GET "$HEALTH_URL")"
 
 if command -v jq >/dev/null 2>&1; then
@@ -57,7 +65,7 @@ fi
 
 if [[ "$SOURCE" == "all" ]]; then
   TRIGGER_URL="http://127.0.0.1:${PORT}/trigger?source=all&force=true&dry_run=true"
-  echo "POST $TRIGGER_URL" >&2
+  ingest_log "POST $TRIGGER_URL"
   RESP="$(ingest_curl_json POST "$TRIGGER_URL")"
   ingest_check_summaries_json "$RESP"
   exit $?
@@ -84,7 +92,7 @@ for KEY in "${SOURCES[@]}"; do
     VENUE_QUERY="&venue=${VENUE}"
   fi
   TRIGGER_URL="http://127.0.0.1:${PORT}/trigger?source=${KEY}&force=true&dry_run=true${VENUE_QUERY}"
-  echo "POST $TRIGGER_URL" >&2
+  ingest_log "POST $TRIGGER_URL"
   RESP="$(ingest_curl_json POST "$TRIGGER_URL")"
 
   if ! ingest_check_summaries_json "$RESP"; then

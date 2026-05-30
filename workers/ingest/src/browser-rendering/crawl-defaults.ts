@@ -10,7 +10,8 @@ export const CRAWL_LIMITS = {
   MAX_PAGES_PER_SEED: 30,
   MAX_DEPTH: 3,
   SHALLOW_LIMIT: 1,
-  SHALLOW_DEPTH: 0,
+  /** BR API rejects depth < 1; limit 1 still crawls only the seed URL. */
+  SHALLOW_DEPTH: 1,
   MAX_LLM_CALLS_PER_RUN: 200,
   PER_SEED_POLL_TIMEOUT_MS: 8 * 60 * 1000,
   POLL_INTERVAL_MS: 5_000,

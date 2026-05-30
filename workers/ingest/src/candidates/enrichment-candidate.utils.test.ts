@@ -29,10 +29,25 @@ describe("enrichment-candidate.utils", () => {
     expect(hasSufficientReviewData(base)).toBe(false);
   });
 
+  it("candidateNeedsEnrichment always runs for needs_changes", () => {
+    expect(
+      candidateNeedsEnrichment({
+        id: "4",
+        status: "needs_changes",
+        normalized_event: { ...base, descriptionText: "Full write-up" },
+        confidence_score: 0.9,
+        review_notes: "[ai] done",
+        suggested_priority: 2,
+        matched_event_id: "e1"
+      })
+    ).toBe(true);
+  });
+
   it("candidateNeedsEnrichment skips already enriched or sufficient rows", () => {
     expect(
       candidateNeedsEnrichment({
         id: "1",
+        status: "pending_review",
         normalized_event: base,
         confidence_score: 0.7,
         review_notes: "[ai] done",
@@ -43,6 +58,7 @@ describe("enrichment-candidate.utils", () => {
     expect(
       candidateNeedsEnrichment({
         id: "2",
+        status: "pending_review",
         normalized_event: { ...base, descriptionText: "Full write-up" },
         confidence_score: 0.7,
         review_notes: null,
@@ -53,6 +69,7 @@ describe("enrichment-candidate.utils", () => {
     expect(
       candidateNeedsEnrichment({
         id: "3",
+        status: "pending_review",
         normalized_event: base,
         confidence_score: 0.7,
         review_notes: null,

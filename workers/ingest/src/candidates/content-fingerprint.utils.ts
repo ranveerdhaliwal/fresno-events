@@ -7,8 +7,15 @@ export interface ExistingCandidateRow {
   status: EventCandidateStatus;
   content_fingerprint: string | null;
   matched_event_id: string | null;
+  occurrence_id: string | null;
+  canonical_candidate_id: string | null;
   reviewed_at: string | null;
   reviewed_by: string | null;
+  review_notes: string | null;
+  title: string;
+  start_ts: string;
+  venue_name: string;
+  normalized_event: NormalizedEvent;
 }
 
 /** Stable fields for “did the source change?” — excludes run metadata and confidence. */
@@ -36,7 +43,7 @@ export function resolveStatusOnRescrape(
   newFingerprint: string
 ): EventCandidateStatus {
   if (!existing) {
-    return "pending_review";
+    return "awaiting_enrichment";
   }
 
   if (existing.content_fingerprint === newFingerprint) {
@@ -49,6 +56,10 @@ export function resolveStatusOnRescrape(
 
   if (existing.status === "duplicate") {
     return "duplicate";
+  }
+
+  if (existing.status === "awaiting_enrichment") {
+    return "awaiting_enrichment";
   }
 
   return "pending_review";

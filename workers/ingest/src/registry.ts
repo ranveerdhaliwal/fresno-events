@@ -76,11 +76,7 @@ export const scrapers: RegisteredScraper[] = [
     label: "Venue ingest (repo configs: crawl + API)",
     defaultCadenceMinutes: 360,
     schedule: "cron",
-    requiredSecrets: [
-      "CLOUDFLARE_ACCOUNT_ID",
-      "CLOUDFLARE_API_TOKEN",
-      "VISIT_FRESNO_API_TOKEN"
-    ],
+    requiredSecrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
     runFactory: (env) => createVenueIngestRunner(env)
   }
 ];

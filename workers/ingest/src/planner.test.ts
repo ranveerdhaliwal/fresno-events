@@ -34,15 +34,14 @@ describe("planner", () => {
     expect(planned.map((p) => p.key)).toContain("seatgeek");
   });
 
-  it("venue-ingest is cron when BR + visit token configured", () => {
+  it("venue-ingest is cron when Cloudflare BR is configured", () => {
     const venueIngest = scrapers.find((s) => s.key === "venue-ingest");
     expect(venueIngest?.schedule).toBe("cron");
     expect(
       canRunScraper(
         {
           CLOUDFLARE_ACCOUNT_ID: "acc",
-          CLOUDFLARE_API_TOKEN: "tok",
-          VISIT_FRESNO_API_TOKEN: "vf"
+          CLOUDFLARE_API_TOKEN: "tok"
         } as IngestEnv,
         venueIngest!
       )

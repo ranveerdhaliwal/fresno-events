@@ -9,6 +9,64 @@ import type { VisitFresnoDoc, VisitFresnoResponse } from "./visit-fresno-api.typ
 const ENDPOINT =
   "https://www.visitfresnocounty.org/includes/rest_v2/plugins_events_events_by_date/find/";
 
+export const VISIT_FRESNO_EVENTS_ENDPOINT = ENDPOINT;
+export const VISIT_FRESNO_SIMPLE_TOKEN_URL =
+  "https://www.visitfresnocounty.org/plugins/core/get_simple_token/";
+export const VISIT_FRESNO_CALENDAR_URL = "https://www.visitfresnocounty.org/events/calendar-of-events/";
+
+export function parseVisitFresnoSimpleTokenBody(body: string): string | null {
+  const trimmed = body.trim();
+  if (/^[a-f0-9]{32}$/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (typeof parsed === "object" && parsed !== null) {
+      const record = parsed as Record<string, unknown>;
+      const candidate = record.token ?? record.simpleToken;
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+  } catch {
+    // Plain-text token only.
+  }
+
+  return null;
+}
+
+export async function fetchVisitFresnoSimpleToken(opts: {
+  userAgent: string;
+  signal?: AbortSignal;
+}): Promise<string | null> {
+  const response = await fetch(VISIT_FRESNO_SIMPLE_TOKEN_URL, {
+    headers: { "User-Agent": opts.userAgent },
+    ...(opts.signal ? { signal: opts.signal } : {})
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return parseVisitFresnoSimpleTokenBody(await response.text());
+}
+
+/** Prefer live Simpleview token; optional env override/fallback for emergencies. */
+export async function resolveVisitFresnoApiToken(opts: {
+  userAgent: string;
+  fallbackToken?: string | undefined;
+  signal?: AbortSignal;
+}): Promise<string | null> {
+  const fetched = await fetchVisitFresnoSimpleToken(opts);
+  if (fetched) {
+    return fetched;
+  }
+
+  const fallback = opts.fallbackToken?.trim();
+  return fallback || null;
+}
+
 export function formatPacificIso(date: Date): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Shared helpers for ingest shell scripts.
 
+ingest_log() {
+  if [[ "${INGEST_VERBOSE:-}" == "1" ]]; then
+    echo "$@" >&2
+  fi
+}
+
 ingest_load_admin_token() {
   if [[ -n "${ADMIN_REVIEW_TOKEN:-}" ]]; then
     return 0
@@ -30,39 +36,33 @@ ingest_curl_json() {
   curl -fsS -X "$method" -H "x-admin-token: ${ADMIN_REVIEW_TOKEN}" "$url"
 }
 
-# Exit 1 if any summary in a dry-run / trigger response failed validation.
+# Print preflight health + persist preview. Never dumps raw JSON (see ingest:dev for full logs).
 ingest_check_summaries_json() {
   local resp="$1"
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "$resp"
-    return 0
-  fi
+  ingest_print_preflight_summary "$resp"
+}
 
-  local failed=0
-  local count
-  count="$(echo "$resp" | jq '.data.summaries | length')"
-  if [[ "$count" == "0" || "$count" == "null" ]]; then
-    echo "FAIL: no summaries in response" >&2
+ingest_print_preflight_summary() {
+  local resp="$1"
+  local script="${REPO_ROOT:-}/scripts/ingest-print-preflight-summary.mjs"
+  if [[ ! -f "$script" ]] || ! command -v node >/dev/null 2>&1; then
+    echo "Preflight summary requires Node.js and $script" >&2
     return 1
   fi
+  printf '%s' "$resp" | node "$script"
+}
 
-  local i=0
-  while [[ "$i" -lt "$count" ]]; do
-    local src ok val_ok events hard
-    src="$(echo "$resp" | jq -r ".data.summaries[$i].source")"
-    ok="$(echo "$resp" | jq -r ".data.summaries[$i].ok // false")"
-    val_ok="$(echo "$resp" | jq -r ".data.summaries[$i].validation.ok // false")"
-    events="$(echo "$resp" | jq -r ".data.summaries[$i].events_found // 0")"
-    hard="$(echo "$resp" | jq -c ".data.summaries[$i].validation.hard // []")"
-
-    if [[ "$ok" == "true" && "$val_ok" == "true" ]]; then
-      echo "PASS $src: events_found=$events validation.ok=true" >&2
-    else
-      echo "FAIL $src: ok=$ok validation.ok=$val_ok events_found=$events hard=$hard" >&2
-      failed=1
-    fi
-    i=$((i + 1))
-  done
-
-  return "$failed"
+# When --venue is set, Fresno venues always use venue-ingest (method is per venue.config.json).
+ingest_apply_venue_source_defaults() {
+  if [[ -z "${VENUE:-}" ]]; then
+    return 0
+  fi
+  if [[ -z "${SOURCE:-}" ]]; then
+    SOURCE="venue-ingest"
+    return 0
+  fi
+  if [[ "$SOURCE" != "venue-ingest" && "$SOURCE" != "all" ]]; then
+    echo "Cannot combine --venue with --source=$SOURCE (venues use source=venue-ingest)." >&2
+    return 2
+  fi
 }

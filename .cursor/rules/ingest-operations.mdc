@@ -48,6 +48,6 @@ Source values: `api:visitfresnocounty`, `api:milb`, `api:downtownfresno`.
 
 Defined in `workers/ingest/src/validation/source-profiles.ts`. Hard fail: duplicate `sourceEventId` in batch, missing fields, too many scrape errors. Soft warn: low event count.
 
-Batch dry-run for API venues (visit/downtown/milb): `pnpm ingest:preflight-apis` (venue-ingest filter). Crawl venues: `pnpm ingest:preflight-venues`.
+Batch dry-run: `pnpm ingest:preflight-direct`, `pnpm ingest:preflight-browser`, or `pnpm ingest:preflight-all`.
 
 Emergency bypass: `INGEST_SKIP_VALIDATION=true` (must log `ingest_validation_skipped`).

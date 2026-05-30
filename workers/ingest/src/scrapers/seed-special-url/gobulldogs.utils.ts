@@ -4,7 +4,7 @@ import { load } from "cheerio";
 export function buildGobulldogsPrintUrl(now: Date, horizonDays = 90): string {
   const end = new Date(now.getTime() + horizonDays * 86_400_000);
   const fmt = (d: Date) => `${d.getMonth() + 1}-${d.getDate()}-${d.getFullYear()}`;
-  return `https://gobulldogs.com/calendar/print/week/0/${fmt(now)}/${fmt(end)}/null`;
+  return `https://gobulldogs.com/calendar/print/month/0/${fmt(now)}/${fmt(end)}/null`;
 }
 
 function parseDateText(text: string, now: Date): string | null {
@@ -17,29 +17,44 @@ function parseDateText(text: string, now: Date): string | null {
 
 /** Parse Sidearm-style print HTML when server-rendered; SPA shells return []. */
 export function parseGobulldogsPrintHtml(html: string, now: Date): NormalizedEvent[] {
+  const withFootballFilter = parseGobulldogsPrintHtmlInner(html, now, true);
+  if (withFootballFilter.length > 0) {
+    return withFootballFilter;
+  }
+  return parseGobulldogsPrintHtmlInner(html, now, false);
+}
+
+function parseGobulldogsPrintHtmlInner(
+  html: string,
+  now: Date,
+  footballOnly: boolean
+): NormalizedEvent[] {
   const $ = load(html);
   const events: NormalizedEvent[] = [];
 
   const selectors = [
     ".sidearm-schedule-game",
     "[data-test-id*='schedule'] [data-test-id*='event']",
-    ".sidearm-calendar-game"
+    ".sidearm-calendar-game",
+    "[data-test-id*='sidearm-calendar']"
   ];
 
   for (const selector of selectors) {
     $(selector).each((_, el) => {
       const row = $(el);
       const sport = row.find(".sport, .sidearm-schedule-game-sport").first().text().trim();
-      if (sport.length > 0 && !/football/i.test(sport)) {
+      if (footballOnly && sport.length > 0 && !/football/i.test(sport)) {
         return;
       }
 
       const title =
-        row.find(".sidearm-schedule-game-opponent, .opponent, .title").first().text().trim() ||
+        row.find(".sidearm-schedule-game-opponent, .opponent, .title, h3, h4").first().text().trim() ||
+        row.attr("aria-label")?.trim() ||
         row.text().trim().slice(0, 120);
       const dateText =
         row.find(".sidearm-schedule-game-date-time, .date, time").first().text().trim() ||
         row.attr("data-date") ||
+        row.find("time").attr("datetime") ||
         "";
       const location =
         row.find(".sidearm-schedule-game-location, .location, .venue").first().text().trim() ||

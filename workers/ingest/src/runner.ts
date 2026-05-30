@@ -1,7 +1,9 @@
 import type { CoordinatorMode, ScrapeContext, ScrapeResult } from "@fresno-events/shared";
 
 import { runEnrichmentPipeline, type EnrichRecentCandidatesOptions, type EnrichmentSummary } from "@/enrichment";
-import { persistScrapeResult, type PersistenceResult } from "@/candidates";
+import { persistScrapeResult, previewPersistScrapeResult, type PersistenceResult } from "@/candidates";
+import type { PersistAuditSummary } from "@/candidates/persist-audit.utils";
+import { mergePersistAuditSummaries } from "@/candidates/persist-analysis.utils";
 import type { IngestEnv } from "@/env";
 import { listRunnableSources, planIngestRuns, sortPlanByStalest, type PlanItem } from "@/planner";
 import { resolveScraperRun, findScraper } from "@/registry";
@@ -20,6 +22,8 @@ export interface RunSummary {
   persistence: PersistenceResult;
   duration_ms: number;
   ok: boolean;
+  /** Scraper already persisted and enriched per venue (venue-ingest). */
+  enrichmentPerVenue?: boolean;
   message?: string;
   dry_run?: boolean;
   events?: Array<{
@@ -30,8 +34,20 @@ export interface RunSummary {
     externalUrl?: string;
   }>;
   scrape_errors?: Array<{ url?: string; message: string }>;
-  seed_metrics?: Array<{ url: string; label?: string | null; events_found: number }>;
+  seed_metrics?: Array<{
+    url: string;
+    label?: string | null;
+    events_found: number;
+    venue_key?: string;
+    event_source?: string;
+    detail_urls_planned?: number;
+    dry_run_plan?: boolean;
+    listing_urls?: string[];
+    detail_urls?: string[];
+    event_links?: Array<{ title: string; url: string; start_ts?: string }>;
+  }>;
   validation?: ScrapeValidationResult;
+  persist_preview?: PersistAuditSummary;
 }
 
 export interface RunOptions {
@@ -47,8 +63,6 @@ export interface RunOptions {
   /** Propagates to scrapers (abort signal). */
   signal?: AbortSignal;
 }
-
-const DRY_RUN_EVENT_PREVIEW_LIMIT = 25;
 
 export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promise<RunSummary[]> {
   const supabase = getSupabaseConfig(env);
@@ -132,14 +146,64 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
   }
 
   if (options.dryRun) {
+    const previews = summaries
+      .map((summary) => summary.persist_preview)
+      .filter((preview): preview is PersistAuditSummary => preview !== undefined);
+    const mergedPreview = previews.length > 0 ? mergePersistAuditSummaries(previews) : null;
+
     console.log(
       JSON.stringify({
         event: "ingest_fetch_phase_done",
         message: "Dry run — no DB writes or enrichment",
-        sources: summaries.map((s) => s.source),
-        total_events_found: summaries.reduce((n, s) => n + s.events_found, 0)
+        sources: summaries.map((s) => ({
+          source: s.source,
+          events_found: s.events_found,
+          ok: s.ok,
+          validation_ok: s.validation?.ok ?? null,
+          ...(s.persist_preview
+            ? {
+                preview: {
+                  new: s.persist_preview.new,
+                  changed: s.persist_preview.changed,
+                  unchanged: s.persist_preview.unchanged
+                }
+              }
+            : {})
+        })),
+        total_events_found: summaries.reduce((n, s) => n + s.events_found, 0),
+        ...(mergedPreview
+          ? {
+              persist_preview: {
+                new: mergedPreview.new,
+                changed: mergedPreview.changed,
+                unchanged: mergedPreview.unchanged,
+                new_items: mergedPreview.new_items,
+                changed_items: mergedPreview.changed_items
+              }
+            }
+          : {})
       })
     );
+
+    if (mergedPreview) {
+      console.log(
+        JSON.stringify({
+          event: "ingest_preflight_summary",
+          dry_run: true,
+          new: mergedPreview.new,
+          changed: mergedPreview.changed,
+          unchanged: mergedPreview.unchanged,
+          new_items: mergedPreview.new_items,
+          changed_items: mergedPreview.changed_items
+        })
+      );
+      console.log(
+        `[ingest] preflight preview: +${mergedPreview.new} new, ~${mergedPreview.changed} changed, =${mergedPreview.unchanged} unchanged (no DB writes).`
+      );
+    } else {
+      console.log("[ingest] preflight preview skipped (no Supabase config or zero events).");
+    }
+
     console.log("[ingest] Fetch phase complete (dry run).");
     return summaries;
   }
@@ -168,8 +232,11 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
     `[ingest] Fetch phase complete (${summaries.length} sources, ${totalEvents} events, ${totalCandidates} candidates persisted).`
   );
 
-  if (!options.skipEnrichment) {
+  const enrichmentPerVenue = summaries.some((s) => s.enrichmentPerVenue);
+  if (!options.skipEnrichment && !enrichmentPerVenue) {
     await runPostIngestEnrichment(env);
+  } else if (enrichmentPerVenue) {
+    console.log("[ingest] Skipping global enrichment (already ran per venue in venue-ingest).");
   } else {
     console.log("[ingest] Skipping AI enrichment (--no-enrich).");
   }
@@ -305,9 +372,33 @@ async function runOne(
     };
   }
 
-  const validation = runScrapeValidation(env, plan.key, result);
+  const validation = runScrapeValidation(env, plan.key, result, ctx);
 
   if (ctx.dryRun) {
+    const persistPreview =
+      validation.ok && ctx.supabase && result.events.length > 0
+        ? (await previewPersistScrapeResult(env, result)) ?? undefined
+        : undefined;
+
+    if (persistPreview) {
+      console.log(
+        JSON.stringify({
+          event: "ingest_preflight_persist_summary",
+          source: plan.key,
+          runId,
+          dry_run: true,
+          new: persistPreview.new,
+          changed: persistPreview.changed,
+          unchanged: persistPreview.unchanged,
+          new_items: persistPreview.new_items,
+          changed_items: persistPreview.changed_items
+        })
+      );
+      console.log(
+        `[ingest] preflight ${plan.key}: +${persistPreview.new} new, ~${persistPreview.changed} changed, =${persistPreview.unchanged} unchanged`
+      );
+    }
+
     return {
       source: plan.key,
       runId,
@@ -324,26 +415,12 @@ async function runOne(
       ok: validation.ok,
       validation,
       dry_run: true,
-      events: result.events.slice(0, DRY_RUN_EVENT_PREVIEW_LIMIT).map((event) => ({
-        title: event.title,
-        venueName: event.venueName,
-        startTs: event.startTs,
-        sourceEventId: event.sourceEventId,
-        ...(event.externalUrl ? { externalUrl: event.externalUrl } : {})
-      })),
+      ...(persistPreview ? { persist_preview: persistPreview } : {}),
       scrape_errors: result.errors.map((err) => ({
         ...(err.url ? { url: err.url } : {}),
         message: err.message
       })),
-      ...(result.seedMetrics?.length
-        ? {
-            seed_metrics: result.seedMetrics.map((metric) => ({
-              url: metric.url,
-              ...(metric.label ? { label: metric.label } : {}),
-              events_found: metric.eventsFound
-            }))
-          }
-        : {})
+      ...(result.seedMetrics?.length ? { seed_metrics: mapSeedMetrics(result) } : {})
     };
   }
 
@@ -366,11 +443,19 @@ async function runOne(
       duration_ms: Math.round(performance.now() - started),
       ok: false,
       message: validation.hard.map((i) => i.message).join("; "),
-      validation
+      validation,
+      scrape_errors: result.errors.map((err) => ({
+        ...(err.url ? { url: err.url } : {}),
+        message: err.message
+      })),
+      ...(result.seedMetrics?.length ? { seed_metrics: mapSeedMetrics(result) } : {})
     };
   }
 
-  const persistence = await persistScrapeResult(env, result);
+  const enrichmentPerVenue = result.metrics.venuePersistPerVenue === true;
+  const persistence: PersistenceResult = enrichmentPerVenue
+    ? { persisted: true, candidates: result.events.length }
+    : await persistScrapeResult(env, result);
   console.log(
     JSON.stringify({
       event: "ingest_source_end",
@@ -381,6 +466,7 @@ async function runOne(
       events_found: result.events.length,
       errors: result.errors.length,
       persistence,
+      enrichment_per_venue: enrichmentPerVenue,
       duration_ms: Math.round(performance.now() - started)
     })
   );
@@ -393,14 +479,44 @@ async function runOne(
     persistence,
     duration_ms: Math.round(performance.now() - started),
     ok: true,
-    validation
+    enrichmentPerVenue,
+    validation,
+    scrape_errors: result.errors.map((err) => ({
+      ...(err.url ? { url: err.url } : {}),
+      message: err.message
+    })),
+    ...(result.seedMetrics?.length ? { seed_metrics: mapSeedMetrics(result) } : {})
   };
+}
+
+function mapSeedMetrics(result: ScrapeResult): NonNullable<RunSummary["seed_metrics"]> {
+  return (result.seedMetrics ?? []).map((metric) => ({
+    url: metric.url,
+    ...(metric.label ? { label: metric.label } : {}),
+    events_found: metric.eventsFound,
+    ...(metric.venueKey ? { venue_key: metric.venueKey } : {}),
+    ...(metric.eventSource ? { event_source: metric.eventSource } : {}),
+    ...(typeof metric.detailUrlsPlanned === "number" ? { detail_urls_planned: metric.detailUrlsPlanned } : {}),
+    ...(metric.dryRunPlan ? { dry_run_plan: true } : {}),
+    ...(metric.listingUrls?.length ? { listing_urls: metric.listingUrls } : {}),
+    ...(metric.detailUrls?.length ? { detail_urls: metric.detailUrls } : {}),
+    ...(metric.eventLinks?.length
+      ? {
+          event_links: metric.eventLinks.map((link) => ({
+            title: link.title,
+            url: link.url,
+            ...(link.startTs ? { start_ts: link.startTs } : {})
+          }))
+        }
+      : {})
+  }));
 }
 
 function runScrapeValidation(
   env: IngestEnv,
   scraperKey: string,
-  result: ScrapeResult
+  result: ScrapeResult,
+  ctx: Pick<RunOneContext, "venueFilter">
 ): ScrapeValidationResult {
   if (env.INGEST_SKIP_VALIDATION === "true") {
     console.log(JSON.stringify({ event: "ingest_validation_skipped", source: scraperKey }));
@@ -408,7 +524,9 @@ function runScrapeValidation(
   }
 
   const profile = getProfileForScraper(scraperKey);
-  const validation = validateScrapeResult(result, profile);
+  const validation = validateScrapeResult(result, profile, {
+    ...(ctx.venueFilter?.length ? { venueFilter: ctx.venueFilter } : {})
+  });
 
   if (validation.soft.length > 0) {
     console.log(

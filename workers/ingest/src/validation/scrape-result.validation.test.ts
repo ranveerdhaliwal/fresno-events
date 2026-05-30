@@ -69,14 +69,44 @@ describe("validateScrapeResult", () => {
     expect(result.soft.some((i) => i.code === "low_event_count_by_source")).toBe(true);
   });
 
-  it("hard-fails when errors exceed maxErrors", () => {
+  it("hard-fails when non-recoverable errors exceed maxErrors", () => {
+    const errors = Array.from({ length: 41 }, (_, i) => ({
+      source: "venue-ingest",
+      message: `fail ${i}`,
+      recoverable: false
+    }));
+    const result = validateScrapeResult(makeResult({ errors }), venueProfile);
+    expect(result.ok).toBe(false);
+    expect(result.hard.some((i) => i.code === "too_many_errors")).toBe(true);
+  });
+
+  it("passes when only recoverable errors exceed maxErrors", () => {
     const errors = Array.from({ length: 41 }, (_, i) => ({
       source: "venue-ingest",
       message: `fail ${i}`,
       recoverable: true
     }));
     const result = validateScrapeResult(makeResult({ errors }), venueProfile);
-    expect(result.ok).toBe(false);
-    expect(result.hard.some((i) => i.code === "too_many_errors")).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.soft.some((i) => i.code === "many_recoverable_errors")).toBe(true);
+  });
+
+  it("skips api source thresholds when venue filter is set", () => {
+    const result = validateScrapeResult(
+      makeResult({
+        events: [
+          {
+            source: "scrape:strummersclub.com",
+            sourceEventId: "s1",
+            title: "Show",
+            venueName: "Strummers",
+            startTs: "2026-06-01T12:00:00.000Z"
+          }
+        ]
+      }),
+      venueProfile,
+      { venueFilter: ["strummers"] }
+    );
+    expect(result.soft.some((i) => i.code === "low_event_count_by_source")).toBe(false);
   });
 });

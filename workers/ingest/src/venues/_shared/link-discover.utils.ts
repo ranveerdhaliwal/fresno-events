@@ -124,9 +124,18 @@ export function discoverFultonDetailUrls(html: string, listingUrl: string, confi
     if (!href) return;
     const abs = absoluteUrl(href, listingUrl);
     if (!abs) return;
-    if (hostAllowed(abs, config)) {
-      urls.add(abs.replace(/\/+$/, ""));
+    if (!hostAllowed(abs, config)) {
+      return;
     }
+    try {
+      const host = new URL(abs).hostname.toLowerCase();
+      if (host.includes("eventbrite")) {
+        return;
+      }
+    } catch {
+      return;
+    }
+    urls.add(abs.replace(/\/+$/, ""));
   });
 
   return [...urls];

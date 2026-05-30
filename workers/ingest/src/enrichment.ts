@@ -34,6 +34,7 @@ export interface EnrichRecentCandidatesOptions {
 
 export interface PendingEnrichmentCounts {
   pending_review: number;
+  needs_changes: number;
   awaiting_enrichment: number;
   already_enriched: number;
 }
@@ -54,8 +55,8 @@ export async function countPendingEnrichment(
   sourceFilter?: string
 ): Promise<PendingEnrichmentCounts> {
   const params = new URLSearchParams({
-    select: "id,review_notes,normalized_event,suggested_priority,confidence_score",
-    status: "eq.pending_review",
+    select: "id,status,review_notes,normalized_event,suggested_priority,confidence_score,matched_event_id",
+    status: "in.(awaiting_enrichment,pending_review,needs_changes)",
     limit: "1000"
   });
 
@@ -67,8 +68,17 @@ export async function countPendingEnrichment(
 
   let awaiting = 0;
   let already = 0;
+  let pendingReview = 0;
+  let needsChanges = 0;
 
   for (const row of rows) {
+    if (row.status === "needs_changes") {
+      needsChanges += 1;
+    } else if (row.status === "awaiting_enrichment") {
+      /* counted via awaiting when candidateNeedsEnrichment */
+    } else {
+      pendingReview += 1;
+    }
     if (candidateNeedsEnrichment(row)) {
       awaiting += 1;
     } else if (row.review_notes?.trimStart().startsWith("[ai]")) {
@@ -77,7 +87,8 @@ export async function countPendingEnrichment(
   }
 
   return {
-    pending_review: rows.length,
+    pending_review: pendingReview,
+    needs_changes: needsChanges,
     awaiting_enrichment: awaiting,
     already_enriched: already
   };
@@ -107,9 +118,8 @@ export async function enrichRecentCandidates(
   const limit = Math.min(Math.max(batchSize, 1), 100);
 
   const params = new URLSearchParams({
-    select: "id,normalized_event,confidence_score,review_notes,suggested_priority",
-    status: "eq.pending_review",
-    review_notes: "is.null",
+    select: "id,status,normalized_event,confidence_score,review_notes,suggested_priority,matched_event_id",
+    status: "in.(awaiting_enrichment,needs_changes)",
     order: "created_at.asc",
     limit: String(limit)
   });
@@ -201,11 +211,25 @@ export async function enrichRecentCandidates(
         updated_at: new Date().toISOString()
       };
 
+      if (row.status === "awaiting_enrichment" && !enrichment.is_junk) {
+        patch.status = "pending_review";
+      }
+
       if (enrichment.is_junk) {
         patch.status = "rejected";
         patch.reviewed_by = "ai";
         patch.reviewed_at = new Date().toISOString();
         summary.auto_rejected += 1;
+        if (row.status === "needs_changes") {
+          console.log(
+            JSON.stringify({
+              event: "ai_enrichment_item_rejected_changed",
+              candidate_id: row.id,
+              matched_event_id: row.matched_event_id ?? null,
+              title: ev.title
+            })
+          );
+        }
       }
 
       const autoReject = enrichment.is_junk;
@@ -302,6 +326,7 @@ export async function runEnrichmentPipeline(
 
   logPhase("AI enrichment starting", {
     pending_review: counts.pending_review,
+    needs_changes: counts.needs_changes,
     awaiting_enrichment: counts.awaiting_enrichment,
     already_enriched: counts.already_enriched,
     batch_size: batchSize,
@@ -407,7 +432,7 @@ interface CandidatePatch {
   confidence_score?: number;
   suggested_priority?: number;
   review_notes?: string | null;
-  status?: "rejected";
+  status?: "pending_review" | "rejected";
   reviewed_by?: string;
   reviewed_at?: string;
   normalized_event?: NormalizedEvent;
@@ -416,6 +441,7 @@ interface CandidatePatch {
 
 async function markSufficientWithoutLlm(supabase: SupabaseConfig, row: EnrichmentCandidateRow) {
   await patchCandidate(supabase, row.id, {
+    ...(row.status === "awaiting_enrichment" ? { status: "pending_review" as const } : {}),
     suggested_priority: 5,
     review_notes: "[ingest] skipped LLM — source already has title, time, category, and description",
     updated_at: new Date().toISOString()

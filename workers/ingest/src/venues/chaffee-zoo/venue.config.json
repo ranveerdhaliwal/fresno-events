@@ -9,5 +9,8 @@
   "allowedExternalHosts": ["ticketapp.org", "www.ticketapp.org"],
   "sourceHostname": "fcz.org",
   "conditionalDetail": true,
-  "extractorVariant": "default"
+  "extractorVariant": "default",
+  "listingDiscovery": "plain",
+  "detailMode": "plain_html",
+  "blockedDetailHosts": ["ticketapp.org", "www.ticketapp.org"]
 }

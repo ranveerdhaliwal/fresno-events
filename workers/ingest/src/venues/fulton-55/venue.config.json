@@ -6,7 +6,9 @@
   "listingUrl": "https://fulton55.com/",
   "detailUrlCap": 40,
   "llmCallCap": 50,
-  "allowedExternalHosts": ["eventbrite.com", "www.eventbrite.com"],
   "sourceHostname": "fulton55.com",
-  "extractorVariant": "default"
+  "extractorVariant": "default",
+  "listingDiscovery": "plain",
+  "detailMode": "none",
+  "blockedDetailHosts": ["eventbrite.com", "www.eventbrite.com"]
 }

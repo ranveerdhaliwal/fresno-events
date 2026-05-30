@@ -29,5 +29,7 @@ export interface IngestEnv {
   VISIT_FRESNO_API_TOKEN?: string;
   /** When true, skip scrape validation (logs ingest_validation_skipped). */
   INGEST_SKIP_VALIDATION?: string;
+  /** When true or 1, link cross-source duplicates (status/canonical). Keys always computed. */
+  INGEST_CROSS_SOURCE_DEDUPE?: string;
   AI?: Ai;
 }

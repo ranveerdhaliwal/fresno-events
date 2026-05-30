@@ -7,5 +7,7 @@
   "detailUrlCap": 40,
   "llmCallCap": 50,
   "sourceHostname": "events.fresnoconventioncenter.com",
-  "extractorVariant": "default"
+  "extractorVariant": "default",
+  "listingDiscovery": "plain",
+  "detailMode": "plain_html"
 }

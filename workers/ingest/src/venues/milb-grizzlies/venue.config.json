@@ -4,5 +4,7 @@
   "enabled": true,
   "strategy": "api",
   "listingUrl": "https://www.milb.com/fresno",
-  "eventSource": "api:milb"
+  "eventSource": "api:milb",
+  "detailMode": "api_embedded",
+  "listingDiscovery": "plain"
 }

@@ -8,5 +8,7 @@
   "llmCallCap": 50,
   "allowedExternalHosts": ["eventmania.com", "www.eventmania.com"],
   "sourceHostname": "www.rainbowballroom.com",
-  "extractorVariant": "default"
+  "extractorVariant": "default",
+  "listingDiscovery": "br_if_empty",
+  "detailMode": "plain_html"
 }

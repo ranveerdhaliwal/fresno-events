@@ -1,11 +1,13 @@
-import type { EventCategory, NormalizedEvent } from "@fresno-events/shared";
+import type { EventCandidateStatus, EventCategory, NormalizedEvent } from "@fresno-events/shared";
 
 export interface EnrichmentCandidateRow {
   id: string;
+  status: EventCandidateStatus;
   normalized_event: NormalizedEvent;
   confidence_score: number;
   review_notes: string | null;
   suggested_priority: number | null;
+  matched_event_id?: string | null;
 }
 
 const AI_REVIEW_PREFIX = "[ai]";
@@ -30,6 +32,9 @@ export function hasSufficientReviewData(event: NormalizedEvent): boolean {
 }
 
 export function candidateNeedsEnrichment(row: EnrichmentCandidateRow): boolean {
+  if (row.status === "needs_changes") {
+    return true;
+  }
   if (hasAiEnrichmentNotes(row.review_notes)) {
     return false;
   }

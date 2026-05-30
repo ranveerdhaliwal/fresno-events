@@ -15,17 +15,31 @@ export async function runHtmlParseVenue(
   const errors: ScrapeError[] = [];
 
   if (ctx.dryRun) {
-    return {
-      events: [],
-      errors: [],
-      listingUrlsFound: 1,
-      detailUrlsVisited: 0,
-      llmCalls: 0,
-      debug: {
-        listingUrls: [config.listingUrl],
-        note: "dry-run — html_parse venue"
-      }
-    };
+    try {
+      const events = await parse(env, config, ctx);
+      return {
+        events,
+        errors,
+        listingUrlsFound: 1,
+        detailUrlsVisited: 0,
+        llmCalls: 0,
+        debug: {
+          listingUrls: [config.listingUrl],
+          detailUrlsPlanned: events.length,
+          note: "dry-run — html_parse venue"
+        }
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        events: [],
+        errors: [{ source: sourceKey, message, recoverable: true }],
+        listingUrlsFound: 0,
+        detailUrlsVisited: 0,
+        llmCalls: 0,
+        debug: { errors: [message] }
+      };
+    }
   }
 
   try {

@@ -11,7 +11,14 @@ export const venueStrategySchema = z.enum([
 
 export type VenueStrategy = z.infer<typeof venueStrategySchema>;
 
+export const venueIngestLaneSchema = z.enum(["direct", "browser"]);
+
+export type VenueIngestLane = z.infer<typeof venueIngestLaneSchema>;
+
 export const extractorVariantSchema = z.enum(["default", "festival", "headline_only"]);
+
+export const listingDiscoverySchema = z.enum(["plain", "br_if_empty"]);
+export const detailModeSchema = z.enum(["none", "plain_html", "br_llm", "api_embedded"]);
 
 export const venueConfigSchema = z.object({
   key: z.string().min(1),
@@ -28,7 +35,12 @@ export const venueConfigSchema = z.object({
   monthWindows: z.number().int().positive().max(18).optional(),
   conditionalDetail: z.boolean().optional(),
   /** NormalizedEvent.source for strategy=api (e.g. api:visitfresnocounty). */
-  eventSource: z.string().min(1).optional()
+  eventSource: z.string().min(1).optional(),
+  /** Override lane grouping for preflight/promote scripts (default: derived from strategy). */
+  ingestLane: venueIngestLaneSchema.optional(),
+  listingDiscovery: listingDiscoverySchema.optional(),
+  detailMode: detailModeSchema.optional(),
+  blockedDetailHosts: z.array(z.string().min(1)).optional()
 });
 
 export type VenueConfig = z.infer<typeof venueConfigSchema>;

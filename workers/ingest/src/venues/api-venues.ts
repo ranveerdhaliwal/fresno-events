@@ -1,4 +1,4 @@
-/** Venue keys with strategy=api — used by ingest:preflight-apis / promote-apis. */
+/** Venue keys with strategy=api (direct lane). */
 export const API_VENUE_KEYS = [
   "visit-fresno-county",
   "downtown-fresno",

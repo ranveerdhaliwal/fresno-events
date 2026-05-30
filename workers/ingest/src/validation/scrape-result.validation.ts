@@ -16,18 +16,36 @@ export interface ScrapeValidationResult {
   soft: ValidationIssue[];
 }
 
+/** Bumped when validation semantics change; exposed on /health for stale-worker detection. */
+export const INGEST_VALIDATION_POLICY = "recoverable_errors_soft_v2";
+
+export interface ValidateScrapeOptions {
+  /** When set, skip full-batch API source count warnings (single-venue promote/preflight). */
+  venueFilter?: string[];
+}
+
 export function validateScrapeResult(
   result: ScrapeResult,
-  profile: SourceValidationProfile | undefined
+  profile: SourceValidationProfile | undefined,
+  options: ValidateScrapeOptions = {}
 ): ScrapeValidationResult {
   const hard: ValidationIssue[] = [];
   const soft: ValidationIssue[] = [];
 
   const maxErrors = profile?.maxErrors ?? 0;
-  if (result.errors.length > maxErrors) {
+  const blockingErrors = result.errors.filter((error) => error.recoverable !== true);
+  if (blockingErrors.length > maxErrors) {
     hard.push({
       code: "too_many_errors",
-      message: `errors=${result.errors.length} exceeds maxErrors=${maxErrors}`
+      message: `non-recoverable errors=${blockingErrors.length} exceeds maxErrors=${maxErrors}`
+    });
+  }
+
+  const recoverableErrors = result.errors.length - blockingErrors.length;
+  if (recoverableErrors > maxErrors && blockingErrors.length <= maxErrors) {
+    soft.push({
+      code: "many_recoverable_errors",
+      message: `recoverable errors=${recoverableErrors} (detail-page failures; batch still persisted if validation passes)`
     });
   }
 
@@ -63,7 +81,7 @@ export function validateScrapeResult(
     }
   }
 
-  if (profile?.multiSource) {
+  if (profile?.multiSource && !options.venueFilter?.length) {
     const bySource = new Map<string, number>();
     for (const event of result.events) {
       bySource.set(event.source, (bySource.get(event.source) ?? 0) + 1);

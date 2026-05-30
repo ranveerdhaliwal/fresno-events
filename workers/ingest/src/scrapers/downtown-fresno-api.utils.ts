@@ -10,9 +10,6 @@ const EVENT_BASE = "https://www.downtownfresno.org";
 export const DOWNTOWN_FRESNO_FID = "22";
 export const DOWNTOWN_FRESNO_BBQ_KEY = "050243126";
 
-export const DOWNTOWN_DETAIL_URL_CAP = 40;
-export const DOWNTOWN_DETAIL_DELAY_MS = 1_000;
-
 export function fmtBbqWindowDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${String(d.getFullYear()).slice(2)}`;
@@ -185,4 +182,70 @@ export function parseDowntownFresnoHtml(html: string, now: Date): NormalizedEven
   }
 
   return events;
+}
+
+const DOWNTOWN_DO_PATH = /\/do\//i;
+
+export function isDowntownDetailUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.hostname.includes("downtownfresno.org") && DOWNTOWN_DO_PATH.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
+export function parseDowntownDetailHtml(html: string, listing: NormalizedEvent): NormalizedEvent {
+  const $ = load(html);
+  const descriptionText =
+    $('meta[property="og:description"]').attr("content")?.trim() ||
+    $('meta[name="description"]').attr("content")?.trim() ||
+    $(".entry-content").first().text().trim().slice(0, 4000) ||
+    undefined;
+  const imageUrl = $('meta[property="og:image"]').attr("content")?.trim();
+
+  if (!descriptionText && !imageUrl) {
+    return listing;
+  }
+
+  return {
+    ...listing,
+    ...(descriptionText ? { descriptionText } : {}),
+    ...(imageUrl ? { imageUrl } : {})
+  };
+}
+
+export async function enrichDowntownEventsWithPlainDetail(
+  events: NormalizedEvent[],
+  userAgent: string,
+  signal?: AbortSignal
+): Promise<{ events: NormalizedEvent[]; pagesVisited: number }> {
+  const out: NormalizedEvent[] = [];
+  let pagesVisited = 0;
+
+  for (const listing of events) {
+    const url = listing.externalUrl;
+    if (!url || !isDowntownDetailUrl(url)) {
+      out.push(listing);
+      continue;
+    }
+
+    pagesVisited += 1;
+    try {
+      const response = await fetch(url, {
+        headers: { "User-Agent": userAgent, Accept: "text/html" },
+        ...(signal ? { signal } : {})
+      });
+      if (!response.ok) {
+        out.push(listing);
+        continue;
+      }
+      const html = await response.text();
+      out.push(parseDowntownDetailHtml(html, listing));
+    } catch {
+      out.push(listing);
+    }
+  }
+
+  return { events: out, pagesVisited };
 }
