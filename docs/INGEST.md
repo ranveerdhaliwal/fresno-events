@@ -75,7 +75,7 @@ Check raw rows: Supabase Studio http://127.0.0.1:54423 → `event_candidates`, `
 | Key | How it fetches | Needs in `.dev.vars` | Cron schedule | Cadence (typical) |
 | --- | --- | --- | --- | --- |
 | `ticketmaster` | Official API | `TICKETMASTER_API_KEY` | cron | 6h |
-| `visit-fresno-api` | CMS REST | `VISIT_FRESNO_API_TOKEN` | cron | 6h |
+| `visit-fresno-api` | CMS REST (`get_simple_token` + `rest_v2`) | optional `VISIT_FRESNO_API_TOKEN` fallback | cron | 6h |
 | `milb-api` | statsapi | — | cron | 12h |
 | `downtown-fresno-api` | CityLight BBQ HTML + BR detail `/do/*` | `CLOUDFLARE_*` + LLM for details (BBQ key in code) | cron | 7d |
 | `seed-special-url` | Custom HTML parsers | — | cron | 12h |
@@ -92,7 +92,9 @@ To add a new API source: add a file under `scrapers/` and register it in `regist
 
 **Event priority (0–5)** is editorial: set at admin approve time on published `events`, default `5`. Not assigned during ingest.
 
-**Re-scrape behavior:** `event_candidates.content_fingerprint` detects content changes. Unchanged rows keep their review status. Approved rows that changed go to `needs_changes`. Linked published `events` always get `last_seen_at` updated; title/start/description patch when content changed.
+**Re-scrape behavior:** `event_candidates.content_fingerprint` detects content changes. Unchanged rows keep their review status. Approved rows that changed go to `needs_changes` and appear in the admin **Updates** tab. Linked published `events` only get `last_seen_at` bumped on re-scrape; title/start/description and other content fields update when an admin **approves the update** (`POST /review/candidates/:id/approve-changes`).
+
+Structured persist logs: `ingest_candidate_new`, `ingest_candidate_changed`, and `ingest_persist_summary` (also stored on `ingest_runs.metrics.audit`).
 
 ---
 

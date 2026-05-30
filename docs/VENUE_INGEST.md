@@ -1,5 +1,9 @@
 # Venue ingest
 
+**Implementation backlog:** [INGEST_DISCOVERY_AND_DETAIL_PLAN.md](INGEST_DISCOVERY_AND_DETAIL_PLAN.md)
+
+**Cross-source dedupe:** [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md) — `occurrence_id`, grouped admin review, `INGEST_CROSS_SOURCE_DEDUPE`.
+
 Single ingest path for Fresno venue sources: **repo modules** under `workers/ingest/src/venues/<key>/`, orchestrated by the **`venue-ingest`** scraper. Replaces legacy `ai-crawl`, `seed_urls`, and separate API registry keys.
 
 Each venue has:
@@ -8,6 +12,15 @@ Each venue has:
 - `run.ts` — discover + parse (or delegates to shared API scraper logic)
 
 Operational state: `venue_ingest_state`, history: `venue_ingest_runs` (dry-runs use `status = dry_run`).
+
+## Ingest lanes
+
+| Lane | Venues (enabled) | `strategy` values | Promote needs BR + LLM? |
+| --- | --- | --- | --- |
+| **direct** | visit-fresno-county, downtown-fresno, milb-grizzlies | `api` | No |
+| **browser** | tower, save-mart, strummers, fulton-55, chaffee-zoo, convention center, rainbow, big fair, **gobulldogs** (Sidearm SPA) | listing / scroll strategies + `html_parse` with `ingestLane: browser` | Yes |
+
+Lane is derived from `strategy` in code (`venue-lanes.utils.ts`); no extra config field.
 
 ## Enabled venues
 
@@ -31,24 +44,24 @@ Operational state: `venue_ingest_state`, history: `venue_ingest_runs` (dry-runs 
 Prerequisite: `pnpm ingest:dev` and `pnpm db:migrate` (or `pnpm db:reset`).
 
 ```bash
-# All enabled venues (dry-run)
-pnpm ingest:preflight-venues
+# By lane
+pnpm ingest:preflight-direct      # API + html_parse (no BR)
+pnpm ingest:preflight-browser     # BR crawl venues
+pnpm ingest:promote-direct
+pnpm ingest:promote-browser
 
-# One crawl venue
-pnpm ingest:preflight --source=venue-ingest --venue=tower-theatre
+# Everything
+pnpm ingest:preflight-all
+pnpm ingest:promote-all
 
-# API venues only (visit + downtown + milb)
-pnpm ingest:preflight-apis
-pnpm ingest:promote-apis
-
-# Real promote (all venues or filtered)
-pnpm ingest:promote-venues
-pnpm ingest:promote --source=venue-ingest --venue=save-mart --no-enrich
+# One venue
+pnpm ingest:preflight --venue=tower-theatre
+pnpm ingest:promote --venue=strummers
 ```
 
-Trigger: `POST /trigger?source=venue-ingest&venue=tower-theatre&force=true&dry_run=true`
+Trigger: `POST /trigger?venue=tower-theatre&force=true&dry_run=true` (source defaults to `venue-ingest`)
 
-**Deprecated (aliases):** `pnpm ingest:preflight-crawl` / `promote-crawl` → venue scripts.
+**Deprecated (aliases):** `pnpm ingest:preflight-crawl` / `promote-crawl` → **browser** lane.
 
 ## Verify
 
@@ -63,6 +76,6 @@ LIMIT 10;
 
 1. Create `venues/<key>/venue.config.json` + `run.ts`.
 2. Register in `venues/registry.ts`.
-3. Preflight: `pnpm ingest:preflight --source=venue-ingest --venue=<key>`.
+3. Preflight: `pnpm ingest:preflight --venue=<key>`.
 
 Cron runs **`venue-ingest`** only (no `seed_urls`, no `ai-crawl`).

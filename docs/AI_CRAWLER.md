@@ -34,7 +34,7 @@ Preflight and promote are **separate** on purpose. Old behavior ran dry-run BR c
 3. **Results** — `GET .../crawl/{id}?status=completed` with cursor pagination
 4. **Cancel** — `DELETE .../crawl/{id}` on client abort ([cancel](https://developers.cloudflare.com/browser-run/quick-actions/crawl-endpoint/#cancel-a-crawl-job))
 
-Shallow crawls use `limit: 1`, `depth: 0` for listing-page seeds. TicketSauce uses monthly `?start=&end=` windows (six shallow jobs per seed).
+Shallow crawls use `limit: 1`, `depth: 1` for listing-page seeds (BR API minimum depth is 1). TicketSauce uses monthly `?start=&end=` windows (six shallow jobs per seed).
 
 ## Cancel / Ctrl+C
 

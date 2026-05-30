@@ -184,11 +184,14 @@ pnpm dev:api            # terminal 2 — for /admin (or pnpm dev)
 | Command | What it does |
 | --- | --- |
 | `pnpm ingest:dev` | Start local ingest worker (port 8788) |
-| `pnpm ingest:preflight --source=<key>` | Dry-run one or comma-separated sources; exit 1 if validation fails |
-| `pnpm ingest:preflight --all` | Dry-run every runnable scraper (needs API keys) |
-| `pnpm ingest:preflight-apis` | Preflight Gate B APIs: visit-fresno, downtown-fresno, milb, seed-special-url |
-| `pnpm ingest:promote --source=<key>` | Preflight then **real** persist (+ enrichment unless `--no-enrich`) |
-| `pnpm ingest:promote --all` | Preflight + promote all runnable sources |
+| `pnpm ingest:preflight-direct` | Dry-run direct lane (visit, downtown, milb, gobulldogs) |
+| `pnpm ingest:preflight-browser` | Dry-run Browser Rendering crawl venues |
+| `pnpm ingest:preflight-all` | Dry-run all enabled venues |
+| `pnpm ingest:promote-direct` | Real persist — direct lane |
+| `pnpm ingest:promote-browser` | Real persist — browser lane |
+| `pnpm ingest:promote-all` | Real persist — all venues |
+| `pnpm ingest:preflight --venue=<key>` | Dry-run one venue |
+| `pnpm ingest:promote --venue=<key>` | Real persist one venue |
 | `pnpm ingest:run` | Lower-level `POST /trigger` (see flags below) |
 | `pnpm ingest:enrich` | AI enrichment on existing `pending_review` rows (`suggested_priority`, confidence, …) |
 
@@ -220,14 +223,17 @@ For **100+ pending** candidates after promote: `pnpm ingest:enrich --all` (runs 
 | `ticketmaster`, `seatgeek`, `eventbrite`, `bandsintown` | per provider | Needs API keys in `workers/ingest/.dev.vars` |
 | `ai-discovery`, `ai-crawl` | crawl lanes | BR + LLM keys |
 
-### Recommended workflow (one source, local)
+### Recommended workflow (local)
 
 ```bash
 pnpm env:local
 pnpm ingest:dev
-pnpm ingest:preflight --source=visit-fresno-api
-pnpm ingest:promote --source=visit-fresno-api
-pnpm ingest:enrich --limit=50          # if you used --no-enrich on promote
+pnpm ingest:preflight-direct
+pnpm ingest:promote-direct
+pnpm ingest:preflight-browser
+pnpm ingest:promote-browser
+# or: pnpm ingest:preflight-all && pnpm ingest:promote-all
+pnpm ingest:enrich --limit=50
 pnpm dev:api                           # open http://127.0.0.1:5182/admin
 ```
 
@@ -257,10 +263,10 @@ Validation can be bypassed in an emergency with `INGEST_SKIP_VALIDATION=true` in
 **Ingest** (see [Data ingestion](#data-ingestion))
 
 - `pnpm ingest:dev`
-- `pnpm ingest:preflight --source=<key>` / `--all`
-- `pnpm ingest:preflight-apis`
-- `pnpm ingest:promote --source=<key>` / `--all` [`--skip-preflight`] [`--no-enrich`]
-- `pnpm ingest:run [--source=...] [--force] [--dry-run] [--no-enrich]`
+- `pnpm ingest:preflight-direct` / `preflight-browser` / `preflight-all`
+- `pnpm ingest:promote-direct` / `promote-browser` / `promote-all`
+- `pnpm ingest:preflight --venue=<key>` / `pnpm ingest:promote --venue=<key>`
+- `pnpm ingest:run [--source=...] [--venue=...] [--force] [--dry-run] [--no-enrich]`
 - `pnpm ingest:enrich [--dry-run] [--source=api:...] [--limit=N]`
 - `pnpm --filter @fresno-events/ingest deploy` — deploy ingest worker (cron from `wrangler.toml`)
 
