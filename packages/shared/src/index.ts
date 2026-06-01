@@ -43,12 +43,21 @@ export { LineupEntrySchema, LineupSchema, parseLineup } from "./lineup.js";
 export {
   computeOccurrenceFingerprints,
   computeOccurrenceKey,
+  computeLooseOccurrenceKey,
   computeUrlKey,
   normalizeTitle,
   normalizeVenue,
   sourcePriorityRank,
   type OccurrenceFingerprints
 } from "./occurrence.js";
+export {
+  isRecurringSeries,
+  venueScope,
+  listingUrlSeriesAnchor,
+  computeCanonicalSeriesId,
+  type SeriesResolveInput,
+  type SeriesResolveResult
+} from "./series.js";
 
 export type EventCandidateStatus =
   | "awaiting_enrichment"
@@ -176,12 +185,79 @@ export interface EventDetailResponse {
   heroImage?: ImageAsset;
   galleryImages: ImageAsset[];
   relatedEvents: EventListItem[];
+  seriesEvents?: EventListItem[];
 }
 
 export interface EventListResponse {
   items: EventListItem[];
   nextCursor: string | null;
   generatedAt: string;
+}
+
+export type HomepageSection = "featured" | "popular";
+
+export interface HomepageSlotItem {
+  position: number;
+  source: "pinned" | "auto";
+  item: EventListItem;
+}
+
+export interface HomepageCurationResponse {
+  featured: HomepageSlotItem[];
+  popular: HomepageSlotItem[];
+  generatedAt: string;
+}
+
+export interface HomepageSlotEventSummary {
+  id: string;
+  slug: string;
+  title: string;
+  startTs: string;
+  status: EventStatus;
+  heroImageUrl: string | null;
+}
+
+export interface HomepageSlotRow {
+  section: HomepageSection;
+  position: number;
+  eventId: string | null;
+  event: HomepageSlotEventSummary | null;
+  stale: boolean;
+}
+
+export interface HomepageSlotsResponse {
+  slots: HomepageSlotRow[];
+  generatedAt: string;
+}
+
+export interface HomepageSlotsPutBody {
+  slots: Array<{ section: HomepageSection; position: number; eventId: string | null }>;
+  reviewedBy?: string;
+}
+
+export interface AdminPublishedEventResponse {
+  event: Event;
+  venue: Venue;
+  heroImage?: ImageAsset;
+}
+
+export interface AdminEventSearchHit {
+  id: string;
+  slug: string;
+  title: string;
+  startTs: string;
+  venueName: string;
+  heroImageUrl: string | null;
+}
+
+export interface AdminEventSearchResponse {
+  items: AdminEventSearchHit[];
+}
+
+export interface AdminEventPatchBody {
+  event?: Partial<NormalizedEvent>;
+  priority?: number;
+  reviewedBy?: string;
 }
 
 export interface ApiSuccess<T> {
@@ -222,6 +298,8 @@ export interface NormalizedEvent {
   imageUrl?: string;
   seriesId?: string;
   seriesName?: string;
+  seriesListingRecId?: string;
+  seriesPresentedBy?: string;
   lineup?: LineupEntry[];
 }
 
@@ -301,6 +379,17 @@ export interface LinkedEventCandidate {
   ticketUrl?: string;
 }
 
+export interface SeriesSiblingCandidate {
+  id: string;
+  source: EventSource;
+  sourceEventId: string;
+  title: string;
+  startTs: string;
+  venueName: string;
+  status: EventCandidateStatus;
+  sourceUrl?: string;
+}
+
 export interface EventCandidate {
   id: string;
   runId?: string;
@@ -362,6 +451,7 @@ export interface ContentDiffSummary {
 export interface EventCandidateDetailResponse {
   candidate: EventCandidate;
   linkedCandidates?: LinkedEventCandidate[];
+  seriesSiblings?: SeriesSiblingCandidate[];
   publishedEvent?: Event;
   contentDiff?: ContentDiffSummary;
 }

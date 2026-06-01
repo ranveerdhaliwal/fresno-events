@@ -148,6 +148,26 @@ export async function computeOccurrenceKey(
   return sha256Hex(`${normalizedTitle}|${bucket}|${normalizedVenue}`);
 }
 
+/** Batch dedupe only — collapses "Backyard 101" vs "Backyard101" at same time/venue. */
+export async function computeLooseOccurrenceKey(
+  title: string,
+  startTs: string,
+  venueName: string
+): Promise<string | null> {
+  const bucket = pacificTimeBucketKey(startTs);
+  if (!bucket) {
+    return null;
+  }
+
+  const looseTitle = normalizeTitle(title).replace(/\s+/g, "");
+  const normalizedVenue = normalizeVenue(venueName);
+  if (!looseTitle || !normalizedVenue) {
+    return null;
+  }
+
+  return sha256Hex(`loose|${looseTitle}|${bucket}|${normalizedVenue}`);
+}
+
 export async function computeOccurrenceKeyForBucket(
   title: string,
   bucketKey: string,

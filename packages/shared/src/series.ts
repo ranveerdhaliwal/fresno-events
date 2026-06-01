@@ -1,0 +1,60 @@
+import { normalizeTitle, normalizeVenue, normalizeListingUrl, sha256Hex } from "./occurrence.js";
+
+const RECURRENCE_PATTERN =
+  /\b(recurring|weekly|biweekly|monthly|every\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun|week|month|day))/i;
+
+export function isRecurringSeries(event: { seriesName?: string }): boolean {
+  if (!event.seriesName?.trim()) {
+    return false;
+  }
+  return RECURRENCE_PATTERN.test(event.seriesName);
+}
+
+export function venueScope(source: string, venueName: string): string {
+  const stripped = source.replace(/^(api|scrape):/, "").replace(/^www\./, "");
+  return stripped || normalizeVenue(venueName);
+}
+
+/** Exported for tests/future use; v1 auto-assign uses title+venue anchor only. */
+export function listingUrlSeriesAnchor(url: string | undefined): string | null {
+  const normalized = normalizeListingUrl(url ?? null);
+  if (!normalized) {
+    return null;
+  }
+  return normalized.replace(/\/\d+\/?$/, "/");
+}
+
+function titleAnchor(title: string, venueName: string): string {
+  const looseTitle = normalizeTitle(title).replace(/\s+/g, "");
+  return `title|${looseTitle}|${normalizeVenue(venueName)}`;
+}
+
+export interface SeriesResolveInput {
+  source: string;
+  title: string;
+  venueName: string;
+  seriesId?: string;
+  seriesName?: string;
+  ticketUrl?: string;
+  externalUrl?: string;
+}
+
+export interface SeriesResolveResult {
+  seriesId: string | undefined;
+}
+
+export async function computeCanonicalSeriesId(input: SeriesResolveInput): Promise<SeriesResolveResult> {
+  if (input.seriesId) {
+    return { seriesId: input.seriesId };
+  }
+
+  if (!isRecurringSeries(input)) {
+    return { seriesId: undefined };
+  }
+
+  const scope = venueScope(input.source, input.venueName);
+  const anchor = titleAnchor(input.title, input.venueName);
+  const payload = `series|${scope}|${anchor}`;
+  const hash = await sha256Hex(payload);
+  return { seriesId: `series:${scope}:${hash}` };
+}
