@@ -1,10 +1,14 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 
 import {
+  dateOnlyStartTs,
+  getPacificDateTimeParts,
   instantFromPacificLocal,
   isVisitFresnoEndOfDayUtc
 } from "@/lib/pacific-instant.utils";
 import type { VisitFresnoDoc, VisitFresnoResponse } from "./visit-fresno-api.types";
+
+const PACIFIC = "America/Los_Angeles";
 
 const ENDPOINT =
   "https://www.visitfresnocounty.org/includes/rest_v2/plugins_events_events_by_date/find/";
@@ -160,9 +164,94 @@ function parseVisitFresnoWallClock(dateYmd: string, timeHms: string): string | n
     return null;
   }
 
-  const pacificIso = `${dateYmd}T${hour}:${minute}:${second}-07:00`;
-  const parsed = new Date(pacificIso);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  const hhmm = `${hour}:${minute}`;
+  return instantFromPacificLocal(dateYmd, hhmm);
+}
+
+/** Pacific calendar date for Visit Fresno `eventDate` (not the UTC date prefix). */
+function visitFresnoPacificDateYmd(eventDate: string): string | null {
+  const parsed = new Date(eventDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return getPacificDateTimeParts(parsed).date;
+}
+
+function pacificWeekdayLong(dateYmd: string): string | null {
+  const noon = instantFromPacificLocal(dateYmd, "12:00");
+  if (!noon) {
+    return null;
+  }
+  return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: PACIFIC })
+    .format(new Date(noon))
+    .toLowerCase();
+}
+
+function weekdayMentioned(text: string, weekday: string): boolean {
+  return text.toLowerCase().includes(weekday.slice(0, 3));
+}
+
+function parseClockToHhMm(hour: number, minute: number, ampm: string | undefined): string | null {
+  let h = hour;
+  const m = minute;
+  if (ampm) {
+    const ap = ampm.toLowerCase();
+    if (ap === "pm" && h < 12) {
+      h += 12;
+    }
+    if (ap === "am" && h === 12) {
+      h = 0;
+    }
+  }
+  if (h > 23 || m > 59) {
+    return null;
+  }
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function extractFirstClock(text: string): string | null {
+  const match = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if (!match?.[1]) {
+    return null;
+  }
+  const hour = Number(match[1]);
+  const minute = match[2] ? Number(match[2]) : 0;
+  return parseClockToHhMm(hour, minute, match[3]);
+}
+
+/** Parse human `times` when `startTime` is absent (recurring listings often only have this). */
+export function parseVisitFresnoTimesField(times: string, dateYmd: string): string | null {
+  const trimmed = times.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const weekday = pacificWeekdayLong(dateYmd);
+  if (!weekday) {
+    return null;
+  }
+
+  const segments = trimmed.split(/\s+and\s+/i);
+  if (segments.length > 1) {
+    for (const segment of segments) {
+      if (!weekdayMentioned(segment, weekday)) {
+        continue;
+      }
+      const clock = extractFirstClock(segment);
+      if (clock) {
+        return clock;
+      }
+    }
+    return null;
+  }
+
+  if (/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?\b/i.test(trimmed)) {
+    if (!weekdayMentioned(trimmed, weekday)) {
+      return null;
+    }
+  }
+
+  return extractFirstClock(trimmed);
 }
 
 /** Parse Visit Fresno `eventDate` + optional `startTime` (avoids 11:59 PM PT sentinel). */
@@ -172,7 +261,11 @@ export function parseVisitFresnoStartTs(raw: VisitFresnoDoc): string | null {
     return null;
   }
 
-  const dateYmd = eventDate.slice(0, 10);
+  const dateYmd = visitFresnoPacificDateYmd(eventDate);
+  if (!dateYmd) {
+    return null;
+  }
+
   const startTime = raw.startTime?.trim();
   if (startTime) {
     const wall = parseVisitFresnoWallClock(dateYmd, startTime);
@@ -181,8 +274,16 @@ export function parseVisitFresnoStartTs(raw: VisitFresnoDoc): string | null {
     }
   }
 
+  const timesClock = raw.times?.trim() ? parseVisitFresnoTimesField(raw.times, dateYmd) : null;
+  if (timesClock) {
+    const wall = instantFromPacificLocal(dateYmd, timesClock);
+    if (wall) {
+      return wall;
+    }
+  }
+
   if (isVisitFresnoEndOfDayUtc(eventDate)) {
-    return instantFromPacificLocal(dateYmd, "12:00");
+    return dateOnlyStartTs(dateYmd);
   }
 
   const parsed = new Date(eventDate);
@@ -201,6 +302,7 @@ export function toNormalizedEvent(raw: VisitFresnoDoc): NormalizedEvent | null {
   const venueAddress = raw.address1?.trim();
   const descriptionText = raw.description ? stripHtml(raw.description) : undefined;
   const externalUrl = raw.absoluteUrl ?? raw.linkUrl;
+  const recurrence = raw.recurrence?.trim();
 
   return {
     source: "api:visitfresnocounty",
@@ -210,6 +312,9 @@ export function toNormalizedEvent(raw: VisitFresnoDoc): NormalizedEvent | null {
     venueName,
     venueCity: raw.city?.trim() || "Fresno",
     startTs: startIso,
+    ...(recurrence ? { seriesName: recurrence } : {}),
+    ...(recurrence ? { seriesListingRecId: raw.recid } : {}),
+    ...(raw.hostname?.trim() ? { seriesPresentedBy: raw.hostname.trim() } : {}),
     ...(venueAddress ? { venueAddress } : {}),
     ...(descriptionText ? { descriptionText } : {}),
     ...(externalUrl ? { externalUrl } : {}),

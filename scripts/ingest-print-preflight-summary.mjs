@@ -53,6 +53,15 @@ function terminalLink(url, label) {
 }
 
 /** @param {string | undefined} iso */
+function isDateOnlyStart(iso) {
+  if (!iso) {
+    return false;
+  }
+  const d = new Date(iso);
+  return !Number.isNaN(d.getTime()) && d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+}
+
+/** @param {string | undefined} iso */
 function formatPstShort(iso) {
   if (!iso) {
     return "";
@@ -70,8 +79,12 @@ function formatPstShort(iso) {
     hour12: true
   }).formatToParts(d);
   const get = (type) => parts.find((p) => p.type === type)?.value ?? "";
+  const dateLabel = `${get("month")}/${get("day")}`;
+  if (isDateOnlyStart(iso)) {
+    return dateLabel;
+  }
   const meridiem = get("dayPeriod").toLowerCase().startsWith("p") ? "p" : "a";
-  return `${get("month")}/${get("day")} ${get("hour")}:${get("minute")}${meridiem}`;
+  return `${dateLabel} ${get("hour")}:${get("minute")}${meridiem}`;
 }
 
 const input = readFileSync(0, "utf8").trim();
@@ -105,8 +118,9 @@ if (
 /** @typedef {{ url?: string, label?: string, events_found?: number, venue_key?: string, event_source?: string, detail_urls_planned?: number, dry_run_plan?: boolean, listing_urls?: string[], detail_urls?: string[], event_links?: EventLink[] }} SeedMetric */
 /** @typedef {{ url?: string, message?: string }} ScrapeError */
 /** @typedef {{ code?: string, message?: string }} ValidationIssue */
-/** @typedef {{ source?: string, title?: string, start_ts?: string, external_url?: string, source_event_id?: string, changed_fields?: string[] }} AuditItem */
+/** @typedef {{ title?: string, start_ts?: string, venue_name?: string, source?: string, source_event_id?: string, kept_source_event_id?: string, kept_title?: string, match?: string, external_url?: string, kept_external_url?: string }} BatchDuplicateItem */
 
+/** @typedef {{ source?: string, title?: string, start_ts?: string, external_url?: string, source_event_id?: string, changed_fields?: string[] }} AuditItem */
 /** @typedef {{ key: string, label: string, url: string, eventSource: string | null, eventsFound: number, errors: ScrapeError[], soft: ValidationIssue[], status: "OK" | "WARN" | "FAIL", detail: string | null }} SourceHealth */
 
 const STALE_VALIDATION_PATTERN = /errors=\d+ exceeds maxErrors=/;
@@ -154,6 +168,41 @@ function resolveEventUrl(item) {
   return "";
 }
 
+/** @param {BatchDuplicateItem} item */
+function printBatchDuplicateLine(item) {
+  const dropped = truncateEnd(item.title?.trim() || "(untitled)", TITLE_MAX);
+  const kept = truncateEnd(item.kept_title?.trim() || "(untitled)", TITLE_MAX);
+  const when = formatPstShort(item.start_ts);
+  const droppedUrl = resolveEventUrl(item);
+  const keptUrl =
+    typeof item.kept_external_url === "string" && item.kept_external_url.startsWith("http")
+      ? item.kept_external_url
+      : "";
+  const match = item.match ? ` [${item.match}]` : "";
+
+  const droppedLabel = droppedUrl
+    ? `${dropped} - ${terminalLink(droppedUrl, shortUrlPath(droppedUrl))}`
+    : dropped;
+  console.log(`  − ${droppedLabel}${when ? ` - ${when}` : ""}${match}`);
+
+  const keptLabel = keptUrl
+    ? `${kept} - ${terminalLink(keptUrl, shortUrlPath(keptUrl))}`
+    : kept;
+  console.log(`    kept: ${keptLabel} (${item.kept_source_event_id ?? "?"})`);
+}
+
+/** @param {BatchDuplicateItem[]} items */
+function printBatchDuplicatesSection(items) {
+  if (items.length === 0) {
+    return;
+  }
+  console.log(`−${items.length} within-batch duplicate(s) removed before validation:`);
+  for (const item of items) {
+    printBatchDuplicateLine(item);
+  }
+  console.log("");
+}
+
 /** @param {{ title?: string, url?: string, start_ts?: string }} row */
 function printEventLine(row) {
   const title = truncateEnd(row.title?.trim() || "(untitled)", TITLE_MAX);
@@ -172,20 +221,10 @@ function collectVenueEvents(metric, newItems) {
   /** @type {{ title: string, url: string, start_ts?: string }[]} */
   const rows = [];
   const source = metric.event_source ?? null;
+  const filteredNewItems = newItems.filter((item) => !source || item.source === source);
 
-  for (const link of metric.event_links ?? []) {
-    rows.push({
-      title: link.title?.trim() || titleFromUrl(link.url ?? ""),
-      url: link.url?.trim() ?? "",
-      ...(link.start_ts ? { start_ts: link.start_ts } : {})
-    });
-  }
-
-  if (rows.length === 0) {
-    for (const item of newItems) {
-      if (source && item.source !== source) {
-        continue;
-      }
+  if (filteredNewItems.length > 0) {
+    for (const item of filteredNewItems) {
       rows.push({
         title: item.title?.trim() || "(untitled)",
         url: resolveEventUrl(item),
@@ -193,28 +232,21 @@ function collectVenueEvents(metric, newItems) {
       });
     }
   } else {
-    const byTitle = new Map(
-      newItems
-        .filter((item) => !source || item.source === source)
-        .map((item) => [item.title?.trim() ?? "", item])
-    );
-    for (const row of rows) {
-      const audit = byTitle.get(row.title);
-      if (!row.start_ts && audit?.start_ts) {
-        row.start_ts = audit.start_ts;
-      }
-      if (!row.url) {
-        row.url = resolveEventUrl(audit ?? {});
-      }
+    for (const link of metric.event_links ?? []) {
+      rows.push({
+        title: link.title?.trim() || titleFromUrl(link.url ?? ""),
+        url: link.url?.trim() ?? "",
+        ...(link.start_ts ? { start_ts: link.start_ts } : {})
+      });
     }
-  }
 
-  if (rows.length === 0) {
-    for (const url of metric.detail_urls ?? []) {
-      if (!url.startsWith("http")) {
-        continue;
+    if (rows.length === 0) {
+      for (const url of metric.detail_urls ?? []) {
+        if (!url.startsWith("http")) {
+          continue;
+        }
+        rows.push({ title: titleFromUrl(url), url });
       }
-      rows.push({ title: titleFromUrl(url), url });
     }
   }
 
@@ -234,8 +266,8 @@ function collectVenueEvents(metric, newItems) {
   return { rows };
 }
 
-/** @param {SeedMetric[]} metrics @param {{ new: number, changed: number, unchanged: number, new_items: AuditItem[], changed_items: AuditItem[] }} merged */
-function printPreflightEventSummary(metrics, merged) {
+/** @param {SeedMetric[]} metrics @param {{ new: number, changed: number, unchanged: number, new_items: AuditItem[], changed_items: AuditItem[], batch_duplicate_items?: BatchDuplicateItem[] }} merged @param {Map<string, number>} [postDedupeCounts] */
+function printPreflightEventSummary(metrics, merged, postDedupeCounts) {
   const browserDryRunOnly =
     metrics.length > 0 &&
     metrics.every((m) => m.dry_run_plan === true && (m.event_links?.length ?? 0) === 0);
@@ -250,14 +282,28 @@ function printPreflightEventSummary(metrics, merged) {
   if (merged.new > 0 || merged.changed > 0 || merged.unchanged > 0) {
     console.log(`+${merged.new} new  ~${merged.changed} changed  =${merged.unchanged} unchanged`);
   }
+  if ((merged.batch_duplicate_items?.length ?? 0) > 0) {
+    const removed = merged.batch_duplicate_items.length;
+    const raw = merged.raw_events_found;
+    const kept = merged.new > 0 ? merged.new : null;
+    if (typeof raw === "number" && typeof kept === "number") {
+      console.log(`−${removed} batch duplicate(s) removed (${raw} raw → ${kept} kept)`);
+    } else {
+      console.log(`−${removed} batch duplicate(s) removed`);
+    }
+  }
   if (browserDryRunOnly && merged.new === 0) {
     console.log("(Browser venues: listing + detail URLs below; full parse on promote.)");
   }
   console.log("");
 
+  if (merged.batch_duplicate_items?.length) {
+    printBatchDuplicatesSection(merged.batch_duplicate_items);
+  }
+
   for (const metric of metrics) {
     const key = metric.venue_key ?? metric.label ?? "venue";
-    const count = typeof metric.events_found === "number" ? metric.events_found : 0;
+    const count = postDedupeCounts?.get(key) ?? metric.events_found ?? 0;
     const source = metric.event_source ? ` · ${metric.event_source}` : "";
     const listing = (metric.listing_urls?.[0] ?? metric.url ?? "").trim();
 
@@ -345,7 +391,17 @@ function collectSourceHealth(summary) {
   const seedMetrics = Array.isArray(summary.seed_metrics) ? summary.seed_metrics : [];
 
   if (seedMetrics.length > 0) {
-    return seedMetrics.map((metric) => healthFromSeedMetric(/** @type {SeedMetric} */ (metric), errors, soft));
+    const postDedupe =
+      seedMetrics.length === 1 && typeof summary.events_found === "number"
+        ? summary.events_found
+        : null;
+    return seedMetrics.map((metric) => {
+      const row = healthFromSeedMetric(/** @type {SeedMetric} */ (metric), errors, soft);
+      if (postDedupe !== null) {
+        return { ...row, eventsFound: postDedupe };
+      }
+      return row;
+    });
   }
 
   const source = typeof summary.source === "string" ? summary.source : "unknown";
@@ -457,17 +513,24 @@ for (const row of healthRows) {
   }
 }
 
-/** @type {{ new: number, changed: number, unchanged: number, new_items: AuditItem[], changed_items: AuditItem[] }} */
+/** @type {{ new: number, changed: number, unchanged: number, new_items: AuditItem[], changed_items: AuditItem[], batch_duplicate_items: BatchDuplicateItem[], raw_events_found?: number }} */
 const merged = {
   new: 0,
   changed: 0,
   unchanged: 0,
   new_items: [],
-  changed_items: []
+  changed_items: [],
+  batch_duplicate_items: []
 };
 
 for (const summary of body.data.summaries) {
   if (!isRecord(summary) || !isRecord(summary.persist_preview)) {
+    if (isRecord(summary) && Array.isArray(summary.batch_duplicate_items)) {
+      merged.batch_duplicate_items.push(.../** @type {BatchDuplicateItem[]} */ (summary.batch_duplicate_items));
+    }
+    if (isRecord(summary) && typeof summary.raw_events_found === "number") {
+      merged.raw_events_found = (merged.raw_events_found ?? 0) + summary.raw_events_found;
+    }
     continue;
   }
   const preview = summary.persist_preview;
@@ -480,17 +543,48 @@ for (const summary of body.data.summaries) {
   if (Array.isArray(preview.changed_items)) {
     merged.changed_items.push(...preview.changed_items);
   }
+  if (Array.isArray(preview.batch_duplicate_items)) {
+    merged.batch_duplicate_items.push(...preview.batch_duplicate_items);
+  } else if (Array.isArray(summary.batch_duplicate_items)) {
+    merged.batch_duplicate_items.push(.../** @type {BatchDuplicateItem[]} */ (summary.batch_duplicate_items));
+  }
+  if (typeof summary.raw_events_found === "number") {
+    merged.raw_events_found = (merged.raw_events_found ?? 0) + summary.raw_events_found;
+  }
 }
 
 if (!isPromote) {
   /** @type {SeedMetric[]} */
   const allSeedMetrics = [];
+  /** @type {Map<string, number>} */
+  const postDedupeCounts = new Map();
   for (const summary of body.data.summaries) {
-    if (isRecord(summary) && Array.isArray(summary.seed_metrics)) {
+    if (!isRecord(summary)) {
+      continue;
+    }
+    if (Array.isArray(summary.seed_metrics)) {
       allSeedMetrics.push(.../** @type {SeedMetric[]} */ (summary.seed_metrics));
     }
+    if (
+      typeof summary.events_found === "number" &&
+      Array.isArray(summary.seed_metrics) &&
+      summary.seed_metrics.length === 1
+    ) {
+      const metric = summary.seed_metrics[0];
+      if (isRecord(metric)) {
+        const key =
+          typeof metric.venue_key === "string"
+            ? metric.venue_key
+            : typeof metric.label === "string"
+              ? metric.label
+              : null;
+        if (key) {
+          postDedupeCounts.set(key, summary.events_found);
+        }
+      }
+    }
   }
-  printPreflightEventSummary(allSeedMetrics, merged);
+  printPreflightEventSummary(allSeedMetrics, merged, postDedupeCounts);
 }
 
 if (isPromote) {

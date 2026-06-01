@@ -25,7 +25,7 @@ Venues split into two **lanes** (by `strategy` in each `venue.config.json`):
 | `pnpm ingest:promote-direct` | **Real** direct lane |
 | `pnpm ingest:promote-browser` | **Real** browser lane |
 | `pnpm ingest:promote-all` | **Real** both lanes |
-| `pnpm ingest:promote --venue=<key>` | **Real** one venue |
+| `pnpm ingest:promote --venue=<key>` | **Real** one venue (enrichment scoped to that venue; no backlog enrichment) |
 | `pnpm review:bulk-approve` | Approve all `pending_review` locally |
 | `POST /review/candidates/:id/approve-changes` | Apply a single `needs_changes` row to its linked `events` row |
 | `POST /review/candidates/bulk-approve-changes` | Bulk approve listed update ids |
@@ -45,16 +45,18 @@ Venues split into two **lanes** (by `strategy` in each `venue.config.json`):
 3. Or `pnpm ingest:preflight-all` / `pnpm ingest:promote-all` for everything at once
 4. Studio: filter `event_candidates` by `source`
 5. `/admin` — **New** tab for `pending_review`, **Updates** tab for `needs_changes`
+6. Visit Fresno preflight: batch duplicate section when dupes exist; ~239 events after within-batch dedupe
+7. Recurring rows: `normalized_event->>'seriesId'` matches `/^series:[^:]+:[a-f0-9]{64}$/`
 
 ## Expected counts (soft warnings)
 
 | Venue key | `event_candidates.source` | Typical count |
 | --- | --- | --- |
-| `visit-fresno-county` | `api:visitfresnocounty` | ~224 |
+| `visit-fresno-county` | `api:visitfresnocounty` | ~239 (after batch dedupe) |
 | `milb-grizzlies` | `api:milb` | ~88 |
 | `downtown-fresno` | `api:downtownfresno` | ~27 |
 | `tower-theatre` | `scrape:towertheatre.ticketsauce.com` | varies |
 
 Hard validation fails on duplicate `sourceEventId` in one batch, missing required fields, or errors over budget.
 
-See [VENUE_INGEST.md](VENUE_INGEST.md).
+See [VENUE_INGEST.md](VENUE_INGEST.md) and [SERIES_EVENTS.md](SERIES_EVENTS.md).

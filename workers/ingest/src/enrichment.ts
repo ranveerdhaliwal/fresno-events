@@ -39,15 +39,27 @@ export interface PendingEnrichmentCounts {
   already_enriched: number;
 }
 
-function logPhase(message: string, payload: Record<string, unknown> = {}) {
-  console.log(
-    JSON.stringify({
-      event: "ingest_phase",
-      phase: message,
-      ...payload
-    })
-  );
+function structLogEnabled(env: IngestEnv): boolean {
+  return env.INGEST_STRUCT_LOG === "1";
+}
+
+function logPhase(env: IngestEnv, message: string, payload: Record<string, unknown> = {}) {
   console.log(`[ingest] ${message}`);
+  if (structLogEnabled(env)) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_phase",
+        phase: message,
+        ...payload
+      })
+    );
+  }
+}
+
+function logStruct(env: IngestEnv, event: string, payload: Record<string, unknown>) {
+  if (structLogEnabled(env)) {
+    console.log(JSON.stringify({ event, ...payload }));
+  }
 }
 
 export async function countPendingEnrichment(
@@ -141,19 +153,18 @@ export async function enrichRecentCandidates(
       continue;
     }
     summary.skipped_sufficient_data += 1;
-    console.log(
-      JSON.stringify({
-        event: "ai_enrichment_item_sufficient",
-        candidate_id: row.id,
-        title: row.normalized_event.title,
-        source: row.normalized_event.source,
-        venue: row.normalized_event.venueName,
-        action: options.dryRun ? "would_tag_without_llm" : "tagged_without_llm"
-      })
-    );
-    console.log(
-      `[ingest] sufficient (no LLM): "${row.normalized_event.title.slice(0, 48)}${row.normalized_event.title.length > 48 ? "…" : ""}"`
-    );
+    const shortTitle =
+      row.normalized_event.title.length > 48
+        ? `${row.normalized_event.title.slice(0, 47)}…`
+        : row.normalized_event.title;
+    console.log(`[ingest] sufficient (no LLM): "${shortTitle}"`);
+    logStruct(env, "ai_enrichment_item_sufficient", {
+      candidate_id: row.id,
+      title: row.normalized_event.title,
+      source: row.normalized_event.source,
+      venue: row.normalized_event.venueName,
+      action: options.dryRun ? "would_tag_without_llm" : "tagged_without_llm"
+    });
     if (!options.dryRun && !hasAiEnrichmentNotes(row.review_notes)) {
       await markSufficientWithoutLlm(supabase, row);
       summary.updated += 1;
@@ -161,46 +172,33 @@ export async function enrichRecentCandidates(
   }
 
   console.log(
-    JSON.stringify({
-      event: "ai_enrichment_batch_start",
-      fetched: rows.length,
-      will_process: toProcess.length,
-      skipped_sufficient_data: summary.skipped_sufficient_data,
-      batch_limit: limit,
-      dry_run: options.dryRun ?? false,
-      ...(options.sourceFilter ? { source_filter: options.sourceFilter } : {})
-    })
+    `[ingest] enrichment batch: ${toProcess.length} to process, ${summary.skipped_sufficient_data} sufficient (skipped LLM), limit ${limit}${options.sourceFilter ? `, source ${options.sourceFilter}` : ""}${options.dryRun ? ", dry-run" : ""}`
   );
+  logStruct(env, "ai_enrichment_batch_start", {
+    fetched: rows.length,
+    will_process: toProcess.length,
+    skipped_sufficient_data: summary.skipped_sufficient_data,
+    batch_limit: limit,
+    dry_run: options.dryRun ?? false,
+    ...(options.sourceFilter ? { source_filter: options.sourceFilter } : {})
+  });
 
   for (const row of toProcess) {
     summary.processed += 1;
     const index = summary.processed;
     const ev = row.normalized_event;
-    console.log(
-      JSON.stringify({
-        event: "ai_enrichment_item_start",
-        candidate_id: row.id,
-        index,
-        batch_total: toProcess.length,
-        source: ev.source,
-        title: ev.title,
-        venue: ev.venueName,
-        start_ts: ev.startTs,
-        category_before: ev.category ?? null
-      })
-    );
+    const progress = { index, total: toProcess.length };
 
     try {
       const enrichment = await enrichCandidate(env, row.normalized_event);
       if (!enrichment) {
-        console.log(
-          JSON.stringify({
-            event: "ai_enrichment_item_skip",
-            candidate_id: row.id,
-            index,
-            reason: "no_model_response"
-          })
-        );
+        const shortTitle = ev.title.length > 48 ? `${ev.title.slice(0, 47)}…` : ev.title;
+        console.log(`[ingest] enrich skip ${index}/${toProcess.length}: no model response — "${shortTitle}"`);
+        logStruct(env, "ai_enrichment_item_skip", {
+          candidate_id: row.id,
+          index,
+          reason: "no_model_response"
+        });
         continue;
       }
 
@@ -221,14 +219,11 @@ export async function enrichRecentCandidates(
         patch.reviewed_at = new Date().toISOString();
         summary.auto_rejected += 1;
         if (row.status === "needs_changes") {
-          console.log(
-            JSON.stringify({
-              event: "ai_enrichment_item_rejected_changed",
-              candidate_id: row.id,
-              matched_event_id: row.matched_event_id ?? null,
-              title: ev.title
-            })
-          );
+          logStruct(env, "ai_enrichment_item_rejected_changed", {
+            candidate_id: row.id,
+            matched_event_id: row.matched_event_id ?? null,
+            title: ev.title
+          });
         }
       }
 
@@ -270,45 +265,40 @@ export async function enrichRecentCandidates(
         db_fields: delta.db_fields,
         reasoning_preview: reasoningPreview(enrichment.reasoning)
       };
+      const doneLine = formatEnrichmentDoneLine(ev.title, delta, enrichment, progress);
 
       if (options.dryRun) {
-        console.log(
-          JSON.stringify({
-            event: "ai_enrichment_item_would_patch",
-            would_patch: patch,
-            ...doneLog
-          })
-        );
-        console.log(formatEnrichmentDoneLine(ev.title, delta, enrichment));
+        console.log(`${doneLine} (dry-run)`);
+        logStruct(env, "ai_enrichment_item_would_patch", { would_patch: patch, ...doneLog });
       } else {
         await patchCandidate(supabase, row.id, patch);
         summary.updated += 1;
-        console.log(JSON.stringify({ event: "ai_enrichment_item_done", ...doneLog }));
-        console.log(formatEnrichmentDoneLine(ev.title, delta, enrichment));
+        console.log(doneLine);
+        logStruct(env, "ai_enrichment_item_done", doneLog);
       }
     } catch (error) {
       summary.errors += 1;
-      console.log(
-        JSON.stringify({
-          event: "ai_enrichment_item_error",
-          candidate_id: row.id,
-          index,
-          message: error instanceof Error ? error.message : String(error)
-        })
-      );
+      const shortTitle = ev.title.length > 48 ? `${ev.title.slice(0, 47)}…` : ev.title;
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`[ingest] enrich error ${index}/${toProcess.length}: ${message} — "${shortTitle}"`);
+      logStruct(env, "ai_enrichment_item_error", {
+        candidate_id: row.id,
+        index,
+        message
+      });
     }
   }
 
   console.log(
-    JSON.stringify({
-      event: "ai_enrichment_batch_end",
-      ...summary,
-      title_changed: batchTitleChanged,
-      category_changed: batchCategoryChanged,
-      rows_with_tags_added: batchTagsAdded,
-      normalized_event_patched: batchNormalizedPatched
-    })
+    `[ingest] enrichment batch done: processed ${summary.processed}, updated ${summary.updated}, rejected ${summary.auto_rejected}, errors ${summary.errors}, title Δ ${batchTitleChanged}, category Δ ${batchCategoryChanged}, tags on ${batchTagsAdded} rows`
   );
+  logStruct(env, "ai_enrichment_batch_end", {
+    ...summary,
+    title_changed: batchTitleChanged,
+    category_changed: batchCategoryChanged,
+    rows_with_tags_added: batchTagsAdded,
+    normalized_event_patched: batchNormalizedPatched
+  });
 
   return summary;
 }
@@ -324,7 +314,7 @@ export async function runEnrichmentPipeline(
 
   const counts = await countPendingEnrichment(supabase, options.sourceFilter);
 
-  logPhase("AI enrichment starting", {
+  logPhase(env, "AI enrichment starting", {
     pending_review: counts.pending_review,
     needs_changes: counts.needs_changes,
     awaiting_enrichment: counts.awaiting_enrichment,
@@ -346,12 +336,12 @@ export async function runEnrichmentPipeline(
 
   if (!getAiBackend(env, "enrichment")) {
     total.skipped_no_backend = true;
-    logPhase("AI enrichment skipped (no LLM provider configured)", {});
+    logPhase(env, "AI enrichment skipped (no LLM provider configured)", {});
     return total;
   }
 
   if (counts.awaiting_enrichment === 0) {
-    logPhase("AI enrichment skipped (no candidates need enrichment)", { ...counts });
+    logPhase(env, "AI enrichment skipped (no candidates need enrichment)", { ...counts });
     return total;
   }
 
@@ -376,7 +366,7 @@ export async function runEnrichmentPipeline(
       break;
     }
 
-    logPhase(`AI enrichment batch ${round} done`, {
+    logPhase(env, `AI enrichment batch ${round} done`, {
       batch_processed: batch.processed,
       batch_updated: batch.updated,
       total_processed: total.processed,
@@ -388,7 +378,7 @@ export async function runEnrichmentPipeline(
     }
   } while (round < 500);
 
-  logPhase("AI enrichment finished", { ...total, rounds: round });
+  logPhase(env, "AI enrichment finished", { ...total, rounds: round });
 
   return total;
 }

@@ -92,7 +92,7 @@ To add a new API source: add a file under `scrapers/` and register it in `regist
 
 **Event priority (0–5)** is editorial: set at admin approve time on published `events`, default `5`. Not assigned during ingest.
 
-**Re-scrape behavior:** `event_candidates.content_fingerprint` detects content changes. Unchanged rows keep their review status. Approved rows that changed go to `needs_changes` and appear in the admin **Updates** tab. Linked published `events` only get `last_seen_at` bumped on re-scrape; title/start/description and other content fields update when an admin **approves the update** (`POST /review/candidates/:id/approve-changes`).
+**Re-scrape behavior:** `event_candidates.content_fingerprint` detects content changes. Unchanged rows keep their review status and enrichment fields (`confidence_score`, `review_notes`, `normalized_event`, etc.); persist only bumps `run_id` / `updated_at` (plus occurrence/link fields when cross-source dedupe applies). Approved rows that changed go to `needs_changes` and appear in the admin **Updates** tab. Linked published `events` only get `last_seen_at` bumped on re-scrape; title/start/description and other content fields update when an admin **approves the update** (`POST /review/candidates/:id/approve-changes`).
 
 Structured persist logs: `ingest_candidate_new`, `ingest_candidate_changed`, and `ingest_persist_summary` (also stored on `ingest_runs.metrics.audit`).
 

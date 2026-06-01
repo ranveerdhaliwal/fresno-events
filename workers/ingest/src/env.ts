@@ -31,5 +31,7 @@ export interface IngestEnv {
   INGEST_SKIP_VALIDATION?: string;
   /** When true or 1, link cross-source duplicates (status/canonical). Keys always computed. */
   INGEST_CROSS_SOURCE_DEDUPE?: string;
+  /** When "1", emit extra structured JSON log lines from enrichment. */
+  INGEST_STRUCT_LOG?: string;
   AI?: Ai;
 }

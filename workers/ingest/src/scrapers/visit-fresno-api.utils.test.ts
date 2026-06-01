@@ -9,9 +9,11 @@ import {
   extractVisitFresnoDocs,
   parseVisitFresnoSimpleTokenBody,
   parseVisitFresnoStartTs,
+  parseVisitFresnoTimesField,
   toNormalizedEvent,
   visitFresnoTotalCount
 } from "./visit-fresno-api.utils";
+import { applySeriesMetadata } from "../lib/series-metadata.utils.js";
 
 const fixturePath = join(import.meta.dirname, "fixtures/visit-fresno-response.json");
 
@@ -41,6 +43,90 @@ describe("visit-fresno-api.utils", () => {
     expect(url).toContain("plugins_events_events_by_date");
     expect(url).toContain("token=test-token");
     expect(url).toContain("json=");
+  });
+
+  it("parseVisitFresnoStartTs uses Pacific calendar date for T06:59:59 sentinel", () => {
+    const cases = [
+      { eventDate: "2026-06-01T06:59:59.000Z", startTime: "08:00:00", month: "5", day: "31", hour: 8 },
+      { eventDate: "2026-06-01T06:59:59.000Z", startTime: "11:30:00", month: "5", day: "31", hour: 11 },
+      { eventDate: "2026-06-01T06:59:59.000Z", startTime: "13:05:00", month: "5", day: "31", hour: 13 }
+    ];
+
+    for (const sample of cases) {
+      const startIso = parseVisitFresnoStartTs({
+        dates: { eventDate: sample.eventDate },
+        startTime: sample.startTime
+      } as import("./visit-fresno-api.types").VisitFresnoDoc);
+      expect(startIso).toBeTruthy();
+
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        hour12: false
+      }).formatToParts(new Date(startIso!));
+      const get = (type: Intl.DateTimeFormatPartTypes) =>
+        parts.find((p) => p.type === type)?.value ?? "";
+      expect(get("month")).toBe(sample.month);
+      expect(get("day")).toBe(sample.day);
+      expect(Number(get("hour"))).toBe(sample.hour);
+    }
+  });
+
+  it("parseVisitFresnoTimesField reads recurring Tuesday market time", () => {
+    expect(parseVisitFresnoTimesField("5 pm on Tuesdays", "2026-06-02")).toBe("17:00");
+    expect(parseVisitFresnoTimesField("5pm-9pm Tuesdays and 10am-2pm Saturdays", "2026-06-02")).toBe(
+      "17:00"
+    );
+    expect(parseVisitFresnoTimesField("5pm-9pm Tuesdays and 10am-2pm Saturdays", "2026-06-06")).toBe(
+      "10:00"
+    );
+  });
+
+  it("parseVisitFresnoStartTs uses times when startTime is absent", () => {
+    const startIso = parseVisitFresnoStartTs({
+      _id: "river-4975",
+      recid: "4975",
+      title: "River Park Farmers Market",
+      dates: { eventDate: "2026-06-03T06:59:59.000Z" },
+      times: "5 pm on Tuesdays"
+    } as import("./visit-fresno-api.types").VisitFresnoDoc);
+
+    expect(startIso).toBeTruthy();
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      hour12: false
+    }).formatToParts(new Date(startIso!));
+    const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+    expect(get("month")).toBe("6");
+    expect(get("day")).toBe("2");
+    expect(Number(get("hour"))).toBe(17);
+  });
+
+  it("parseVisitFresnoStartTs uses date-only sentinel when time is unknown", () => {
+    const startIso = parseVisitFresnoStartTs({
+      _id: "no-time",
+      recid: "1",
+      title: "Mystery Event",
+      dates: { eventDate: "2026-06-03T06:59:59.000Z" }
+    } as import("./visit-fresno-api.types").VisitFresnoDoc);
+
+    expect(startIso).toBe("2026-06-02T12:00:00.000Z");
+
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      hour12: false
+    }).formatToParts(new Date(startIso!));
+    const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+    expect(get("month")).toBe("6");
+    expect(get("day")).toBe("2");
   });
 
   it("parseVisitFresnoStartTs uses startTime instead of 06:59:59 sentinel", () => {
@@ -82,5 +168,26 @@ describe("visit-fresno-api.utils", () => {
     const normalized = docs.map((doc) => toNormalizedEvent(doc)).filter((e) => e !== null);
     const ids = normalized.map((e) => e.sourceEventId);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("does not set seriesId in mapper; applySeriesMetadata assigns canonical id", async () => {
+    const raw = {
+      _id: "occ-123",
+      recid: "8487",
+      title: "Backyard 101 - Trivia",
+      dates: { eventDate: "2026-06-03T06:59:59.000Z" },
+      location: "The Backyard Social Club",
+      city: "Fresno",
+      recurrence: "Recurring weekly on Tuesday",
+      hostname: "Backyard 101"
+    };
+    const mapped = toNormalizedEvent(raw);
+    expect(mapped?.seriesId).toBeUndefined();
+    expect(mapped?.seriesName).toBe("Recurring weekly on Tuesday");
+    expect(mapped?.seriesListingRecId).toBe("8487");
+    expect(mapped?.seriesPresentedBy).toBe("Backyard 101");
+
+    const [withSeries] = await applySeriesMetadata([mapped!]);
+    expect(withSeries?.seriesId).toMatch(/^series:visitfresnocounty:[a-f0-9]{64}$/);
   });
 });

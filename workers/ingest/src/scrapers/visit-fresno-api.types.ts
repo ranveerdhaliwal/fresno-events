@@ -21,7 +21,11 @@ const VisitFresnoDocSchema = z.object({
   url: z.string().optional(),
   media_raw: z.array(MediaRawSchema).optional(),
   startTime: z.string().optional(),
-  endTime: z.string().optional()
+  endTime: z.string().optional(),
+  times: z.string().optional(),
+  recurrence: z.string().optional(),
+  hostname: z.string().optional(),
+  recurType: z.union([z.string(), z.number()]).optional()
 });
 
 const VisitFresnoDocsPageSchema = z.object({

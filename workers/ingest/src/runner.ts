@@ -2,7 +2,9 @@ import type { CoordinatorMode, ScrapeContext, ScrapeResult } from "@fresno-event
 
 import { runEnrichmentPipeline, type EnrichRecentCandidatesOptions, type EnrichmentSummary } from "@/enrichment";
 import { persistScrapeResult, previewPersistScrapeResult, type PersistenceResult } from "@/candidates";
-import type { PersistAuditSummary } from "@/candidates/persist-audit.utils";
+import { dedupeScrapeBatch } from "@/lib/scrape-batch-dedupe.utils";
+import { applySeriesMetadata } from "@/lib/series-metadata.utils";
+import type { PersistAuditItemBatchDuplicate, PersistAuditSummary } from "@/candidates/persist-audit.utils";
 import { mergePersistAuditSummaries } from "@/candidates/persist-analysis.utils";
 import type { IngestEnv } from "@/env";
 import { listRunnableSources, planIngestRuns, sortPlanByStalest, type PlanItem } from "@/planner";
@@ -48,6 +50,10 @@ export interface RunSummary {
   }>;
   validation?: ScrapeValidationResult;
   persist_preview?: PersistAuditSummary;
+  /** Scrape count before within-batch dedupe (when dedupe runs). */
+  raw_events_found?: number;
+  batch_duplicates_removed?: number;
+  batch_duplicate_items?: PersistAuditItemBatchDuplicate[];
 }
 
 export interface RunOptions {
@@ -178,14 +184,26 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
                 changed: mergedPreview.changed,
                 unchanged: mergedPreview.unchanged,
                 new_items: mergedPreview.new_items,
-                changed_items: mergedPreview.changed_items
+                changed_items: mergedPreview.changed_items,
+                ...(mergedPreview.batch_duplicates
+                  ? {
+                      batch_duplicates: mergedPreview.batch_duplicates,
+                      batch_duplicate_items: mergedPreview.batch_duplicate_items
+                    }
+                  : {})
               }
             }
-          : {})
+          : {}),
+        batch_duplicates_removed: summaries.reduce(
+          (n, s) => n + (s.batch_duplicates_removed ?? 0),
+          0
+        ),
+        batch_duplicate_items: summaries.flatMap((s) => s.batch_duplicate_items ?? [])
       })
     );
 
     if (mergedPreview) {
+      const batchRemoved = summaries.reduce((n, s) => n + (s.batch_duplicates_removed ?? 0), 0);
       console.log(
         JSON.stringify({
           event: "ingest_preflight_summary",
@@ -194,11 +212,20 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
           changed: mergedPreview.changed,
           unchanged: mergedPreview.unchanged,
           new_items: mergedPreview.new_items,
-          changed_items: mergedPreview.changed_items
+          changed_items: mergedPreview.changed_items,
+          ...(mergedPreview.batch_duplicates
+            ? {
+                batch_duplicates: mergedPreview.batch_duplicates,
+                batch_duplicate_items: mergedPreview.batch_duplicate_items
+              }
+            : {}),
+          ...(batchRemoved > 0 ? { batch_duplicates_removed: batchRemoved } : {})
         })
       );
+      const batchNote =
+        batchRemoved > 0 ? `, −${batchRemoved} batch duplicate(s) removed` : "";
       console.log(
-        `[ingest] preflight preview: +${mergedPreview.new} new, ~${mergedPreview.changed} changed, =${mergedPreview.unchanged} unchanged (no DB writes).`
+        `[ingest] preflight preview: +${mergedPreview.new} new, ~${mergedPreview.changed} changed, =${mergedPreview.unchanged} unchanged${batchNote} (no DB writes).`
       );
     } else {
       console.log("[ingest] preflight preview skipped (no Supabase config or zero events).");
@@ -372,13 +399,51 @@ async function runOne(
     };
   }
 
+  const rawEventCount = result.events.length;
+  const batchDedupe = await dedupeScrapeBatch(result.events);
+  result.events = batchDedupe.events;
+  const batchDedupeFields =
+    batchDedupe.removed > 0
+      ? {
+          raw_events_found: rawEventCount,
+          batch_duplicates_removed: batchDedupe.removed,
+          batch_duplicate_items: batchDedupe.duplicates
+        }
+      : {};
+  if (batchDedupe.removed > 0) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_batch_duplicates",
+        source: plan.key,
+        runId,
+        raw_events: rawEventCount,
+        kept_events: result.events.length,
+        removed: batchDedupe.removed,
+        items: batchDedupe.duplicates
+      })
+    );
+    console.log(
+      `[ingest] ${plan.key}: removed ${batchDedupe.removed} within-batch duplicate(s) (${rawEventCount} → ${result.events.length})`
+    );
+  }
+
+  result.events = await applySeriesMetadata(result.events);
+
   const validation = runScrapeValidation(env, plan.key, result, ctx);
 
   if (ctx.dryRun) {
-    const persistPreview =
+    let persistPreview =
       validation.ok && ctx.supabase && result.events.length > 0
         ? (await previewPersistScrapeResult(env, result)) ?? undefined
         : undefined;
+
+    if (persistPreview && batchDedupe.removed > 0) {
+      persistPreview = {
+        ...persistPreview,
+        batch_duplicates: batchDedupe.removed,
+        batch_duplicate_items: batchDedupe.duplicates
+      };
+    }
 
     if (persistPreview) {
       console.log(
@@ -416,6 +481,7 @@ async function runOne(
       validation,
       dry_run: true,
       ...(persistPreview ? { persist_preview: persistPreview } : {}),
+      ...batchDedupeFields,
       scrape_errors: result.errors.map((err) => ({
         ...(err.url ? { url: err.url } : {}),
         message: err.message
@@ -448,7 +514,8 @@ async function runOne(
         ...(err.url ? { url: err.url } : {}),
         message: err.message
       })),
-      ...(result.seedMetrics?.length ? { seed_metrics: mapSeedMetrics(result) } : {})
+      ...(result.seedMetrics?.length ? { seed_metrics: mapSeedMetrics(result) } : {}),
+      ...batchDedupeFields
     };
   }
 
@@ -485,7 +552,8 @@ async function runOne(
       ...(err.url ? { url: err.url } : {}),
       message: err.message
     })),
-    ...(result.seedMetrics?.length ? { seed_metrics: mapSeedMetrics(result) } : {})
+    ...(result.seedMetrics?.length ? { seed_metrics: mapSeedMetrics(result) } : {}),
+    ...batchDedupeFields
   };
 }
 

@@ -4,6 +4,8 @@
 
 **Cross-source dedupe:** [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md) — `occurrence_id`, grouped admin review, `INGEST_CROSS_SOURCE_DEDUPE`.
 
+**Series events:** [SERIES_EVENTS.md](SERIES_EVENTS.md) — recurring shows, canonical `seriesId`, batch dedupe. Plan: [SERIES_EVENTS_PLAN.md](SERIES_EVENTS_PLAN.md).
+
 Single ingest path for Fresno venue sources: **repo modules** under `workers/ingest/src/venues/<key>/`, orchestrated by the **`venue-ingest`** scraper. Replaces legacy `ai-crawl`, `seed_urls`, and separate API registry keys.
 
 Each venue has:

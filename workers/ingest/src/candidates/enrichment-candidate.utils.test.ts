@@ -4,6 +4,7 @@ import type { NormalizedEvent } from "@fresno-events/shared";
 
 import {
   candidateNeedsEnrichment,
+  formatEnrichmentDoneLine,
   hasAiEnrichmentNotes,
   hasSufficientReviewData,
   summarizeEnrichmentDelta
@@ -119,5 +120,41 @@ describe("enrichment-candidate.utils", () => {
 
     expect(delta.status_change).toBe("pending_review → rejected");
     expect(delta.db_fields).toContain("status");
+  });
+
+  it("formatEnrichmentDoneLine fits on one readable line", () => {
+    const delta = summarizeEnrichmentDelta(
+      base,
+      {
+        confidence: 0.98,
+        category: "sports",
+        cleaned_title: null,
+        tags: ["baseball", "grizzlies"],
+        is_junk: false,
+        reasoning: "Local baseball game.",
+        suggested_priority: 4
+      },
+      { autoReject: false }
+    );
+
+    const line = formatEnrichmentDoneLine(
+      base.title,
+      delta,
+      {
+        confidence: 0.98,
+        category: "sports",
+        cleaned_title: null,
+        tags: ["baseball", "grizzlies"],
+        is_junk: false,
+        reasoning: "Local baseball game.",
+        suggested_priority: 4
+      },
+      { index: 2, total: 100 }
+    );
+
+    expect(line).toMatch(/^\[ingest\] enriched 2\/100:/);
+    expect(line).toContain("conf 0.98");
+    expect(line).toContain("category music → sports");
+    expect(line).toContain("tags +2");
   });
 });

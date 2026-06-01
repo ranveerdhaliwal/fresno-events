@@ -3,7 +3,7 @@
 #
 # Examples:
 #   pnpm ingest:promote --venue=strummers
-#   pnpm ingest:promote --venue=downtown-fresno --no-enrich
+#   pnpm ingest:promote --venue=downtown-fresno
 #   pnpm ingest:promote-direct
 #   pnpm ingest:promote-browser
 #   pnpm ingest:promote-all

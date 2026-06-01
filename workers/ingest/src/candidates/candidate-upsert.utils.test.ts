@@ -1,0 +1,193 @@
+import { describe, expect, it } from "vitest";
+
+import type { NormalizedEvent } from "@fresno-events/shared";
+
+import {
+  buildCandidateUpsertRow,
+  defaultConfidenceScore,
+  shouldResetConfidenceOnChangedUpsert
+} from "@/candidates/candidate-upsert.utils";
+import type { ExistingCandidateRow } from "@/candidates/content-fingerprint.utils";
+import type { OccurrencePersistFields } from "@/candidates/occurrence-resolve.utils";
+import { candidateNeedsEnrichment } from "@/candidates/enrichment-candidate.utils";
+
+const base: NormalizedEvent = {
+  source: "api:visitfresnocounty",
+  sourceEventId: "evt-1",
+  title: "Summer Concert",
+  venueName: "Woodward Park",
+  startTs: "2026-06-01T02:00:00.000Z",
+  category: "music",
+  descriptionText: "Live music outdoors"
+};
+
+const baseOccurrence: OccurrencePersistFields = {
+  occurrenceId: "occ-1",
+  occurrenceKey: "key-1",
+  urlKey: "url-1",
+  canonicalCandidateId: null,
+  matchedEventId: null,
+  statusOverride: null,
+  matchStep: "new",
+  primaryCandidateId: null,
+  publishedEventId: null
+};
+
+function existingRow(overrides: Partial<ExistingCandidateRow> = {}): ExistingCandidateRow {
+  return {
+    id: "c1",
+    source: "api:visitfresnocounty",
+    source_event_id: "evt-1",
+    status: "pending_review",
+    content_fingerprint: "fp-1",
+    matched_event_id: null,
+    occurrence_id: "occ-1",
+    canonical_candidate_id: null,
+    reviewed_at: null,
+    reviewed_by: null,
+    review_notes: "[ai] enriched",
+    title: base.title,
+    start_ts: base.startTs,
+    venue_name: base.venueName,
+    normalized_event: { ...base, tags: ["live"] },
+    ...overrides
+  };
+}
+
+describe("candidate-upsert.utils", () => {
+  it("unchanged upsert only touches run metadata and occurrence fields", async () => {
+    const row = await buildCandidateUpsertRow({
+      auditKind: "unchanged",
+      runId: "run-2",
+      event: base,
+      fingerprint: "fp-1",
+      status: "pending_review",
+      existing: existingRow(),
+      contentChanged: false,
+      occurrence: baseOccurrence
+    });
+
+    expect(row).toMatchObject({
+      source: base.source,
+      source_event_id: base.sourceEventId,
+      run_id: "run-2",
+      occurrence_id: "occ-1"
+    });
+    expect(row.updated_at).toEqual(expect.any(String));
+    expect(row).not.toHaveProperty("confidence_score");
+    expect(row).not.toHaveProperty("normalized_event");
+    expect(row).not.toHaveProperty("title");
+    expect(row).not.toHaveProperty("review_notes");
+    expect(row).not.toHaveProperty("reviewed_at");
+    expect(row).not.toHaveProperty("reviewed_by");
+    expect(row).not.toHaveProperty("content_fingerprint");
+    expect(row).not.toHaveProperty("dedupe_hash");
+    expect(row).not.toHaveProperty("raw_payload");
+    expect(row).not.toHaveProperty("status");
+  });
+
+  it("unchanged upsert includes status when occurrence overrides to duplicate", async () => {
+    const row = await buildCandidateUpsertRow({
+      auditKind: "unchanged",
+      runId: "run-2",
+      event: base,
+      fingerprint: "fp-1",
+      status: "duplicate",
+      existing: existingRow({ status: "pending_review" }),
+      contentChanged: false,
+      occurrence: {
+        ...baseOccurrence,
+        statusOverride: "duplicate",
+        canonicalCandidateId: "primary-1"
+      }
+    });
+
+    expect(row.status).toBe("duplicate");
+    expect(row.canonical_candidate_id).toBe("primary-1");
+  });
+
+  it("new upsert includes default confidence and raw_payload", async () => {
+    const row = await buildCandidateUpsertRow({
+      auditKind: "new",
+      runId: "run-1",
+      event: base,
+      fingerprint: "fp-new",
+      status: "awaiting_enrichment",
+      contentChanged: true,
+      occurrence: baseOccurrence
+    });
+
+    expect(row.confidence_score).toBe(0.7);
+    expect(row.raw_payload).toEqual({});
+    expect(row.normalized_event).toEqual(base);
+    expect(row.review_notes).toBeNull();
+  });
+
+  it("new ticketmaster upsert uses 0.84 confidence", async () => {
+    const row = await buildCandidateUpsertRow({
+      auditKind: "new",
+      runId: "run-1",
+      event: { ...base, source: "ticketmaster" },
+      fingerprint: "fp-new",
+      status: "awaiting_enrichment",
+      contentChanged: true,
+      occurrence: baseOccurrence
+    });
+
+    expect(row.confidence_score).toBe(0.84);
+  });
+
+  it("changed needs_changes upsert clears notes and omits confidence", async () => {
+    const row = await buildCandidateUpsertRow({
+      auditKind: "changed",
+      runId: "run-2",
+      event: { ...base, title: "Updated title" },
+      fingerprint: "fp-2",
+      status: "needs_changes",
+      existing: existingRow({ status: "approved", matched_event_id: "e1" }),
+      contentChanged: true,
+      occurrence: { ...baseOccurrence, matchedEventId: "e1" }
+    });
+
+    expect(row.review_notes).toBeNull();
+    expect(row.normalized_event).toMatchObject({ title: "Updated title" });
+    expect(row).not.toHaveProperty("confidence_score");
+    expect(row).not.toHaveProperty("raw_payload");
+  });
+
+  it("changed pending_review upsert resets default confidence", async () => {
+    const row = await buildCandidateUpsertRow({
+      auditKind: "changed",
+      runId: "run-2",
+      event: { ...base, title: "Updated title" },
+      fingerprint: "fp-2",
+      status: "pending_review",
+      existing: existingRow(),
+      contentChanged: true,
+      occurrence: baseOccurrence
+    });
+
+    expect(row.review_notes).toBeNull();
+    expect(row.confidence_score).toBe(defaultConfidenceScore(base.source));
+  });
+
+  it("shouldResetConfidenceOnChangedUpsert is true only for pending_review", () => {
+    expect(shouldResetConfidenceOnChangedUpsert("pending_review")).toBe(true);
+    expect(shouldResetConfidenceOnChangedUpsert("needs_changes")).toBe(false);
+    expect(shouldResetConfidenceOnChangedUpsert("awaiting_enrichment")).toBe(false);
+  });
+
+  it("needs_changes with ai notes still needs enrichment after content change", () => {
+    expect(
+      candidateNeedsEnrichment({
+        id: "c1",
+        status: "needs_changes",
+        normalized_event: base,
+        confidence_score: 0.98,
+        review_notes: "[ai] stale notes cleared on upsert in practice",
+        suggested_priority: 2,
+        matched_event_id: "e1"
+      })
+    ).toBe(true);
+  });
+});

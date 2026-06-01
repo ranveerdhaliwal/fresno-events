@@ -1,10 +1,11 @@
 import type { EventSource, NormalizedEvent, ScrapeResult } from "@fresno-events/shared";
 
+import { buildCandidateUpsertRow } from "@/candidates/candidate-upsert.utils";
 import {
   type ExistingCandidateRow
 } from "@/candidates/content-fingerprint.utils";
 import { buildOccurrenceMatchIndex } from "@/candidates/occurrence-match-fetch.utils";
-import { resolveOccurrenceForPersist, type OccurrencePersistFields } from "@/candidates/occurrence-resolve.utils";
+import { resolveOccurrenceForPersist } from "@/candidates/occurrence-resolve.utils";
 import { analyzeEventsForPersist } from "@/candidates/persist-analysis.utils";
 import {
   buildPersistAuditSummary,
@@ -56,6 +57,34 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
     };
   }
 
+  const validEvents: NormalizedEvent[] = [];
+  let invalidEvents = 0;
+  for (const event of uniqueEvents) {
+    const titleOk = typeof event.title === "string" && event.title.trim().length > 0;
+    const venueOk = typeof event.venueName === "string" && event.venueName.trim().length > 0;
+    const startOk = typeof event.startTs === "string" && event.startTs.trim().length > 0;
+    const sourceOk = typeof event.source === "string" && event.source.trim().length > 0;
+    const idOk = typeof event.sourceEventId === "string" && event.sourceEventId.trim().length > 0;
+
+    if (!titleOk || !venueOk || !startOk || !sourceOk || !idOk) {
+      invalidEvents += 1;
+      console.log(
+        JSON.stringify({
+          event: "ingest_event_invalid",
+          run_id: result.runId,
+          source: event.source,
+          source_event_id: event.sourceEventId,
+          title: typeof event.title === "string" ? event.title : null,
+          venue_name: typeof event.venueName === "string" ? event.venueName : null,
+          start_ts: typeof event.startTs === "string" ? event.startTs : null
+        })
+      );
+      continue;
+    }
+
+    validEvents.push(event);
+  }
+
   await supabaseRequest(config, "/rest/v1/ingest_runs?on_conflict=id", {
     method: "POST",
     headers: {
@@ -66,19 +95,29 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       id: result.runId,
       source: result.source,
       status: result.errors.length > 0 ? "completed_with_errors" : "completed",
-      events_found: uniqueEvents.length,
+      events_found: validEvents.length,
       errors_count: result.errors.length,
       metrics: result.metrics,
       finished_at: new Date().toISOString()
     })
   });
 
-  if (uniqueEvents.length === 0) {
+  if (validEvents.length === 0) {
+    if (invalidEvents > 0) {
+      console.log(
+        JSON.stringify({
+          event: "ingest_persist_skipped_invalid_events",
+          run_id: result.runId,
+          source: result.source,
+          invalid_events: invalidEvents
+        })
+      );
+    }
     return { persisted: true, candidates: 0 };
   }
 
-  const existingByKey = await fetchExistingCandidatesForEvents(config, uniqueEvents);
-  const matchIndex = await buildOccurrenceMatchIndex(config, uniqueEvents);
+  const existingByKey = await fetchExistingCandidatesForEvents(config, validEvents);
+  const matchIndex = await buildOccurrenceMatchIndex(config, validEvents);
   const crossSourceDedupe = isCrossSourceDedupeEnabled(env);
   const persistStarted = performance.now();
   let publishedSynced = 0;
@@ -91,13 +130,14 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       event: "ingest_persist_start",
       source: result.source,
       runId: result.runId,
-      candidates: uniqueEvents.length,
-      batches: Math.ceil(uniqueEvents.length / CANDIDATE_UPSERT_BATCH_SIZE)
+      candidates: validEvents.length,
+      invalid_events: invalidEvents,
+      batches: Math.ceil(validEvents.length / CANDIDATE_UPSERT_BATCH_SIZE)
     })
   );
 
-  for (let offset = 0; offset < uniqueEvents.length; offset += CANDIDATE_UPSERT_BATCH_SIZE) {
-    const chunk = uniqueEvents.slice(offset, offset + CANDIDATE_UPSERT_BATCH_SIZE);
+  for (let offset = 0; offset < validEvents.length; offset += CANDIDATE_UPSERT_BATCH_SIZE) {
+    const chunk = validEvents.slice(offset, offset + CANDIDATE_UPSERT_BATCH_SIZE);
     const { analyses } = await analyzeEventsForPersist(chunk, existingByKey);
     const rows: Array<Record<string, unknown>> = [];
 
@@ -138,9 +178,9 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
 
       const occurrence = await resolveOccurrenceForPersist({
         event,
-        existingId: existing?.id,
+        ...(existing?.id ? { existingId: existing.id } : {}),
         existingOccurrenceId: existing?.occurrence_id ?? null,
-        existingStatus: existing?.status,
+        ...(existing?.status ? { existingStatus: existing.status } : {}),
         existingMatchedEventId: existing?.matched_event_id ?? null,
         existingCanonicalCandidateId: existing?.canonical_candidate_id ?? null,
         baseStatus: status,
@@ -150,15 +190,16 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
 
       const rowStatus = occurrence.statusOverride ?? status;
       rows.push(
-        await toCandidateRow(
-          result.runId,
+        await buildCandidateUpsertRow({
+          auditKind,
+          runId: result.runId,
           event,
           fingerprint,
-          rowStatus,
-          existing,
+          status: rowStatus,
+          ...(existing ? { existing } : {}),
           contentChanged,
           occurrence
-        )
+        })
       );
 
       const syncEventId = occurrence.matchedEventId ?? existing?.matched_event_id ?? null;
@@ -170,6 +211,33 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
         if (synced) {
           publishedSynced += 1;
         }
+      }
+    }
+
+    // Debug: if Supabase rejects the upsert, we need to know whether the payload
+    // included required NOT NULL fields (title, venue_name, start_ts, normalized_event).
+    for (const row of rows) {
+      const source = typeof row.source === "string" ? row.source : null;
+      const sourceEventId = typeof row.source_event_id === "string" ? row.source_event_id : null;
+      const titleOk = typeof row.title === "string" && row.title.trim().length > 0;
+      const venueOk = typeof row.venue_name === "string" && row.venue_name.trim().length > 0;
+      const startOk = typeof row.start_ts === "string" && row.start_ts.trim().length > 0;
+      const normalizedOk = row.normalized_event !== null && row.normalized_event !== undefined;
+
+      if (!titleOk || !venueOk || !startOk || !normalizedOk) {
+        console.log(
+          JSON.stringify({
+            event: "ingest_candidate_upsert_row_invalid",
+            run_id: result.runId,
+            source,
+            source_event_id: sourceEventId,
+            has_title: titleOk,
+            has_venue_name: venueOk,
+            has_start_ts: startOk,
+            has_normalized_event: normalizedOk,
+            row_keys: Object.keys(row).sort()
+          })
+        );
       }
     }
 
@@ -212,7 +280,8 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       event: "ingest_persist_end",
       source: result.source,
       runId: result.runId,
-      candidates: uniqueEvents.length,
+      candidates: validEvents.length,
+      invalid_events: invalidEvents,
       unchanged,
       changed: auditSummary.new + auditSummary.changed,
       published_events_synced: publishedSynced,
@@ -220,7 +289,7 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
     })
   );
 
-  return { persisted: true, candidates: uniqueEvents.length };
+  return { persisted: true, candidates: validEvents.length };
 }
 
 /** Postgres upsert rejects duplicate (source, source_event_id) in one batch. */
@@ -323,55 +392,9 @@ async function fetchExistingCandidatesForSource(
   return map;
 }
 
-async function toCandidateRow(
-  runId: string,
-  event: NormalizedEvent,
-  fingerprint: string,
-  status: string,
-  existing: ExistingCandidateRow | undefined,
-  contentChanged: boolean,
-  occurrence: OccurrencePersistFields
-) {
-  const now = new Date().toISOString();
-  const row: Record<string, unknown> = {
-    run_id: runId,
-    source: event.source,
-    source_event_id: event.sourceEventId,
-    title: event.title,
-    venue_name: event.venueName,
-    start_ts: event.startTs,
-    source_url: event.externalUrl ?? null,
-    ticket_url: event.ticketUrl ?? null,
-    normalized_event: event,
-    raw_payload: {},
-    content_fingerprint: fingerprint,
-    dedupe_hash: await legacyDedupeHash(event),
-    confidence_score: event.source === "ticketmaster" ? 0.84 : 0.7,
-    status,
-    occurrence_id: occurrence.occurrenceId,
-    occurrence_key: occurrence.occurrenceKey,
-    url_key: occurrence.urlKey,
-    canonical_candidate_id: occurrence.canonicalCandidateId,
-    updated_at: now,
-    reviewed_at: existing?.reviewed_at ?? null,
-    reviewed_by: existing?.reviewed_by ?? null,
-    matched_event_id: occurrence.matchedEventId ?? existing?.matched_event_id ?? null,
-    review_notes: contentChanged && existing ? null : (existing?.review_notes ?? null)
-  };
-
-  return row;
-}
-
 function isCrossSourceDedupeEnabled(env: IngestEnv) {
   const value = env.INGEST_CROSS_SOURCE_DEDUPE?.trim().toLowerCase();
   return value === "true" || value === "1";
-}
-
-/** Legacy dedupe_hash (unique constraint); unchanged algorithm for compatibility. */
-async function legacyDedupeHash(event: NormalizedEvent) {
-  return sha256Hex(
-    [event.source, event.sourceEventId, event.title, event.venueName, event.startTs].join("|").toLowerCase()
-  );
 }
 
 async function syncPublishedEvent(
@@ -447,11 +470,6 @@ async function patchIngestRunAuditMetrics(
       })
     );
   }
-}
-
-async function sha256Hex(value: string) {
-  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function supabaseHeaders(config: SupabaseConfig) {

@@ -32,12 +32,30 @@ export interface PersistAuditItemChanged {
   after: Partial<Record<FingerprintDiffField, string | null>>;
 }
 
+/** Same real-world occurrence scraped twice in one batch (series CMS dupes, title drift). */
+export interface PersistAuditItemBatchDuplicate {
+  title: string;
+  start_ts: string;
+  venue_name: string;
+  source: string;
+  source_event_id: string;
+  kept_source_event_id: string;
+  kept_title: string;
+  match: "occurrence_key" | "url_key" | "loose_title";
+  /** Dropped row's public event page. */
+  external_url?: string;
+  /** Kept row's public event page (for side-by-side verification). */
+  kept_external_url?: string;
+}
+
 export interface PersistAuditSummary {
   new: number;
   changed: number;
   unchanged: number;
   new_items: PersistAuditItemNew[];
   changed_items: PersistAuditItemChanged[];
+  batch_duplicates?: number;
+  batch_duplicate_items?: PersistAuditItemBatchDuplicate[];
 }
 
 function normalizeDiffValue(value: string | null | undefined): string | null {
@@ -122,13 +140,21 @@ export function buildPersistAuditSummary(opts: {
   newItems: PersistAuditItemNew[];
   changedItems: PersistAuditItemChanged[];
   unchangedCount: number;
+  batchDuplicateItems?: PersistAuditItemBatchDuplicate[];
 }): PersistAuditSummary {
+  const batchDuplicateItems = opts.batchDuplicateItems ?? [];
   return {
     new: opts.newItems.length,
     changed: opts.changedItems.length,
     unchanged: opts.unchangedCount,
     new_items: opts.newItems,
-    changed_items: opts.changedItems
+    changed_items: opts.changedItems,
+    ...(batchDuplicateItems.length > 0
+      ? {
+          batch_duplicates: batchDuplicateItems.length,
+          batch_duplicate_items: batchDuplicateItems
+        }
+      : {})
   };
 }
 

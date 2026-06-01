@@ -50,6 +50,7 @@ export default {
             .map((part) => part.trim())
             .filter(Boolean)
         : undefined;
+      const isVenueTrigger = (venueFilter?.length ?? 0) > 0;
       const sources = sourcesParam ?? (venueFilter?.length ? "venue-ingest" : undefined);
 
       if (dryRun && resumeJobs) {
@@ -78,7 +79,9 @@ export default {
         console.log(JSON.stringify({ event: "ingest_run", trigger: "manual", ...summary }));
       }
 
-      if (!dryRun && !skipEnrichment) {
+      // `--venue` implies venue-scoped persist + enrichment inside venue-ingest.
+      // Do NOT run global backlog enrichment unless explicitly requested (promote-all / enrich-all).
+      if (!dryRun && !skipEnrichment && !isVenueTrigger) {
         ctx.waitUntil(runPostIngestEnrichment(env));
       }
 

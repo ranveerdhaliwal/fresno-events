@@ -131,25 +131,33 @@ export function reasoningPreview(reasoning: string, maxLen = 120): string {
 export function formatEnrichmentDoneLine(
   title: string,
   delta: EnrichmentFieldDelta,
-  enrichment: EnrichmentModelResult
+  enrichment: EnrichmentModelResult,
+  opts?: { index?: number; total?: number }
 ): string {
-  const parts: string[] = [`priority ${enrichment.suggested_priority}`];
+  const progress =
+    opts?.index !== undefined && opts?.total !== undefined ? ` ${opts.index}/${opts.total}:` : ":";
+  const parts: string[] = [`conf ${enrichment.confidence.toFixed(2)}`, `priority ${enrichment.suggested_priority}`];
   if (enrichment.is_junk) {
     parts.push("rejected as junk");
   }
   if (delta.title_changed) {
-    parts.push(`title: "${delta.title_before}" → "${delta.title_after}"`);
-  } else {
-    parts.push("title unchanged");
+    parts.push(`title "${truncateForLog(delta.title_before, 32)}" → "${truncateForLog(delta.title_after, 32)}"`);
   }
   if (delta.category_changed) {
-    parts.push(`category: ${delta.category_before ?? "?"} → ${delta.category_after}`);
+    parts.push(`category ${delta.category_before ?? "?"} → ${delta.category_after}`);
   } else if (delta.category_after) {
-    parts.push(`category: ${delta.category_after}`);
+    parts.push(`category ${delta.category_after}`);
   }
   if (delta.tags_added.length > 0) {
     parts.push(`tags +${delta.tags_added.length}`);
   }
-  const shortTitle = title.length > 48 ? `${title.slice(0, 48)}…` : title;
-  return `[ingest] enriched: "${shortTitle}" — ${parts.join(", ")}`;
+  const shortTitle = truncateForLog(title, 48);
+  return `[ingest] enriched${progress} "${shortTitle}" — ${parts.join(", ")}`;
+}
+
+function truncateForLog(text: string, max: number): string {
+  if (text.length <= max) {
+    return text;
+  }
+  return `${text.slice(0, max - 1)}…`;
 }

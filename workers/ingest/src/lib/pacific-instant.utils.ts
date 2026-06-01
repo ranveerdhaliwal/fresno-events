@@ -23,10 +23,24 @@ export function getPacificDateTimeParts(instant: Date): { date: string; hour: nu
   };
 }
 
-/** Visit Fresno `eventDate` often ends with T06:59:59.000Z (displays as 11:59 PM PT). */
+/** Visit Fresno `eventDate` often ends with T06:59:59.000Z — end of that Pacific calendar day (11:59 PM PT). */
 export function isVisitFresnoEndOfDayUtc(iso: string): boolean {
   const d = new Date(iso);
   return !Number.isNaN(d.getTime()) && d.getUTCHours() === 6 && d.getUTCMinutes() === 59;
+}
+
+/** Matches admin “empty start time = all-day” (`${date}T12:00:00Z`). */
+export function isDateOnlyStartTs(iso: string): boolean {
+  const d = new Date(iso);
+  return !Number.isNaN(d.getTime()) && d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+}
+
+/** Pacific calendar date with no known wall time — not a real noon start. */
+export function dateOnlyStartTs(dateYmd: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateYmd)) {
+    return null;
+  }
+  return new Date(`${dateYmd}T12:00:00.000Z`).toISOString();
 }
 
 export function instantFromPacificLocal(dateYmd: string, timeHHmm: string): string | null {
@@ -44,7 +58,8 @@ export function instantFromPacificLocal(dateYmd: string, timeHHmm: string): stri
   const [year, month, day] = dateYmd.split("-").map(Number);
   const base = Date.UTC(year!, month! - 1, day!, 8, 0, 0);
 
-  for (let deltaMs = -14 * 3_600_000; deltaMs <= 14 * 3_600_000; deltaMs += 60_000) {
+  // Pacific wall times on dateYmd can be up to ~24h from this UTC anchor (evening events).
+  for (let deltaMs = -26 * 3_600_000; deltaMs <= 26 * 3_600_000; deltaMs += 60_000) {
     const probe = new Date(base + deltaMs);
     const pacific = getPacificDateTimeParts(probe);
     if (pacific.date === dateYmd && pacific.hour === hour && pacific.minute === minute) {

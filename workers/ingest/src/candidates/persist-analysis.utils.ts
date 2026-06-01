@@ -105,10 +105,12 @@ export async function analyzeEventsForPersist(
 export function mergePersistAuditSummaries(summaries: PersistAuditSummary[]): PersistAuditSummary {
   const newItems = summaries.flatMap((summary) => summary.new_items);
   const changedItems = summaries.flatMap((summary) => summary.changed_items);
+  const batchDuplicateItems = summaries.flatMap((summary) => summary.batch_duplicate_items ?? []);
 
   return buildPersistAuditSummary({
     newItems,
     changedItems,
-    unchangedCount: summaries.reduce((total, summary) => total + summary.unchanged, 0)
+    unchangedCount: summaries.reduce((total, summary) => total + summary.unchanged, 0),
+    batchDuplicateItems
   });
 }
