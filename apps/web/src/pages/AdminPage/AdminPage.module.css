@@ -3,8 +3,8 @@
 }
 
 .bar {
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface-nav);
+  color: var(--text-on-nav);
   padding: 12px 32px;
   display: flex;
   align-items: center;
@@ -24,7 +24,7 @@
   font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 2px;
-  opacity: 0.7;
+  color: color-mix(in srgb, var(--text-on-nav) 70%, transparent);
 }
 
 .content {

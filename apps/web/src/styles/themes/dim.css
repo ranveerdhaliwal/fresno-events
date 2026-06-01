@@ -1,0 +1,46 @@
+/* ============================================================
+   What Up Fresno — DIM theme (default)
+   ============================================================ */
+
+:root,
+[data-theme="dim"] {
+  color-scheme: dark;
+
+  /* --- Theme surfaces --- */
+  --theme-surface-page: #1f2a33; /* navy page */
+  --theme-surface-inset: #283540; /* inset panels on page */
+  --theme-surface-card: #e6d4ac; /* warm paper */
+  --theme-surface-muted: #d4c196; /* warm inset on paper */
+  --theme-surface-chip: #c9b88a; /* date-chip on paper */
+
+  /* --- Text --- */
+  --theme-text-on-page: #e8d9b8;
+  --theme-text-on-nav: #f4e8d0;
+  --theme-text-primary: var(--color-ink); /* text on paper */
+  --theme-text-secondary-on-card: rgba(20, 24, 29, 0.7);
+  --theme-text-label: #7ac0d4;
+  --theme-text-label-muted: #a8d5e2;
+  --theme-text-label-on-card: #2e5266;
+
+  /* --- Borders / dividers --- */
+  --theme-border-default: var(--color-ink);
+  --theme-border-subtle: rgba(20, 24, 29, 0.35);
+  --theme-border-on-page: rgba(232, 217, 184, 0.45);
+  --theme-divider-on-page: rgba(232, 217, 184, 0.35);
+  /* Cards on navy page: cream-tinted edge + offset shadow so right/bottom pop */
+  --theme-border-card-on-page: 1.5px solid color-mix(in srgb, var(--theme-text-on-page) 42%, var(--color-ink));
+  --theme-shadow-card-on-page: 5px 5px 0 rgba(232, 217, 184, 0.38);
+
+  /* --- Effects --- */
+  --theme-shadow-color: var(--color-ink);
+  --theme-shadow-opacity: 0.68; /* soften postcard shadows on warm paper */
+  --theme-hover-row: rgba(232, 217, 184, 0.1);
+  --theme-hover-row-on-card: rgba(20, 24, 29, 0.07);
+  --theme-stripe-gap: #f4e8d0;
+
+  /* Halftone dots on page bg, softened for dark */
+  --theme-bg-halftone:
+    radial-gradient(rgba(232, 217, 184, 0.06) 1px, transparent 1px),
+    radial-gradient(rgba(232, 217, 184, 0.04) 1px, transparent 1px);
+}
+

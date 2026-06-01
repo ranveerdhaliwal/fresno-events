@@ -26,13 +26,13 @@
 
 .empty {
   font-size: 13px;
-  color: var(--teal);
+  color: var(--text-label);
   font-weight: 500;
   padding: 8px 0 16px;
 }
 
 .loading {
-  color: var(--teal);
+  color: var(--text-label);
   font-weight: 600;
 }
 

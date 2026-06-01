@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 
 import { PlaceholderImage } from "@/components/PlaceholderImage";
+import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { cn } from "@/lib/cn";
 
 import type { EventRowProps } from "./EventRow.types";
@@ -67,20 +68,26 @@ export function EventRow({
 
   if (!onSelect) {
     return (
-      <Link
-        to="/event/$slug"
-        params={{ slug: slug ?? event.slug }}
-        className={className}
-        data-testid={`event-row-${event.slug}`}
-      >
-        {content}
-      </Link>
+      <div className={styles.rowWrap}>
+        <Link
+          to="/event/$slug"
+          params={{ slug: slug ?? event.slug }}
+          className={className}
+          data-testid={`event-row-${event.slug}`}
+        >
+          {content}
+        </Link>
+        <AdminEditLink eventId={event.id} className={styles.adminEdit} />
+      </div>
     );
   }
 
   return (
-    <button type="button" className={className} onClick={onSelect} data-testid={`event-row-${event.slug}`}>
-      {content}
-    </button>
+    <div className={styles.rowWrap}>
+      <button type="button" className={className} onClick={onSelect} data-testid={`event-row-${event.slug}`}>
+        {content}
+      </button>
+      <AdminEditLink eventId={event.id} className={styles.adminEdit} />
+    </div>
   );
 }

@@ -5,7 +5,7 @@
   left: 0;
   right: 0;
   z-index: 30;
-  background: var(--ink);
+  background: var(--surface-nav);
   border-top: 3px solid var(--coral);
   padding: 8px 8px calc(8px + var(--safe-bottom));
   grid-template-columns: repeat(5, 1fr);
@@ -18,7 +18,7 @@
   font-family: var(--font-display);
   font-size: 9px;
   letter-spacing: 1px;
-  color: rgba(244, 232, 208, 0.55);
+  color: color-mix(in srgb, var(--text-on-nav) 55%, transparent);
   text-decoration: none;
   padding: 6px 4px;
 }

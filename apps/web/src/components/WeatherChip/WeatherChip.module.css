@@ -1,5 +1,5 @@
 .chip {
-  background: var(--paper);
+  background: var(--surface-card);
   border: var(--border-card);
   border-radius: 999px;
   padding: 4px 12px;
@@ -7,6 +7,7 @@
   font-weight: 600;
   box-shadow: var(--shadow-xs);
   margin-left: auto;
+  color: var(--text-primary);
 }
 
 @media (max-width: 600px) {

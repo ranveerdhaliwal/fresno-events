@@ -1,17 +1,18 @@
 .card {
   margin: 32px;
-  background: var(--paper);
+  background: var(--surface-card);
   border: var(--border-card);
   box-shadow: var(--shadow-lg);
   padding: 48px 40px;
   max-width: 720px;
+  color: var(--text-primary);
 }
 
 .eyebrow {
   font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 3px;
-  color: var(--teal);
+  color: var(--text-label);
   text-transform: uppercase;
   margin: 0 0 12px;
 }
@@ -27,7 +28,7 @@
   font-size: 16px;
   line-height: 1.6;
   margin: 0 0 24px;
-  opacity: 0.85;
+  color: var(--text-secondary-on-card);
 }
 
 .actions {
@@ -38,7 +39,7 @@
 }
 
 .actions span {
-  background: var(--linen);
+  background: var(--surface-muted);
   border: var(--border-card);
   padding: 6px 12px;
   font-size: 12px;

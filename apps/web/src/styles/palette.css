@@ -1,0 +1,12 @@
+/* Brand palette (immutable across themes) */
+
+:root {
+  --color-coral: #d85a3c;
+  --color-coral-dark: #b3401c;
+  --color-mustard: #f2c14e;
+  --color-olive: #6b8e4e;
+
+  /* Near-black used for borders + nav in both themes */
+  --color-ink: #14181d;
+}
+

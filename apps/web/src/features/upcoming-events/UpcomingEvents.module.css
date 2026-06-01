@@ -4,7 +4,7 @@
 
 .loading {
   padding: 24px 0;
-  color: var(--teal);
+  color: var(--text-label);
   font-weight: 600;
 }
 
@@ -33,7 +33,7 @@
 
 .sub {
   font-size: 12px;
-  color: var(--teal);
+  color: var(--text-label);
   font-weight: 600;
   margin-left: auto;
 }
@@ -49,7 +49,7 @@
 .chip,
 .chipActive {
   flex: 0 0 auto;
-  background: var(--paper);
+  background: var(--surface-card);
   border: var(--border-card);
   border-radius: 999px;
   padding: 5px 12px;
@@ -59,7 +59,7 @@
 
 .chipActive {
   background: var(--coral);
-  color: var(--paper);
+  color: var(--surface-card);
   font-weight: 600;
 }
 

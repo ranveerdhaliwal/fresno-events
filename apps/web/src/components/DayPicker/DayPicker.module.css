@@ -1,8 +1,9 @@
 .picker {
-  background: var(--paper);
-  border: var(--border-card);
-  box-shadow: var(--shadow-md);
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
+  box-shadow: var(--shadow-card-on-page);
   padding: 12px;
+  color: var(--text-primary);
 }
 
 .head {
@@ -17,7 +18,7 @@
   font-size: 12px;
   letter-spacing: 2px;
   margin: 0;
-  color: var(--teal);
+  color: var(--text-label-on-card);
 }
 
 .head a {
@@ -45,7 +46,7 @@
 
 .today {
   background: var(--coral);
-  color: var(--paper);
+  color: var(--surface-card);
 }
 
 .dow {
@@ -65,7 +66,7 @@
 
 .pick {
   margin-top: 6px;
-  background: var(--ink);
+  background: var(--surface-nav);
   color: var(--mustard);
   border: var(--border-card);
   padding: 6px;

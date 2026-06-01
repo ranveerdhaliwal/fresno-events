@@ -1,34 +1,27 @@
-/* What Up Fresno — design tokens (canonical source for raw hex) */
+/* What Up Fresno — global design tokens (typography, layout, elevations) */
 
 :root {
-  --coral: #d94f3d;
-  --coral-dark: #b3401c;
-  --mustard: #f2c14e;
-  --teal: #2e5266;
-  --teal-light: #7aa9c2;
-  --cream: #f4e8d0;
-  --linen: #faf1dc;
-  --olive: #6b8e4e;
-  --orange: #e8743c;
-  --espresso: #3d2817;
-  --ink: #1a1a1a;
-  --paper: #ffffff;
-
   --font-display: "Alfa Slab One", serif;
   --font-script: "Yellowtail", cursive;
   --font-body: "Work Sans", system-ui, sans-serif;
 
-  --shadow-xs: 2px 2px 0 var(--ink);
-  --shadow-sm: 3px 3px 0 var(--ink);
-  --shadow-md: 4px 4px 0 var(--ink);
-  --shadow-lg: 5px 5px 0 var(--ink);
-  --shadow-hover: 7px 7px 0 var(--ink);
-  --shadow-coral-lg: 5px 5px 0 var(--coral);
-  --shadow-coral-hover: 7px 7px 0 var(--coral);
+  /* Shadows keep postcard offsets; strength varies by theme via --shadow-opacity */
+  --shadow-xs: 2px 2px 0
+    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
+  --shadow-sm: 3px 3px 0
+    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
+  --shadow-md: 4px 4px 0
+    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
+  --shadow-lg: 5px 5px 0
+    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
+  --shadow-hover: 7px 7px 0
+    color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
+  --shadow-coral-lg: 5px 5px 0 color-mix(in srgb, var(--coral) 92%, transparent);
+  --shadow-coral-hover: 7px 7px 0 color-mix(in srgb, var(--coral) 92%, transparent);
 
-  --border-thin: 1px solid var(--ink);
-  --border-card: 1.5px solid var(--ink);
-  --border-thick: 2px solid var(--ink);
+  --border-thin: 1px solid var(--border-default);
+  --border-card: 1.5px solid var(--border-default);
+  --border-thick: 2px solid var(--border-default);
   --border-hero: 3px solid var(--coral);
 
   --page-max: 1280px;
@@ -38,31 +31,28 @@
   --side-col: 380px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 
-  --bg-halftone:
-    radial-gradient(rgba(26, 26, 26, 0.05) 1px, transparent 1px),
-    radial-gradient(rgba(26, 26, 26, 0.04) 1px, transparent 1px);
   --bg-halftone-size: 22px 22px, 31px 31px;
   --bg-halftone-position: 0 0, 11px 15px;
 
   --rainbow-stripe: repeating-linear-gradient(
     90deg,
     var(--coral) 0 14px,
-    var(--cream) 14px 18px,
-    var(--teal) 18px 32px,
-    var(--cream) 32px 36px,
+    var(--stripe-gap) 14px 18px,
+    var(--text-label) 18px 32px,
+    var(--stripe-gap) 32px 36px,
     var(--mustard) 36px 50px,
-    var(--cream) 50px 54px
+    var(--stripe-gap) 50px 54px
   );
   --rainbow-stripe-height: 6px;
 
   --rainbow-stripe-mobile: repeating-linear-gradient(
     90deg,
     var(--coral) 0 12px,
-    var(--cream) 12px 15px,
-    var(--teal) 15px 27px,
-    var(--cream) 27px 30px,
+    var(--stripe-gap) 12px 15px,
+    var(--text-label) 15px 27px,
+    var(--stripe-gap) 27px 30px,
     var(--mustard) 30px 42px,
-    var(--cream) 42px 45px
+    var(--stripe-gap) 42px 45px
   );
   --rainbow-stripe-height-mobile: 5px;
 }

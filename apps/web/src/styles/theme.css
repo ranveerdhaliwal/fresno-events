@@ -1,0 +1,56 @@
+/* Semantic theme roles (stable API for components) */
+
+:root {
+  /* Surfaces */
+  --surface-page: var(--theme-surface-page);
+  --surface-inset: var(--theme-surface-inset);
+  --surface-card: var(--theme-surface-card);
+  --surface-muted: var(--theme-surface-muted);
+  --surface-chip: var(--theme-surface-chip);
+  --surface-nav: var(--color-ink);
+
+  /* Text */
+  --text-on-page: var(--theme-text-on-page);
+  --text-on-nav: var(--theme-text-on-nav);
+  --text-primary: var(--theme-text-primary);
+  --text-secondary-on-card: var(--theme-text-secondary-on-card);
+  --text-label: var(--theme-text-label);
+  --text-label-muted: var(--theme-text-label-muted);
+  --text-label-on-card: var(--theme-text-label-on-card);
+
+  /* Cards sitting on the page background */
+  --border-card-on-page: var(--theme-border-card-on-page);
+  --shadow-card-on-page: var(--theme-shadow-card-on-page);
+  --hover-row-on-card: var(--theme-hover-row-on-card);
+
+  /* Brand */
+  --coral: var(--color-coral);
+  --coral-dark: var(--color-coral-dark);
+  --mustard: var(--color-mustard);
+  --olive: var(--color-olive);
+  --ink: var(--color-ink);
+
+  /* Borders / dividers */
+  --border-default: var(--theme-border-default);
+  --border-subtle: var(--theme-border-subtle);
+  --border-on-page: var(--theme-border-on-page);
+  --divider-on-page: var(--theme-divider-on-page);
+
+  /* Effects */
+  --shadow-color: var(--theme-shadow-color);
+  --shadow-opacity: var(--theme-shadow-opacity);
+  --hover-row: var(--theme-hover-row);
+  --stripe-gap: var(--theme-stripe-gap);
+
+  /* Halftone */
+  --bg-halftone: var(--theme-bg-halftone);
+
+  /* Focus + selection */
+  --focus-ring: 3px solid var(--mustard);
+  --selected-outline: 3px solid var(--mustard);
+
+  /* Tints used in a few components */
+  --tint-mustard-18: rgba(242, 193, 78, 0.18);
+  --tint-paper-65: color-mix(in srgb, var(--surface-card) 65%, transparent);
+}
+

@@ -18,7 +18,7 @@
 }
 
 .sep {
-  opacity: 0.4;
+  color: color-mix(in srgb, var(--text-on-page) 40%, transparent);
 }
 
 .current {
@@ -27,15 +27,15 @@
 
 .back {
   margin-left: auto;
-  background: var(--paper);
-  border: 2px solid var(--ink);
+  background: var(--surface-card);
+  border: 2px solid var(--border-default);
   padding: 5px 14px;
   font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 2px;
   box-shadow: var(--shadow-xs);
   text-decoration: none;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .heroWrap {
@@ -46,7 +46,7 @@
   height: 420px;
   position: relative;
   overflow: hidden;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--border-default);
   box-shadow: 6px 6px 0 var(--coral);
 }
 
@@ -69,7 +69,7 @@
 
 .heroText {
   flex: 1;
-  color: var(--paper);
+  color: var(--text-on-nav);
 }
 
 .heroPills {
@@ -81,7 +81,7 @@
 .pill,
 .pillMustard {
   background: var(--coral);
-  color: var(--paper);
+  color: var(--surface-card);
   border: var(--border-card);
   padding: 5px 14px;
   font-family: var(--font-display);
@@ -92,7 +92,7 @@
 
 .pillMustard {
   background: var(--mustard);
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .heroText h1 {
@@ -111,6 +111,14 @@
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
 }
 
+.seriesSubtitle {
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-on-nav) 70%, transparent);
+  margin: 0 0 4px;
+}
+
 .heroActions {
   display: flex;
   flex-direction: column;
@@ -119,15 +127,15 @@
 
 .primaryBtn,
 .saveBtn {
-  background: var(--paper);
-  border: 2px solid var(--ink);
+  background: var(--surface-card);
+  border: 2px solid var(--border-default);
   padding: 12px 20px;
   font-family: var(--font-display);
   font-size: 11.5px;
   letter-spacing: 2px;
   box-shadow: var(--shadow-md);
   text-decoration: none;
-  color: var(--ink);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,25 +145,26 @@
 
 .primaryBtn {
   background: var(--coral);
-  color: var(--paper);
+  color: var(--surface-card);
 }
 
 .quickFacts {
   margin: 32px 32px;
-  background: var(--paper);
-  border: var(--border-card);
-  box-shadow: var(--shadow-lg);
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
+  box-shadow: var(--shadow-card-on-page);
   padding: 22px 28px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 24px;
+  color: var(--text-primary);
 }
 
 .fact .lab {
   font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 2px;
-  color: var(--teal);
+  color: var(--text-label-on-card);
   text-transform: uppercase;
   display: block;
   margin-bottom: 6px;
@@ -165,11 +174,12 @@
   font-family: var(--font-display);
   font-size: 18px;
   display: block;
+  color: var(--text-primary);
 }
 
 .fact .sub {
   font-size: 12.5px;
-  opacity: 0.65;
+  color: color-mix(in srgb, var(--text-secondary-on-card) 85%, transparent);
   margin-top: 4px;
   display: block;
 }
@@ -210,7 +220,7 @@
 }
 
 .act {
-  background: var(--paper);
+  background: var(--surface-card);
   border: var(--border-card);
   padding: 12px 14px;
   box-shadow: var(--shadow-sm);
@@ -232,7 +242,7 @@
 
 .where {
   font-size: 12px;
-  opacity: 0.65;
+  color: color-mix(in srgb, var(--text-secondary-on-card) 90%, transparent);
   margin: 0;
 }
 
@@ -252,7 +262,7 @@
   right: 0;
   top: 110px;
   height: 22px;
-  background: rgba(244, 232, 208, 0.65);
+  background: color-mix(in srgb, var(--theme-stripe-gap, var(--stripe-gap)) 65%, transparent);
 }
 
 .road2 {
@@ -261,7 +271,7 @@
   bottom: 0;
   left: 45%;
   width: 22px;
-  background: rgba(244, 232, 208, 0.65);
+  background: color-mix(in srgb, var(--theme-stripe-gap, var(--stripe-gap)) 65%, transparent);
 }
 
 .pin {
@@ -275,17 +285,17 @@
   width: 36px;
   height: 36px;
   background: var(--coral);
-  border: 2.5px solid var(--ink);
+  border: 2.5px solid var(--border-default);
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--shadow-color) 30%, transparent);
 }
 
 .mapLabel {
   position: absolute;
   bottom: 14px;
   left: 14px;
-  background: var(--paper);
+  background: var(--surface-card);
   border: var(--border-card);
   padding: 6px 12px;
   font-size: 12px;
@@ -294,13 +304,13 @@
 }
 
 .mapLink {
-  color: var(--teal);
+  color: var(--text-label);
   font-weight: 600;
   text-decoration: none;
 }
 
 .sourceBox {
-  background: var(--linen);
+  background: var(--surface-muted);
   border: var(--border-card);
   padding: 16px;
   box-shadow: var(--shadow-sm);
@@ -310,7 +320,7 @@
   font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 2px;
-  color: var(--teal);
+  color: var(--text-label);
 }
 
 .relatedList {
@@ -326,17 +336,18 @@
 }
 
 .sideCard {
-  background: var(--paper);
-  border: var(--border-card);
-  box-shadow: var(--shadow-lg);
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
+  box-shadow: var(--shadow-card-on-page);
   padding: 22px 24px;
+  color: var(--text-primary);
 }
 
 .sideCard h3 {
   font-family: var(--font-display);
   font-size: 12px;
   letter-spacing: 2.5px;
-  color: var(--teal);
+  color: var(--text-label-on-card);
   margin: 0 0 14px;
   padding-bottom: 10px;
   border-bottom: var(--border-card);
@@ -362,7 +373,7 @@
 
 .orgMeta {
   font-size: 12px;
-  color: var(--teal);
+  color: var(--text-label-on-card);
   margin: 2px 0 0;
 }
 
@@ -375,7 +386,7 @@
 .shareRow button {
   flex: 1;
   background: var(--mustard);
-  border: 2px solid var(--ink);
+  border: 2px solid var(--border-default);
   padding: 8px;
   font-family: var(--font-display);
   font-size: 10px;
@@ -390,15 +401,15 @@
 }
 
 .tags span {
-  background: var(--linen);
-  border: 1px solid var(--ink);
+  background: var(--surface-muted);
+  border: 1px solid var(--border-default);
   padding: 4px 10px;
   font-size: 11px;
   font-weight: 600;
 }
 
 .postcard {
-  background: var(--linen);
+  background: var(--surface-muted);
 }
 
 .postcardScript {
@@ -428,8 +439,8 @@
 .error button {
   margin: 16px 8px;
   background: var(--coral);
-  color: var(--paper);
-  border: 2px solid var(--ink);
+  color: var(--surface-card);
+  border: 2px solid var(--border-default);
   padding: 10px 20px;
   font-family: var(--font-display);
   letter-spacing: 2px;
@@ -487,7 +498,7 @@
   }
 
   .fact {
-    border-bottom: 1px dashed rgba(26, 26, 26, 0.2);
+    border-bottom: 1px dashed var(--border-subtle);
     padding-bottom: 12px;
   }
 }

@@ -1,5 +1,5 @@
 .head {
-  background: var(--ink);
+  background: var(--surface-nav);
   color: var(--mustard);
   padding: 10px 16px;
   display: flex;
@@ -19,7 +19,7 @@
 .script {
   font-family: var(--font-script);
   font-size: 18px;
-  color: var(--cream);
+  color: var(--text-on-nav);
   margin-right: 6px;
   transform: rotate(-3deg);
   display: inline-block;
@@ -30,7 +30,7 @@
 .num {
   margin-left: auto;
   background: var(--coral);
-  color: var(--paper);
+  color: var(--surface-card);
   border-radius: 999px;
   padding: 2px 10px;
   font-family: var(--font-display);
@@ -39,11 +39,11 @@
 
 .live {
   background: var(--coral);
-  color: var(--paper);
+  color: var(--surface-card);
 }
 
 .live .count {
-  background: var(--ink);
+  background: var(--surface-nav);
   color: var(--mustard);
 }
 

@@ -1,6 +1,6 @@
 .section {
   padding: 28px 32px 30px;
-  border-bottom: 1px solid rgba(26, 26, 26, 0.12);
+  border-bottom: 1px solid var(--divider-on-page);
   position: relative;
 }
 
@@ -11,7 +11,7 @@
   left: 0;
   right: 0;
   height: 6px;
-  background: repeating-linear-gradient(90deg, var(--coral) 0 12px, var(--mustard) 12px 24px, var(--teal) 24px 36px);
+  background: repeating-linear-gradient(90deg, var(--coral) 0 12px, var(--mustard) 12px 24px, var(--text-label) 24px 36px);
   opacity: 0.85;
 }
 
@@ -60,7 +60,7 @@
 
 .sub {
   font-size: 13px;
-  color: var(--teal);
+  color: var(--text-label);
   font-weight: 600;
 }
 

@@ -4,8 +4,8 @@
   top: 0;
   z-index: 20;
   height: var(--nav-height-mobile);
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface-nav);
+  color: var(--text-on-nav);
   padding: 0 16px;
   align-items: center;
   justify-content: space-between;
@@ -15,7 +15,7 @@
 .iconBtn {
   background: transparent;
   border: 0;
-  color: var(--cream);
+  color: var(--text-on-nav);
   font-size: 20px;
   width: 40px;
   height: 40px;
@@ -38,8 +38,8 @@
 
 .signIn {
   background: var(--mustard);
-  color: var(--ink);
-  border: 2px solid var(--ink);
+  color: var(--text-primary);
+  border: 2px solid var(--border-default);
   border-radius: 999px;
   padding: 5px 12px;
   font-family: var(--font-display);

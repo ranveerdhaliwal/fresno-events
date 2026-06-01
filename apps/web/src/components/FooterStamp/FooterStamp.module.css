@@ -1,7 +1,7 @@
 .stamp {
   margin-top: 40px;
   padding-top: 20px;
-  border-top: 1.5px dashed rgba(26, 26, 26, 0.25);
+  border-top: 1.5px dashed var(--divider-on-page);
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -13,7 +13,7 @@
   font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 2px;
-  opacity: 0.5;
+  color: color-mix(in srgb, var(--text-on-page) 55%, transparent);
 }
 
 .greeting {

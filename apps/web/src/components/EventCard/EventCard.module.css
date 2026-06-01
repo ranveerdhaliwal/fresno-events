@@ -2,18 +2,18 @@
   display: none;
   grid-template-columns: 58px 1fr;
   gap: 12px;
-  background: var(--paper);
+  background: var(--surface-card);
   border: var(--border-card);
   box-shadow: var(--shadow-md);
   padding: 12px 14px;
   text-decoration: none;
-  color: var(--ink);
+  color: var(--text-primary);
   align-items: center;
 }
 
 .date {
   border: var(--border-card);
-  background: var(--cream);
+  background: var(--surface-chip);
   text-align: center;
   padding: 6px 4px;
   box-shadow: var(--shadow-xs);
@@ -43,7 +43,7 @@
 .meta {
   margin: 4px 0 0;
   font-size: 11.5px;
-  color: var(--teal);
+  color: var(--text-label-on-card);
   font-weight: 600;
 }
 
@@ -58,7 +58,7 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.5px;
-  color: var(--teal);
+  color: var(--text-label-on-card);
   text-transform: uppercase;
 }
 

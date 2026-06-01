@@ -1,0 +1,37 @@
+/* ============================================================
+   What Up Fresno — LIGHT theme (preserves current look)
+   ============================================================ */
+
+[data-theme="light"] {
+  --theme-surface-page: #f4e8d0; /* old --cream */
+  --theme-surface-inset: #faf1dc; /* old --linen */
+  --theme-surface-card: #ffffff; /* old --paper */
+  --theme-surface-muted: #faf1dc;
+  --theme-surface-chip: #f4e8d0;
+
+  --theme-text-on-page: #1a1a1a; /* old --ink */
+  --theme-text-on-nav: #f4e8d0;
+  --theme-text-primary: #1a1a1a;
+  --theme-text-secondary-on-card: rgba(26, 26, 26, 0.7);
+  --theme-text-label: #2e5266; /* old --teal */
+  --theme-text-label-muted: #7aa9c2; /* old --teal-light */
+  --theme-text-label-on-card: #2e5266;
+
+  --theme-border-default: #1a1a1a;
+  --theme-border-subtle: rgba(26, 26, 26, 0.35);
+  --theme-border-on-page: rgba(26, 26, 26, 0.25);
+  --theme-divider-on-page: rgba(26, 26, 26, 0.12);
+  --theme-border-card-on-page: 1.5px solid #1a1a1a;
+  --theme-shadow-card-on-page: 5px 5px 0 #1a1a1a;
+
+  --theme-shadow-color: #1a1a1a;
+  --theme-shadow-opacity: 1;
+  --theme-hover-row: rgba(26, 26, 26, 0.06);
+  --theme-hover-row-on-card: rgba(26, 26, 26, 0.06);
+  --theme-stripe-gap: #f4e8d0;
+
+  --theme-bg-halftone:
+    radial-gradient(rgba(26, 26, 26, 0.05) 1px, transparent 1px),
+    radial-gradient(rgba(26, 26, 26, 0.04) 1px, transparent 1px);
+}
+

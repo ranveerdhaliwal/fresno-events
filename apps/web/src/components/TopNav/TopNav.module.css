@@ -1,10 +1,10 @@
 .outer {
-  background: var(--ink);
+  background: var(--surface-nav);
 }
 
 .nav {
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface-nav);
+  color: var(--text-on-nav);
   padding: 0 32px;
   height: var(--nav-height);
   display: flex;
@@ -38,7 +38,7 @@
   font-family: var(--font-display);
   font-size: 13px;
   letter-spacing: 2px;
-  color: var(--cream);
+  color: var(--text-on-nav);
   text-decoration: none;
   padding: 6px 0;
   border-bottom: 2px solid transparent;
@@ -62,8 +62,8 @@
 
 .search {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(244, 232, 208, 0.25);
-  color: var(--cream);
+  border: 1px solid var(--border-on-page);
+  color: var(--text-on-nav);
   padding: 8px 14px 8px 36px;
   border-radius: 999px;
   width: 280px;
@@ -72,8 +72,8 @@
 
 .signIn {
   background: var(--mustard);
-  color: var(--ink);
-  border: 2px solid var(--ink);
+  color: var(--text-primary);
+  border: 2px solid var(--border-default);
   border-radius: 999px;
   padding: 7px 18px;
   font-family: var(--font-display);

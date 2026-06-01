@@ -1,12 +1,12 @@
 .section {
   padding: 28px 32px;
-  border-bottom: 1px solid rgba(26, 26, 26, 0.12);
+  border-bottom: 1px solid var(--divider-on-page);
 }
 
 .loading {
   padding: 48px 32px;
   font-weight: 600;
-  color: var(--teal);
+  color: var(--text-label);
 }
 
 .header {
@@ -35,21 +35,22 @@
 
 .tabsDesktop {
   display: flex;
-  border: 2px solid var(--ink);
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
   border-radius: 999px;
   overflow: hidden;
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-card-on-page);
 }
 
 .tab,
 .tabActive {
-  background: transparent;
+  background: var(--surface-card);
   border: 0;
   padding: 6px 18px;
   font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 2px;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .tabActive {
@@ -72,11 +73,11 @@
   font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 2px;
-  background: var(--paper);
+  background: var(--surface-card);
 }
 
 .pillActive {
-  background: var(--ink);
+  background: var(--surface-nav);
   color: var(--mustard);
 }
 
@@ -96,6 +97,17 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
+}
+
+.cardWrap {
+  position: relative;
+}
+
+.adminEdit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
 }
 
 .smallRow {

@@ -1,11 +1,12 @@
 .card {
-  background: var(--paper);
-  border: var(--border-card);
-  box-shadow: var(--shadow-md);
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
+  box-shadow: var(--shadow-card-on-page);
+  color: var(--text-primary);
 }
 
 .head {
-  background: var(--ink);
+  background: var(--surface-nav);
   color: var(--mustard);
   padding: 10px 14px;
   display: flex;
@@ -22,7 +23,7 @@
 
 .badge {
   background: var(--coral);
-  color: var(--paper);
+  color: var(--surface-card);
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
@@ -35,12 +36,16 @@
   padding: 0;
 }
 
+.list li {
+  position: relative;
+}
+
 .list li a {
   display: grid;
   grid-template-columns: 28px 1fr;
   gap: 10px;
   padding: 10px 14px;
-  border-top: 1px dashed rgba(26, 26, 26, 0.18);
+  border-top: 1px dashed var(--border-subtle);
   text-decoration: none;
   color: inherit;
   align-items: center;
@@ -51,7 +56,7 @@
 }
 
 .list li a:hover {
-  background: var(--linen);
+  background: var(--hover-row-on-card);
 }
 
 .rank {
@@ -71,8 +76,14 @@
 .meta {
   display: block;
   font-size: 11px;
-  color: var(--teal);
+  color: var(--text-label-on-card);
   font-weight: 600;
+}
+
+.adminEdit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 
 @media (max-width: 600px) {
