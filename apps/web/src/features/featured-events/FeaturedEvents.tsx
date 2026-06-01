@@ -4,9 +4,10 @@ import { AdSlot } from "@/components/AdSlot";
 import { DayPicker } from "@/components/DayPicker";
 import { FeatureCard } from "@/components/FeatureCard";
 import { PopularList } from "@/components/PopularList";
-import { toFeatureCardViewModel, toPopularViewModels, type FeaturedBadge } from "@/lib/event-view-model";
+import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
+import type { FeaturedBadge } from "@/lib/event-view-model";
 
-import { useTodayEvents } from "./useTodayEvents";
+import { filterFeaturedCards, useHomepageCuration } from "./useHomepageCuration";
 import styles from "./FeaturedEvents.module.css";
 
 const TABS: { id: "all" | FeaturedBadge; label: string }[] = [
@@ -16,17 +17,15 @@ const TABS: { id: "all" | FeaturedBadge; label: string }[] = [
 ];
 
 export function FeaturedEvents() {
-  const { data, isLoading } = useTodayEvents();
+  const { viewModel, isLoading } = useHomepageCuration();
   const [tab, setTab] = useState<"all" | FeaturedBadge>("all");
 
   const cards = useMemo(() => {
-    if (!data) return [];
-    const mapped = data.items.map((item) => toFeatureCardViewModel(item));
-    if (tab === "all") return mapped;
-    return mapped.filter((card) => card.badge === tab || (tab === "tonight" && card.badge === "tonight"));
-  }, [data, tab]);
+    if (!viewModel) return [];
+    return filterFeaturedCards(viewModel.featuredCards, tab);
+  }, [viewModel, tab]);
 
-  const popular = useMemo(() => (data ? toPopularViewModels(data.items) : []), [data]);
+  const popular = viewModel?.popularEvents ?? [];
 
   if (isLoading) {
     return <div className={styles.loading}>Loading featured events…</div>;
@@ -72,17 +71,23 @@ export function FeaturedEvents() {
         <div className={styles.grid}>
           <div className={styles.heroes}>
             {heroes.map((card) => (
-              <FeatureCard key={card.id} card={card} variant="hero" />
+              <div key={card.id} className={styles.cardWrap}>
+                <FeatureCard card={card} variant="hero" />
+                <AdminEditLink eventId={card.id} className={styles.adminEdit} />
+              </div>
             ))}
           </div>
           <div className={styles.smallRow}>
             {small.map((card) => (
-              <FeatureCard key={card.id} card={card} variant="small" />
+              <div key={card.id} className={styles.cardWrap}>
+                <FeatureCard card={card} variant="small" />
+                <AdminEditLink eventId={card.id} className={styles.adminEdit} />
+              </div>
             ))}
           </div>
         </div>
         <aside className={styles.side}>
-          <PopularList events={popular} count={popular.length} />
+          <PopularList events={popular} count={popular.length} renderAdminEdit={(eventId) => <AdminEditLink eventId={eventId} />} />
           <DayPicker />
           <AdSlot variant="card" />
         </aside>

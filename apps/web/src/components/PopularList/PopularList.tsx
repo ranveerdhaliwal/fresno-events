@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import type { PopularEventViewModel } from "@/lib/event-view-model";
 
@@ -8,9 +9,10 @@ export interface PopularListProps {
   title?: string;
   count?: number;
   events: PopularEventViewModel[];
+  renderAdminEdit?: (eventId: string) => ReactNode;
 }
 
-export function PopularList({ title = "POPULAR RIGHT NOW", count, events }: PopularListProps) {
+export function PopularList({ title = "POPULAR RIGHT NOW", count, events, renderAdminEdit }: PopularListProps) {
   return (
     <div className={styles.card} data-testid="popular-list">
       <div className={styles.head}>
@@ -27,6 +29,7 @@ export function PopularList({ title = "POPULAR RIGHT NOW", count, events }: Popu
                 <span className={styles.meta}>{event.meta}</span>
               </span>
             </Link>
+            {renderAdminEdit ? <div className={styles.adminEdit}>{renderAdminEdit(event.id)}</div> : null}
           </li>
         ))}
       </ul>

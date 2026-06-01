@@ -102,10 +102,15 @@ export function formStateToEventPatch(
 }
 
 function encodeStartInstant(draft: AdminEventFormState): string | null {
-  if (!draft.startDate.trim()) {
+  const date = draft.startDate.trim();
+  if (!date) {
     return null;
   }
-  return instantFromPacificLocal(draft.startDate.trim(), draft.startTime.trim());
+  if (!draft.startTime.trim()) {
+    // All-day events use noon UTC sentinel (matches ingest scrapers).
+    return new Date(`${date}T12:00:00Z`).toISOString();
+  }
+  return instantFromPacificLocal(date, draft.startTime.trim());
 }
 
 function encodeEndInstant(draft: AdminEventFormState): string | undefined {

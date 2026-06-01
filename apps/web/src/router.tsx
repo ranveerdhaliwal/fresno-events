@@ -1,7 +1,10 @@
 import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router";
 
 import { PlaceholderPage } from "@/components/PlaceholderPage";
-import { AdminPage } from "@/pages/AdminPage";
+import { AdminLayoutPage } from "@/pages/AdminLayoutPage";
+import { AdminHomepagePage } from "@/pages/AdminHomepagePage";
+import { AdminEventEditorPage } from "@/pages/AdminEventEditorPage";
+import { AdminReviewPage } from "@/pages/AdminReviewPage";
 import { DayPage } from "@/pages/DayPage";
 import { EventDetailPage } from "@/pages/EventDetailPage";
 import { HomePage } from "@/pages/HomePage";
@@ -122,10 +125,28 @@ const settingsRoute = createRoute({
   )
 });
 
-const adminRoute = createRoute({
+const adminLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
-  component: AdminPage
+  component: AdminLayoutPage
+});
+
+const adminIndexRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/",
+  component: AdminReviewPage
+});
+
+const adminHomepageRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/homepage",
+  component: AdminHomepagePage
+});
+
+const adminEventEditorRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/events/$eventId",
+  component: AdminEventEditorPage
 });
 
 const routeTree = rootRoute.addChildren([
@@ -140,7 +161,7 @@ const routeTree = rootRoute.addChildren([
   searchRoute,
   savedRoute,
   settingsRoute,
-  adminRoute
+  adminLayoutRoute.addChildren([adminIndexRoute, adminHomepageRoute, adminEventEditorRoute])
 ]);
 
 export const router = createRouter({

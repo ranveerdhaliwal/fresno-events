@@ -9,6 +9,7 @@ import { SeeAllDayCta } from "@/components/SeeAllDayCta";
 import { FooterStamp } from "@/components/FooterStamp";
 import { StickyCtaBar } from "@/components/StickyCtaBar";
 import { ContextStrip } from "@/components/ContextStrip";
+import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { deriveTagline, formatPrice, toEventRowViewModel } from "@/lib/event-view-model";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { formatCountdownLabel, formatEventDate, formatShortTime, toIsoDateLocal } from "@/lib/event-time";
@@ -26,7 +27,8 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
   const dayIso = toIsoDateLocal(new Date(event.startTs));
   const whatToKnow = event.tags.length > 0 ? event.tags : null;
 
-  const relatedRows = detail.relatedEvents.map((item, i) => toEventRowViewModel(item));
+  const relatedRows = detail.relatedEvents.map((item) => toEventRowViewModel(item));
+  const seriesRows = (detail.seriesEvents ?? []).map((item) => toEventRowViewModel(item));
 
   return (
     <article className={styles.article} data-testid="event-detail-view">
@@ -52,8 +54,10 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               <div className={styles.heroPills}>
                 {event.priority <= 1 ? <span className={styles.pill}>HUGE</span> : null}
                 <span className={styles.pillMustard}>{event.category.replace("_", " ")}</span>
+                <AdminEditLink eventId={event.id} />
               </div>
               <h1>{event.title}</h1>
+              {event.seriesName ? <p className={styles.seriesSubtitle}>{event.seriesName}</p> : null}
               <p className={styles.tagline}>{tagline}</p>
             </div>
             <div className={styles.heroActions}>
@@ -103,16 +107,20 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
             <p>{event.descriptionText ?? "Details are still being confirmed for this event."}</p>
           </section>
 
-          <section className={styles.sec}>
-            <SecHead number="02" script="who's playing" title="LINEUP" />
-            <div className={styles.lineup}>
-              <div className={styles.act}>
-                <p className={styles.who}>{event.title}</p>
-                <p className={styles.when}>{formatShortTime(event.startTs)}</p>
-                <p className={styles.where}>{venue.name}</p>
+          {event.lineup && event.lineup.length > 0 ? (
+            <section className={styles.sec}>
+              <SecHead number="02" script="who's playing" title="LINEUP" />
+              <div className={styles.lineup}>
+                {event.lineup.map((entry, index) => (
+                  <div key={`${entry.name}-${index}`} className={styles.act}>
+                    <p className={styles.who}>{entry.name}</p>
+                    {entry.time ? <p className={styles.when}>{entry.time}</p> : null}
+                    {entry.stage ? <p className={styles.where}>{entry.stage}</p> : null}
+                  </div>
+                ))}
               </div>
-            </div>
-          </section>
+            </section>
+          ) : null}
 
           <section className={styles.sec}>
             <SecHead number="03" script="find it" title="LOCATION & PARKING" />
@@ -153,8 +161,29 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
             </div>
           </section>
 
+          {seriesRows.length > 0 ? (
+            <section className={styles.sec}>
+              <SecHead
+                number="06"
+                script="same series"
+                title="MORE IN THIS SERIES"
+                count={seriesRows.length}
+              />
+              <div className={styles.relatedList}>
+                {seriesRows.map((row) => (
+                  <EventRow key={row.id} event={row} slug={row.slug} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <section className={styles.sec}>
-            <SecHead number="06" script="same day" title="OTHER EVENTS THIS DAY" count={relatedRows.length} />
+            <SecHead
+              number={seriesRows.length > 0 ? "07" : "06"}
+              script="same day"
+              title="OTHER EVENTS THIS DAY"
+              count={relatedRows.length}
+            />
             <div className={styles.relatedList}>
               {relatedRows.map((row) => (
                 <EventRow key={row.id} event={row} slug={row.slug} />

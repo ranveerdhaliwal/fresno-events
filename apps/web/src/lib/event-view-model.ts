@@ -3,58 +3,24 @@ import { clampEventPriority } from "@fresno-events/shared";
 
 import { formatEventDate, formatShortTime, isTonight, isWeekend, toIsoDateLocal } from "@/lib/event-time";
 import { resolveMediaUrl } from "@/lib/media-url";
-import { gradientForPalette, paletteKeyForCategory, type ImagePaletteKey } from "@/lib/image-palette";
+import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
 
-export type FeaturedBadge = "tonight" | "weekend" | "huge" | "default";
-export type RowPriority = 0 | 1 | 2 | 3 | 4 | 5;
-
-export interface EventRowViewModel {
-  id: string;
-  slug: string;
-  title: string;
-  tagline: string;
-  venueName: string;
-  neighborhood: string;
-  timeLabel: string;
-  dateLabel: string;
-  dayShort: string;
-  dayNum: string;
-  categoryLabel: string;
-  priceLabel: string;
-  flagLabel: string | null;
-  priority: RowPriority;
-  paletteKey: ImagePaletteKey;
-  paletteGradient: string;
-  imageUrl: string | null;
-  isFree: boolean;
-  isLive: boolean;
-  featuredBadge: FeaturedBadge;
-}
-
-export interface FeatureCardViewModel {
-  id: string;
-  slug: string;
-  title: string;
-  description: string;
-  venueName: string;
-  timeLabel: string;
-  priceLabel: string;
-  categoryLabel: string;
-  badge: FeaturedBadge;
-  paletteKey: ImagePaletteKey;
-  paletteGradient: string;
-  imageUrl: string | null;
-  isFree: boolean;
-}
-
-export interface PopularEventViewModel {
-  rank: number;
-  id: string;
-  slug: string;
-  title: string;
-  meta: string;
-  priceLabel: string;
-}
+export type {
+  DayStripTile,
+  FeatureCardViewModel,
+  FeaturedBadge,
+  EventRowViewModel,
+  PopularEventViewModel,
+  RowPriority
+} from "@/lib/event-view-model.types";
+import type {
+  DayStripTile,
+  FeatureCardViewModel,
+  FeaturedBadge,
+  EventRowViewModel,
+  PopularEventViewModel,
+  RowPriority
+} from "@/lib/event-view-model.types";
 
 const CATEGORY_LABELS: Partial<Record<Event["category"], string>> = {
   music: "Live music",
@@ -192,15 +158,6 @@ export function toPopularViewModels(items: EventListItem[], limit = 5): PopularE
     meta: `${item.venue.neighborhood ?? item.venue.city} · ${formatShortTime(item.event.startTs)}`,
     priceLabel: formatPrice(item.event)
   }));
-}
-
-export interface DayStripTile {
-  isoDate: string;
-  dow: string;
-  dayNum: string;
-  count: number;
-  isToday: boolean;
-  isWeekend: boolean;
 }
 
 export function buildDayStripTiles(anchor: Date, eventCounts: Map<string, number>, days = 14): DayStripTile[] {

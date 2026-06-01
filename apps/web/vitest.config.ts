@@ -10,7 +10,8 @@ export default defineConfig({
     }
   },
   test: {
-    environment: "jsdom",
+    // happy-dom: lighter DOM for component tests; avoids jsdom 27+ ESM require issues on Node 20.
+    environment: "happy-dom",
     setupFiles: ["src/tests/setup.ts"],
     coverage: {
       provider: "v8",

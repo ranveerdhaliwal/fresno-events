@@ -26,6 +26,7 @@ const baseCandidate = {
   confidenceScore: 0.87,
   suggestedPriority: 1,
   status: "pending_review",
+  occurrenceId: "occ-1",
   createdAt: "2026-04-25T08:00:00.000Z",
   updatedAt: "2026-04-25T08:00:00.000Z"
 } satisfies EventCandidate;

@@ -22,8 +22,9 @@ export function getPacificDateTimeParts(instant: Date): PacificDateTimeParts {
   const year = get("year");
   const month = get("month");
   const day = get("day");
-  const hour = Number(get("hour"));
+  const hourRaw = Number(get("hour"));
   const minute = Number(get("minute"));
+  const hour = hourRaw === 24 ? 0 : hourRaw;
 
   return {
     date: `${year}-${month}-${day}`,

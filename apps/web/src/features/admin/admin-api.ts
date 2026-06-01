@@ -1,4 +1,7 @@
 import type {
+  AdminEventPatchBody,
+  AdminEventSearchResponse,
+  AdminPublishedEventResponse,
   ApiResponse,
   EventCandidate,
   CandidateBulkApproveChangesResponse,
@@ -6,9 +9,20 @@ import type {
   CandidateBulkDeleteResponse,
   EventCandidateDetailResponse,
   EventCandidateListResponse,
-  NormalizedEvent,
+  HomepageSlotsPutBody,
+  HomepageSlotsResponse,
   ReviewDecisionResponse
 } from "@fresno-events/shared";
+
+import type {
+  ApproveBody,
+  BulkApproveBody,
+  CandidateStatusFilter,
+  RejectBody,
+  ReviewQueueTab
+} from "./admin-api.types";
+
+export type { ApproveBody, BulkApproveBody, CandidateStatusFilter, RejectBody, ReviewQueueTab } from "./admin-api.types";
 
 function getApiUrl() {
   const value = import.meta.env.VITE_API_URL?.trim();
@@ -33,10 +47,6 @@ export function isAdminAuthError(error: unknown): error is AdminApiError {
 export async function verifyAdminToken(token: string): Promise<void> {
   await listCandidates(token, "pending_review", { limit: 1 });
 }
-
-export type CandidateStatusFilter = EventCandidate["status"];
-
-export type ReviewQueueTab = "new" | "updates" | "approved" | "rejected";
 
 export function reviewTabToStatus(tab: ReviewQueueTab): CandidateStatusFilter {
   switch (tab) {
@@ -65,18 +75,6 @@ export async function listCandidates(
 
 export async function getCandidate(token: string, id: string) {
   return adminFetch<EventCandidateDetailResponse>(token, `/review/candidates/${encodeURIComponent(id)}`);
-}
-
-export interface ApproveBody {
-  event?: Partial<NormalizedEvent>;
-  notes?: string;
-  reviewedBy?: string;
-  priority?: number;
-}
-
-export interface RejectBody {
-  notes?: string;
-  reviewedBy?: string;
 }
 
 export async function approveCandidate(token: string, id: string, body: ApproveBody) {
@@ -111,15 +109,6 @@ export async function deleteCandidates(token: string, ids: string[], options: { 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ids })
   });
-}
-
-export interface BulkApproveBody {
-  ids?: string[];
-  notes?: string;
-  reviewedBy?: string;
-  priority?: number;
-  status?: "pending_review";
-  limit?: number;
 }
 
 export async function bulkApproveCandidates(token: string, ids: string[], body: Omit<BulkApproveBody, "ids"> = {}) {
@@ -160,6 +149,49 @@ export async function bulkApproveChangesAll(token: string, body: Omit<BulkApprov
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
+}
+
+export async function getHomepageSlots(token: string) {
+  return adminFetch<HomepageSlotsResponse>(token, "/review/homepage-slots");
+}
+
+export async function saveHomepageSlots(token: string, body: HomepageSlotsPutBody) {
+  return adminFetch<HomepageSlotsResponse>(token, "/review/homepage-slots", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+}
+
+export async function searchPublishedEvents(
+  token: string,
+  q: string,
+  opts?: { limit?: number; scope?: "future" | "all" }
+) {
+  const params = new URLSearchParams({ q });
+  if (opts?.limit) {
+    params.set("limit", String(opts.limit));
+  }
+  if (opts?.scope) {
+    params.set("scope", opts.scope);
+  }
+  return adminFetch<AdminEventSearchResponse>(token, `/review/events/search?${params}`);
+}
+
+export async function getPublishedEvent(token: string, eventId: string) {
+  return adminFetch<AdminPublishedEventResponse>(token, `/review/events/${encodeURIComponent(eventId)}`);
+}
+
+export async function patchPublishedEvent(token: string, eventId: string, body: AdminEventPatchBody) {
+  return adminFetch<{ event: AdminPublishedEventResponse["event"] }>(
+    token,
+    `/review/events/${encodeURIComponent(eventId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }
+  );
 }
 
 async function adminFetch<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {

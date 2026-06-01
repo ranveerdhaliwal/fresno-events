@@ -1,7 +1,7 @@
-import type { ApiResponse, EventDetailResponse, EventListItem, EventListResponse } from "@fresno-events/shared";
+import type { ApiResponse, EventDetailResponse, EventListItem, EventListResponse, HomepageCurationResponse } from "@fresno-events/shared";
 
 import { getMockEventBySlug, getMockEventList } from "@/services/events.mock";
-import type { EventDetailResult, EventListResult } from "@/services/events.types";
+import type { EventDetailResult, EventListResult, HomepageCurationResult } from "@/services/events.types";
 
 export async function listDayEvents(isoDate: string, signal?: AbortSignal): Promise<EventListResult> {
   const from = new Date(`${isoDate}T00:00:00-07:00`);
@@ -13,7 +13,8 @@ export const eventsService = {
   listTodayEvents,
   listWeekEvents,
   listDayEvents,
-  getEventDetail
+  getEventDetail,
+  getHomepageCuration
 };
 
 export async function listTodayEvents(signal?: AbortSignal): Promise<EventListResult> {
@@ -78,6 +79,40 @@ export async function getEventDetail(slug: string, signal?: AbortSignal): Promis
 
     console.warn("Falling back to mock event detail because the Events API is unavailable.", error);
     return createMockDetailResult(slug);
+  }
+}
+
+export async function getHomepageCuration(signal?: AbortSignal): Promise<HomepageCurationResult> {
+  const apiUrl = getApiUrl();
+
+  if (!apiUrl) {
+    return createMockHomepageResult(signal);
+  }
+
+  try {
+    const response = await fetch(new URL("/events/homepage", apiUrl), createRequestInit(signal));
+
+    if (!response.ok) {
+      throw new Error(`Homepage API responded with ${response.status}`);
+    }
+
+    const payload = (await response.json()) as ApiResponse<HomepageCurationResponse>;
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    return {
+      ...payload.data,
+      source: "api"
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+
+    console.warn("Falling back to mock homepage curation because the Events API is unavailable.", error);
+    return createMockHomepageResult(signal);
   }
 }
 
@@ -150,6 +185,27 @@ function createMockResult(options: { from?: Date; until?: Date } = {}): EventLis
     nextCursor: null,
     source: "mock",
     generatedAt: new Date().toISOString()
+  };
+}
+
+async function createMockHomepageResult(signal?: AbortSignal): Promise<HomepageCurationResult> {
+  const list = await listTodayEvents(signal);
+  const featured = list.items.slice(0, 5).map((item, index) => ({
+    position: index + 1,
+    source: "auto" as const,
+    item
+  }));
+  const popular = list.items.slice(0, 5).map((item, index) => ({
+    position: index + 1,
+    source: "auto" as const,
+    item
+  }));
+
+  return {
+    featured,
+    popular,
+    generatedAt: list.generatedAt,
+    source: "mock"
   };
 }
 

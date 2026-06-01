@@ -1,4 +1,4 @@
-import type { EventDetailResponse, EventListItem } from "@fresno-events/shared";
+import type { EventDetailResponse, EventListItem, HomepageCurationResponse } from "@fresno-events/shared";
 
 export interface EventListResult {
   items: EventListItem[];
@@ -12,4 +12,8 @@ export interface EventDetailResult {
   item: EventListItem;
   source: "api" | "mock";
   generatedAt: string;
+}
+
+export interface HomepageCurationResult extends HomepageCurationResponse {
+  source: "api" | "mock";
 }
