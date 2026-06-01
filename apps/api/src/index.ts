@@ -8,6 +8,8 @@ import { eventsRoute } from "@/routes/events";
 import { imagesRoute } from "@/routes/images";
 import { ogRoute } from "@/routes/og";
 import { reviewRoute } from "@/routes/review";
+import { reviewHomepageRoute } from "@/routes/review-homepage";
+import { reviewEventsRoute } from "@/routes/review-events";
 import { savesRoute } from "@/routes/saves";
 import { searchRoute } from "@/routes/search";
 import { venuesRoute } from "@/routes/venues";
@@ -81,6 +83,8 @@ app.route("/search", searchRoute);
 app.route("/saves", savesRoute);
 app.route("/og", ogRoute);
 app.route("/review", reviewRoute);
+app.route("/review", reviewHomepageRoute);
+app.route("/review", reviewEventsRoute);
 app.route("/images", imagesRoute);
 
 app.notFound((c) => c.json({ ok: false, error: { code: "not_found", message: "Route not found." } }, 404));

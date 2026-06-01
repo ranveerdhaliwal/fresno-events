@@ -14,6 +14,9 @@ import {
 
 import type { Env } from "@/env";
 import { toEventSource } from "@/lib/event-source";
+import type { SupabaseEventRow, SupabaseImageRow, SupabaseVenueRow } from "@/lib/supabase-events.types";
+
+export type { SupabaseEventRow, SupabaseImageRow, SupabaseVenueRow } from "@/lib/supabase-events.types";
 
 const scheduledStatuses = ["scheduled", "sold_out", "postponed"] as const;
 const validStatuses: EventStatus[] = ["scheduled", "cancelled", "postponed", "sold_out", "inferred_cancelled"];
@@ -30,7 +33,7 @@ export class SupabaseEventsError extends Error {
 
 export async function listEventsFromSupabase(
   env: Env,
-  options: { from: Date; until?: Date; limit: number; maxPriority?: number }
+  options: { from: Date; until?: Date; limit: number; maxPriority?: number; seriesId?: string }
 ): Promise<EventListResponse> {
   const { url, key } = getSupabaseConfig(env);
   const filters: Record<string, string> = {
@@ -42,6 +45,10 @@ export async function listEventsFromSupabase(
 
   if (options.maxPriority !== undefined) {
     filters.priority = `lte.${options.maxPriority}`;
+  }
+
+  if (options.seriesId) {
+    filters.series_id = `eq.${options.seriesId}`;
   }
 
   const params = createEventParams(filters);
@@ -77,11 +84,69 @@ export async function getEventFromSupabase(env: Env, slug: string): Promise<Even
   const item = mapEventRow(row);
   const galleryImages = await fetchImagesByIds(url, key, item.event.galleryImageIds);
 
+  let seriesEvents: EventListItem[] | undefined;
+  if (row.series_id) {
+    const siblingParams = createEventParams({
+      series_id: `eq.${row.series_id}`,
+      status: `in.(${scheduledStatuses.join(",")})`,
+      id: `neq.${row.id}`,
+      start_ts: `gte.${new Date().toISOString()}`,
+      order: "start_ts.asc",
+      limit: "20"
+    });
+    const siblingRows = await fetchEventRows(url, key, siblingParams);
+    const mapped = siblingRows.map(mapEventRow);
+    if (mapped.length > 0) {
+      seriesEvents = mapped;
+    }
+  }
+
   return {
     ...item,
     galleryImages,
-    relatedEvents: []
+    relatedEvents: [],
+    ...(seriesEvents ? { seriesEvents } : {})
   };
+}
+
+export async function listEventsByIds(env: Env, ids: string[]): Promise<EventListItem[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const { url, key } = getSupabaseConfig(env);
+  const params = createEventParams({
+    id: `in.(${ids.join(",")})`,
+    limit: String(ids.length)
+  });
+
+  const rows = await fetchEventRows(url, key, params);
+  const items = rows.map(mapEventRow);
+  const byId = new Map(items.map((item) => [item.event.id, item]));
+  return ids.flatMap((id) => {
+    const item = byId.get(id);
+    return item ? [item] : [];
+  });
+}
+
+export async function searchEventsFromSupabase(
+  env: Env,
+  options: { q: string; limit: number; from?: Date }
+): Promise<EventListItem[]> {
+  const { url, key } = getSupabaseConfig(env);
+  const filters: Record<string, string> = {
+    status: `in.(${scheduledStatuses.join(",")})`,
+    title: `ilike.*${options.q.replace(/[%_]/g, "")}*`,
+    order: "start_ts.asc",
+    limit: String(options.limit)
+  };
+
+  if (options.from) {
+    filters.start_ts = `gte.${options.from.toISOString()}`;
+  }
+
+  const rows = await fetchEventRows(url, key, createEventParams(filters));
+  return rows.map(mapEventRow);
 }
 
 function getSupabaseConfig(env: Env) {
@@ -299,80 +364,4 @@ function toStringRecord(value: unknown): Record<string, string> {
 
 function toNumber(value: number | string) {
   return typeof value === "number" ? value : Number(value);
-}
-
-interface SupabaseEventRow {
-  id: string;
-  slug: string;
-  source: string;
-  source_event_id: string | null;
-  source_refs: unknown;
-  title: string;
-  description_html: string | null;
-  description_text: string | null;
-  venue_id: string;
-  start_ts: string;
-  end_ts: string | null;
-  timezone: string | null;
-  doors_ts: string | null;
-  category: string | null;
-  subcategories: string[] | null;
-  tags: string[] | null;
-  price_min: number | string | null;
-  price_max: number | string | null;
-  currency: string | null;
-  is_free: boolean | null;
-  ticket_url: string | null;
-  age_restriction: string | null;
-  status: string | null;
-  hero_image_id: string | null;
-  gallery_image_ids: string[] | null;
-  primary_artist_id: string | null;
-  all_artist_ids: string[] | null;
-  external_url: string | null;
-  dedupe_hash: string | null;
-  confidence_score: number | null;
-  last_seen_at: string | null;
-  priority: number | null;
-  series_id: string | null;
-  series_name: string | null;
-  lineup: unknown;
-  created_at: string;
-  updated_at: string;
-  venue: SupabaseVenueRow | null;
-  hero_image: SupabaseImageRow | null;
-}
-
-interface SupabaseVenueRow {
-  id: string;
-  slug: string;
-  name: string;
-  address: string | null;
-  city: string;
-  neighborhood: string | null;
-  lat: number | null;
-  lng: number | null;
-  capacity: number | null;
-  website: string | null;
-  phone: string | null;
-  socials: unknown;
-  hero_image_id: string | null;
-  description: string | null;
-  primary_category: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface SupabaseImageRow {
-  id: string;
-  storage_key: string;
-  cdn_url: string;
-  width: number | null;
-  height: number | null;
-  blurhash: string | null;
-  dominant_color: string | null;
-  alt_text: string | null;
-  source_url: string | null;
-  license: string | null;
-  created_at: string;
 }

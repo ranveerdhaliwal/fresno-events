@@ -1,17 +1,34 @@
 import { Hono } from "hono";
 
+import type { HomepageCurationResponse } from "@fresno-events/shared";
+
 import type { Env } from "@/env";
+import { resolveHomepageCuration, HomepageCurationError } from "@/lib/homepage-curation";
 import { getEventFromSupabase, listEventsFromSupabase, SupabaseEventsError } from "@/lib/supabase-events";
 import { fail, ok } from "@/lib/responses";
 
-import { parseFrom, parseLimit, parseMaxPriority, parseOptionalDate } from "./events.utils";
+import { parseFrom, parseLimit, parseMaxPriority, parseOptionalDate, parseSeriesId } from "./events.utils";
 
 export const eventsRoute = new Hono<{ Bindings: Env }>()
+  .get("/homepage", async (c) => {
+    try {
+      return ok<HomepageCurationResponse>(c, await resolveHomepageCuration(c.env));
+    } catch (error) {
+      if (error instanceof HomepageCurationError) {
+        return fail(c, error.code, error.message, error.status as 400);
+      }
+      if (error instanceof SupabaseEventsError) {
+        return fail(c, "events_unavailable", error.message, error.status === 503 ? 503 : 502);
+      }
+      return fail(c, "events_unavailable", "The homepage curation could not be loaded.", 502);
+    }
+  })
   .get("/", async (c) => {
     const limit = parseLimit(c.req.query("limit"));
     const from = parseFrom(c.req.query("from"));
     const until = parseOptionalDate(c.req.query("until"));
     const maxPriority = parseMaxPriority(c.req.query("maxPriority"));
+    const seriesId = parseSeriesId(c.req.query("series_id"));
 
     if (!from) {
       return fail(c, "invalid_from", "The from query parameter must be a valid ISO date.", 400);
@@ -32,7 +49,8 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
           from,
           limit,
           ...(until ? { until } : {}),
-          ...(maxPriority !== undefined ? { maxPriority } : {})
+          ...(maxPriority !== undefined ? { maxPriority } : {}),
+          ...(seriesId ? { seriesId } : {})
         })
       );
     } catch (error) {

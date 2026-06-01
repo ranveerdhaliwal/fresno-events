@@ -1,14 +1,9 @@
 import type { Env } from "@/env";
+import { supabaseRequest } from "@/lib/supabase-client";
+import type { DownloadedImage, ImageInsert, MirroredImage } from "@/lib/images.types";
 import { logError } from "@/lib/structured-log";
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const FETCH_TIMEOUT_MS = 8_000;
-
-export interface MirroredImage {
-  id: string;
-  storage_key: string;
-  cdn_url: string;
-}
+export type { MirroredImage } from "@/lib/images.types";
 
 /**
  * Mirror a remote event image to the R2 EVENT_IMAGES bucket and persist a row
@@ -55,10 +50,8 @@ export async function mirrorImageToR2(env: Env, imageUrl: string, altText: strin
   });
 }
 
-interface DownloadedImage {
-  bytes: Uint8Array;
-  contentType: string;
-}
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 8_000;
 
 async function downloadImage(imageUrl: string): Promise<DownloadedImage | null> {
   const controller = new AbortController();
@@ -107,13 +100,6 @@ async function findImageBySource(env: Env, imageUrl: string): Promise<MirroredIm
 
   const rows = await supabaseRequest<MirroredImage[]>(env, `/rest/v1/images?${params}`);
   return rows[0] ?? null;
-}
-
-interface ImageInsert {
-  storage_key: string;
-  cdn_url: string;
-  source_url: string;
-  alt_text: string | null;
 }
 
 async function upsertImageRow(env: Env, row: ImageInsert): Promise<MirroredImage> {
@@ -199,31 +185,6 @@ async function insertImageRow(env: Env, row: ImageInsert): Promise<MirroredImage
 
     throw error;
   }
-}
-
-async function supabaseRequest<T>(env: Env, path: string, init: RequestInit = {}): Promise<T> {
-  const url = env.SUPABASE_URL?.replace(/\/$/, "");
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required to mirror images.");
-  }
-
-  const response = await fetch(`${url}${path}`, {
-    ...init,
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      Accept: "application/json",
-      ...init.headers
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Supabase image request failed with ${response.status}: ${await response.text()}`);
-  }
-
-  return await response.json() as T;
 }
 
 function buildCdnUrl(env: Env, storageKey: string) {

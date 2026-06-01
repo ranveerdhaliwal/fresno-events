@@ -42,3 +42,16 @@ export function parseMaxPriority(value: string | undefined): number | undefined 
 
   return parsed;
 }
+
+export function parseSeriesId(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 200) {
+    return undefined;
+  }
+
+  return trimmed;
+}

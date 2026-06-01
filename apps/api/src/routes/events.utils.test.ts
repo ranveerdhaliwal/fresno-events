@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { parseFrom, parseLimit, parseMaxPriority, parseOptionalDate } from "./events.utils";
+import { parseFrom, parseLimit, parseMaxPriority, parseOptionalDate, parseSeriesId } from "./events.utils";
 
 describe("parseLimit", () => {
   it("defaults invalid input to 12", () => {
@@ -76,5 +76,21 @@ describe("parseMaxPriority", () => {
   it("parses integers 0–5", () => {
     expect(parseMaxPriority("0")).toBe(0);
     expect(parseMaxPriority("5")).toBe(5);
+  });
+});
+
+describe("parseSeriesId", () => {
+  it("returns undefined when omitted or empty", () => {
+    expect(parseSeriesId(undefined)).toBeUndefined();
+    expect(parseSeriesId("")).toBeUndefined();
+    expect(parseSeriesId("   ")).toBeUndefined();
+  });
+
+  it("returns undefined when too long", () => {
+    expect(parseSeriesId("x".repeat(201))).toBeUndefined();
+  });
+
+  it("trims and returns valid series id", () => {
+    expect(parseSeriesId("  series:visitfresnocounty:abc123  ")).toBe("series:visitfresnocounty:abc123");
   });
 });
