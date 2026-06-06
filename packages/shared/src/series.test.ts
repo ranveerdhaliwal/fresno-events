@@ -74,6 +74,20 @@ describe("computeCanonicalSeriesId", () => {
     expect(a.seriesId).toMatch(/^series:visitfresnocounty:[a-f0-9]{64}$/);
   });
 
+  it("groups multi-night listings by shared recid", async () => {
+    const base = {
+      source: "api:visitfresnocounty",
+      title: "Miss California Competition Week",
+      venueName: "William Saroyan Theatre",
+      seriesListingRecId: "9109",
+      groupByListingRecId: true
+    };
+    const a = await computeCanonicalSeriesId(base);
+    const b = await computeCanonicalSeriesId({ ...base, title: "Miss California Competition Week" });
+    expect(a.seriesId).toBe(b.seriesId);
+    expect(a.seriesId).toMatch(/^series:visitfresnocounty:[a-f0-9]{64}$/);
+  });
+
   it("different CMS slugs same loose title → same seriesId", async () => {
     const base = {
       source: "api:visitfresnocounty",

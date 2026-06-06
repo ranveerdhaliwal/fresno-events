@@ -35,6 +35,9 @@ export interface SeriesResolveInput {
   venueName: string;
   seriesId?: string;
   seriesName?: string;
+  seriesListingRecId?: string;
+  /** Assign series from CMS listing id when multiple nights share recid. */
+  groupByListingRecId?: boolean;
   ticketUrl?: string;
   externalUrl?: string;
 }
@@ -48,13 +51,32 @@ export async function computeCanonicalSeriesId(input: SeriesResolveInput): Promi
     return { seriesId: input.seriesId };
   }
 
+  const scope = venueScope(input.source, input.venueName);
+
+  if (input.groupByListingRecId && input.seriesListingRecId?.trim()) {
+    const payload = `series|${scope}|listing|${input.seriesListingRecId.trim()}`;
+    const hash = await sha256Hex(payload);
+    return { seriesId: `series:${scope}:${hash}` };
+  }
+
   if (!isRecurringSeries(input)) {
     return { seriesId: undefined };
   }
 
-  const scope = venueScope(input.source, input.venueName);
   const anchor = titleAnchor(input.title, input.venueName);
   const payload = `series|${scope}|${anchor}`;
   const hash = await sha256Hex(payload);
   return { seriesId: `series:${scope}:${hash}` };
+}
+
+/** Ad-hoc series id for admin manual links (title + venue anchor, no recurrence label). */
+export async function computeAdHocSeriesId(input: {
+  source: string;
+  title: string;
+  venueName: string;
+}): Promise<string> {
+  const scope = venueScope(input.source, input.venueName);
+  const anchor = titleAnchor(input.title, input.venueName);
+  const hash = await sha256Hex(`series|${scope}|${anchor}`);
+  return `series:${scope}:${hash}`;
 }

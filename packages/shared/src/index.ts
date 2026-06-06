@@ -54,6 +54,7 @@ export {
   isRecurringSeries,
   venueScope,
   listingUrlSeriesAnchor,
+  computeAdHocSeriesId,
   computeCanonicalSeriesId,
   type SeriesResolveInput,
   type SeriesResolveResult
@@ -292,7 +293,10 @@ export interface NormalizedEvent {
   tags?: string[];
   priceMin?: number;
   priceMax?: number;
+  /** Free-form price when CMS text is not numeric (e.g. "see website for details"). */
+  priceNotes?: string;
   currency?: string;
+  isFree?: boolean;
   ticketUrl?: string;
   externalUrl?: string;
   imageUrl?: string;
@@ -339,6 +343,14 @@ export interface ScrapeSeedMetric {
   detailUrls?: string[];
   /** Parsed events with links (API / listing scrape in dry-run). */
   eventLinks?: Array<{ title: string; url: string; startTs?: string }>;
+  /** venue.config.json strategy (api, html_parse, listing_then_detail, …). */
+  strategy?: string;
+  /** direct = HTTP/API only; browser = may use Browser Rendering + LLM on promote. */
+  ingestLane?: "direct" | "browser";
+  /** How detail pages are fetched (api_embedded, plain_html, br_llm, none). */
+  detailMode?: string;
+  /** HTTP URLs this run actually requests (API endpoints, listing pages, …). */
+  fetchUrls?: string[];
 }
 
 export interface ScrapeResult {
@@ -351,6 +363,8 @@ export interface ScrapeResult {
     durationMs: number;
     /** Venue-ingest persisted and enriched each venue inside the scraper run. */
     venuePersistPerVenue?: boolean;
+    /** Primary HTTP URLs fetched during this scrape (for preflight/promote logs). */
+    fetchUrls?: string[];
   };
   seedMetrics?: ScrapeSeedMetric[];
 }
@@ -390,6 +404,9 @@ export interface SeriesSiblingCandidate {
   sourceUrl?: string;
 }
 
+/** Whether ingest has enough structured fields, or detail_page_url still needs a fetch. */
+export type CandidateDetailStatus = "complete" | "pending";
+
 export interface EventCandidate {
   id: string;
   runId?: string;
@@ -400,6 +417,9 @@ export interface EventCandidate {
   startTs: string;
   sourceUrl?: string;
   ticketUrl?: string;
+  detailStatus: CandidateDetailStatus;
+  /** Canonical show/detail URL for backfill when detailStatus is pending. */
+  detailPageUrl?: string;
   normalizedEvent: NormalizedEvent;
   rawPayload: Record<string, unknown>;
   dedupeHash: string;
