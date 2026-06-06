@@ -40,6 +40,8 @@ function existingRow(overrides: Partial<ExistingCandidateRow> = {}): ExistingCan
     source_event_id: "evt-1",
     status: "pending_review",
     content_fingerprint: "fp-1",
+    confidence_score: 0.98,
+    raw_payload: {},
     matched_event_id: null,
     occurrence_id: "occ-1",
     canonical_candidate_id: null,
@@ -71,19 +73,12 @@ describe("candidate-upsert.utils", () => {
       source: base.source,
       source_event_id: base.sourceEventId,
       run_id: "run-2",
-      occurrence_id: "occ-1"
+      occurrence_id: "occ-1",
+      detail_status: "complete",
+      detail_page_url: null
     });
     expect(row.updated_at).toEqual(expect.any(String));
-    expect(row).not.toHaveProperty("confidence_score");
-    expect(row).not.toHaveProperty("normalized_event");
-    expect(row).not.toHaveProperty("title");
-    expect(row).not.toHaveProperty("review_notes");
-    expect(row).not.toHaveProperty("reviewed_at");
-    expect(row).not.toHaveProperty("reviewed_by");
-    expect(row).not.toHaveProperty("content_fingerprint");
-    expect(row).not.toHaveProperty("dedupe_hash");
-    expect(row).not.toHaveProperty("raw_payload");
-    expect(row).not.toHaveProperty("status");
+    expect(row.detail_status).toBe("complete");
   });
 
   it("unchanged upsert includes status when occurrence overrides to duplicate", async () => {
@@ -151,8 +146,32 @@ describe("candidate-upsert.utils", () => {
 
     expect(row.review_notes).toBeNull();
     expect(row.normalized_event).toMatchObject({ title: "Updated title" });
-    expect(row).not.toHaveProperty("confidence_score");
-    expect(row).not.toHaveProperty("raw_payload");
+    expect(row.confidence_score).toBe(0.98);
+    expect(row.raw_payload).toEqual({});
+  });
+
+  it("new and changed rows in one batch share the same keys", async () => {
+    const newRow = await buildCandidateUpsertRow({
+      auditKind: "new",
+      runId: "run-1",
+      event: base,
+      fingerprint: "fp-new",
+      status: "awaiting_enrichment",
+      contentChanged: true,
+      occurrence: baseOccurrence
+    });
+    const changedRow = await buildCandidateUpsertRow({
+      auditKind: "changed",
+      runId: "run-1",
+      event: { ...base, title: "Updated title" },
+      fingerprint: "fp-2",
+      status: "needs_changes",
+      existing: existingRow({ status: "approved", matched_event_id: "e1" }),
+      contentChanged: true,
+      occurrence: { ...baseOccurrence, matchedEventId: "e1" }
+    });
+
+    expect(Object.keys(newRow).sort()).toEqual(Object.keys(changedRow).sort());
   });
 
   it("changed pending_review upsert resets default confidence", async () => {

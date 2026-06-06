@@ -32,13 +32,14 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
         message: "Visit Fresno API token could not be fetched from get_simple_token.",
         recoverable: true
       }
-    ], 0);
+    ], 0, []);
   }
 
   log({ step: "token_ready", source: "get_simple_token" });
   const limit = 50;
   const ranges = buildVisitFresnoDateRanges(ctx.now);
   let pages = 0;
+  const fetchUrls: string[] = [];
 
   for (const range of ranges) {
     let skip = 0;
@@ -47,6 +48,9 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
     while (pages < 40) {
       const url = buildVisitFresnoUrl({ token, skip, limit, range });
       const safeUrl = redactCredentialsInUrl(url);
+      if (fetchUrls.length === 0) {
+        fetchUrls.push(safeUrl);
+      }
       pages += 1;
 
       const page = await fetchVisitFresnoPage(ctx, url, safeUrl);
@@ -90,7 +94,7 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
 
   log({ step: "run_end", eventsFound: events.length, pagesVisited: pages, errors: errors.length });
 
-  return finish(ctx, started, events, errors, pages);
+  return finish(ctx, started, events, errors, pages, fetchUrls);
 }
 
 async function fetchVisitFresnoPage(
@@ -160,7 +164,8 @@ function finish(
   started: number,
   events: ScrapeResult["events"],
   errors: ScrapeError[],
-  pages: number
+  pages: number,
+  fetchUrls: string[]
 ): ScrapeResult {
   return {
     source: "visit-fresno-api",
@@ -169,7 +174,8 @@ function finish(
     errors,
     metrics: {
       pagesVisited: pages,
-      durationMs: Math.round(performance.now() - started)
+      durationMs: Math.round(performance.now() - started),
+      fetchUrls
     }
   };
 }

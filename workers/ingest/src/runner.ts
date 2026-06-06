@@ -47,6 +47,10 @@ export interface RunSummary {
     listing_urls?: string[];
     detail_urls?: string[];
     event_links?: Array<{ title: string; url: string; start_ts?: string }>;
+    strategy?: string;
+    ingest_lane?: "direct" | "browser";
+    detail_mode?: string;
+    fetch_urls?: string[];
   }>;
   validation?: ScrapeValidationResult;
   persist_preview?: PersistAuditSummary;
@@ -576,7 +580,11 @@ function mapSeedMetrics(result: ScrapeResult): NonNullable<RunSummary["seed_metr
             ...(link.startTs ? { start_ts: link.startTs } : {})
           }))
         }
-      : {})
+      : {}),
+    ...(metric.strategy ? { strategy: metric.strategy } : {}),
+    ...(metric.ingestLane ? { ingest_lane: metric.ingestLane } : {}),
+    ...(metric.detailMode ? { detail_mode: metric.detailMode } : {}),
+    ...(metric.fetchUrls?.length ? { fetch_urls: metric.fetchUrls } : {})
   }));
 }
 

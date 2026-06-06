@@ -115,13 +115,68 @@ if (
 }
 
 /** @typedef {{ title?: string, url?: string, start_ts?: string }} EventLink */
-/** @typedef {{ url?: string, label?: string, events_found?: number, venue_key?: string, event_source?: string, detail_urls_planned?: number, dry_run_plan?: boolean, listing_urls?: string[], detail_urls?: string[], event_links?: EventLink[] }} SeedMetric */
+/** @typedef {{ url?: string, label?: string, events_found?: number, venue_key?: string, event_source?: string, detail_urls_planned?: number, dry_run_plan?: boolean, listing_urls?: string[], detail_urls?: string[], event_links?: EventLink[], strategy?: string, ingest_lane?: string, detail_mode?: string, fetch_urls?: string[] }} SeedMetric */
 /** @typedef {{ url?: string, message?: string }} ScrapeError */
 /** @typedef {{ code?: string, message?: string }} ValidationIssue */
 /** @typedef {{ title?: string, start_ts?: string, venue_name?: string, source?: string, source_event_id?: string, kept_source_event_id?: string, kept_title?: string, match?: string, external_url?: string, kept_external_url?: string }} BatchDuplicateItem */
 
 /** @typedef {{ source?: string, title?: string, start_ts?: string, external_url?: string, source_event_id?: string, changed_fields?: string[] }} AuditItem */
-/** @typedef {{ key: string, label: string, url: string, eventSource: string | null, eventsFound: number, errors: ScrapeError[], soft: ValidationIssue[], status: "OK" | "WARN" | "FAIL", detail: string | null }} SourceHealth */
+/** @typedef {{ key: string, label: string, url: string, eventSource: string | null, eventsFound: number, errors: ScrapeError[], soft: ValidationIssue[], status: "OK" | "WARN" | "FAIL", detail: string | null, metric?: SeedMetric }} SourceHealth */
+
+/** @param {SeedMetric | undefined} metric */
+function formatVenueMethod(metric) {
+  if (!metric) {
+    return null;
+  }
+  const parts = [];
+  if (metric.strategy) {
+    parts.push(`strategy=${metric.strategy}`);
+  }
+  if (metric.ingest_lane) {
+    parts.push(`${metric.ingest_lane} lane`);
+  }
+  if (metric.detail_mode) {
+    parts.push(`detail=${metric.detail_mode}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/** @param {string} indent @param {string} label @param {string} url */
+function printUrlLine(indent, label, url) {
+  const safe = url?.trim();
+  if (!safe?.startsWith("http")) {
+    return;
+  }
+  const linked =
+    process.env.NO_HYPERLINK === "1" || !process.stdout.isTTY
+      ? safe
+      : terminalLink(safe, safe);
+  console.log(`${indent}${label.padEnd(5)} ${linked}`);
+}
+
+/** @param {SeedMetric | undefined} metric @param {string} [indent] */
+function printVenueSourceLines(metric, indent = "  ") {
+  if (!metric) {
+    return;
+  }
+  const method = formatVenueMethod(metric);
+  if (method) {
+    console.log(`${indent}method: ${method}`);
+  }
+
+  const site = (metric.listing_urls?.[0] ?? metric.url ?? "").trim();
+  if (site.startsWith("http")) {
+    printUrlLine(indent, "site", site);
+  }
+
+  const fetchUrls = [...new Set(metric.fetch_urls ?? [])].filter((u) => u.startsWith("http"));
+  for (const fetchUrl of fetchUrls) {
+    if (fetchUrl === site) {
+      continue;
+    }
+    printUrlLine(indent, "fetch", fetchUrl);
+  }
+}
 
 const STALE_VALIDATION_PATTERN = /errors=\d+ exceeds maxErrors=/;
 
@@ -141,6 +196,19 @@ function isRecord(value) {
 }
 
 /** @param {string} url */
+/** Drop feed/query variants so preflight rows match one show per URL. */
+function normalizePreflightDetailUrl(url) {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.get("format") === "ical") {
+      u.search = "";
+    }
+    return u.href.replace(/\/+$/, "");
+  } catch {
+    return url;
+  }
+}
+
 function titleFromUrl(url) {
   try {
     const slug = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "event";
@@ -241,27 +309,38 @@ function collectVenueEvents(metric, newItems) {
     }
 
     if (rows.length === 0) {
+      const seen = new Set();
       for (const url of metric.detail_urls ?? []) {
         if (!url.startsWith("http")) {
           continue;
         }
-        rows.push({ title: titleFromUrl(url), url });
+        const key = normalizePreflightDetailUrl(url);
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        rows.push({ title: titleFromUrl(key), url: key });
       }
     }
   }
 
-  rows.sort((a, b) => {
-    if (!a.start_ts && !b.start_ts) {
-      return a.title.localeCompare(b.title);
-    }
-    if (!a.start_ts) {
-      return 1;
-    }
-    if (!b.start_ts) {
-      return -1;
-    }
-    return new Date(a.start_ts).getTime() - new Date(b.start_ts).getTime();
-  });
+  const allHaveStart = rows.length > 0 && rows.every((row) => row.start_ts);
+  if (allHaveStart) {
+    rows.sort((a, b) => new Date(a.start_ts).getTime() - new Date(b.start_ts).getTime());
+  } else if (rows.some((row) => row.start_ts)) {
+    rows.sort((a, b) => {
+      if (!a.start_ts && !b.start_ts) {
+        return 0;
+      }
+      if (!a.start_ts) {
+        return 1;
+      }
+      if (!b.start_ts) {
+        return -1;
+      }
+      return new Date(a.start_ts).getTime() - new Date(b.start_ts).getTime();
+    });
+  }
 
   return { rows };
 }
@@ -303,14 +382,16 @@ function printPreflightEventSummary(metrics, merged, postDedupeCounts) {
 
   for (const metric of metrics) {
     const key = metric.venue_key ?? metric.label ?? "venue";
-    const count = postDedupeCounts?.get(key) ?? metric.events_found ?? 0;
+    const planned =
+      metric.dry_run_plan === true && typeof metric.detail_urls_planned === "number"
+        ? metric.detail_urls_planned
+        : null;
+    const count = postDedupeCounts?.get(key) ?? planned ?? metric.events_found ?? 0;
+    const countLabel = planned !== null ? "shows planned" : "events";
     const source = metric.event_source ? ` · ${metric.event_source}` : "";
-    const listing = (metric.listing_urls?.[0] ?? metric.url ?? "").trim();
 
-    console.log(`${key} (${count} events)${source}`);
-    if (listing.startsWith("http")) {
-      console.log(`  listing - ${terminalLink(listing, shortUrlPath(listing))}`);
-    }
+    console.log(`${key} (${count} ${countLabel})${source}`);
+    printVenueSourceLines(metric);
 
     const { rows } = collectVenueEvents(metric, merged.new_items);
     for (const row of rows) {
@@ -377,7 +458,7 @@ function healthFromSeedMetric(metric, errors, softIssues) {
     detail = soft.map((issue) => issue.message).filter(Boolean).join("; ");
   }
 
-  return { key, label, url, eventSource, eventsFound, errors: matchedErrors, soft, status, detail };
+  return { key, label, url, eventSource, eventsFound, errors: matchedErrors, soft, status, detail, metric };
 }
 
 /** @param {unknown} summary @returns {SourceHealth[]} */
@@ -397,7 +478,8 @@ function collectSourceHealth(summary) {
         : null;
     return seedMetrics.map((metric) => {
       const row = healthFromSeedMetric(/** @type {SeedMetric} */ (metric), errors, soft);
-      if (postDedupe !== null) {
+      // Browser dry-run: summary.events_found is 0; seed metric carries planned detail URL count.
+      if (postDedupe !== null && metric.dry_run_plan !== true) {
         return { ...row, eventsFound: postDedupe };
       }
       return row;
@@ -508,6 +590,9 @@ for (const row of healthRows) {
   const count = String(row.eventsFound).padStart(3);
   const source = row.eventSource ? ` ${row.eventSource}` : "";
   console.log(`${pad} ${name} ${count} events${source}`);
+  if (row.metric) {
+    printVenueSourceLines(row.metric, "     ");
+  }
   if (row.detail) {
     console.log(`     ${row.detail}`);
   }

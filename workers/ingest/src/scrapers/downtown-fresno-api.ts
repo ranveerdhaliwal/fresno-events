@@ -25,7 +25,8 @@ async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
 
   log({ step: "run_start", dry_run: dryRun });
 
-  let listings = await discoverListings(ctx, errors);
+  const discovered = await discoverListings(ctx, errors);
+  let listings = discovered.events;
   let pages = listings.length;
 
   if (!dryRun && listings.length > 0) {
@@ -44,11 +45,15 @@ async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
     note: "direct lane — BBQ widget + plain HTTP /do/ detail"
   });
 
-  return finish(ctx, started, listings, errors, pages);
+  return finish(ctx, started, listings, errors, pages, discovered.fetchUrls);
 }
 
-async function discoverListings(ctx: ScrapeContext, errors: ScrapeError[]): Promise<NormalizedEvent[]> {
+async function discoverListings(
+  ctx: ScrapeContext,
+  errors: ScrapeError[]
+): Promise<{ events: NormalizedEvent[]; fetchUrls: string[] }> {
   const events: NormalizedEvent[] = [];
+  const fetchUrls: string[] = [];
   const windows = buildDowntownWindows(ctx.now);
 
   log({ step: "discover_start", windowCount: windows.length });
@@ -57,6 +62,7 @@ async function discoverListings(ctx: ScrapeContext, errors: ScrapeError[]): Prom
   for (const bbqparam of windows) {
     const url = buildDowntownFresnoUrl(bbqparam);
     const safeUrl = redactCredentialsInUrl(url);
+    fetchUrls.push(safeUrl);
     pages += 1;
 
     log({ step: "window_fetch_start", page: pages, total: windows.length, bbqparam });
@@ -122,7 +128,7 @@ async function discoverListings(ctx: ScrapeContext, errors: ScrapeError[]): Prom
 
   const deduped = dedupeBySourceEventId(events);
   log({ step: "discover_end", rawCount: events.length, dedupedCount: deduped.length, pages });
-  return deduped;
+  return { events: deduped, fetchUrls };
 }
 
 function dedupeBySourceEventId(events: NormalizedEvent[]): NormalizedEvent[] {
@@ -138,7 +144,8 @@ function finish(
   started: number,
   events: NormalizedEvent[],
   errors: ScrapeError[],
-  pages: number
+  pages: number,
+  fetchUrls: string[]
 ): ScrapeResult {
   return {
     source: "downtown-fresno-api",
@@ -147,7 +154,8 @@ function finish(
     errors,
     metrics: {
       pagesVisited: pages,
-      durationMs: Math.round(performance.now() - started)
+      durationMs: Math.round(performance.now() - started),
+      fetchUrls
     }
   };
 }

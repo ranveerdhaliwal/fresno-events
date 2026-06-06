@@ -47,6 +47,8 @@ export type VenueConfig = z.infer<typeof venueConfigSchema>;
 
 export interface VenueRunDebug {
   listingUrls?: string[];
+  /** HTTP URLs actually requested (API JSON, listing HTML, …). */
+  fetchUrls?: string[];
   detailUrls?: string[];
   detailUrlsPlanned?: number;
   llmCalls?: number;

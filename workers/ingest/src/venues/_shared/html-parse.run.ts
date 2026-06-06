@@ -25,6 +25,7 @@ export async function runHtmlParseVenue(
         llmCalls: 0,
         debug: {
           listingUrls: [config.listingUrl],
+          fetchUrls: [config.listingUrl],
           detailUrlsPlanned: events.length,
           note: "dry-run — html_parse venue"
         }
@@ -50,7 +51,11 @@ export async function runHtmlParseVenue(
       listingUrlsFound: 1,
       detailUrlsVisited: 0,
       llmCalls: 0,
-      debug: { listingUrls: [config.listingUrl], note: `parsed ${events.length} events` }
+      debug: {
+        listingUrls: [config.listingUrl],
+        fetchUrls: [config.listingUrl],
+        note: `parsed ${events.length} events`
+      }
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

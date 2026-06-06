@@ -1,14 +1,22 @@
 import type { IngestEnv } from "@/env";
+import { run as runSaveMartApi } from "@/scrapers/save-mart-api";
+import { runApiVenue } from "@/venues/_shared/api-venue.run";
 import type { VenueConfig, VenueRunContext, VenueRunResult } from "@/venues/venue.types";
-import { discoverSaveMartDetailUrls } from "@/venues/_shared/link-discover.utils";
-import { runListingThenDetailPipeline } from "@/venues/_shared/listing-detail.run";
 
-import saveMartConfig from "./venue.config.json";
+import configJson from "./venue.config.json";
 
-const config = saveMartConfig as VenueConfig;
+const config = configJson as VenueConfig;
 
-export async function run(env: IngestEnv, ctx: VenueRunContext): Promise<VenueRunResult> {
-  return runListingThenDetailPipeline(env, config, ctx, discoverSaveMartDetailUrls);
+async function runSaveMartWithConfig(env: IngestEnv, ctx: VenueRunContext): Promise<VenueRunResult> {
+  return runApiVenue(env, config, ctx, (scrapeCtx) =>
+    runSaveMartApi({
+      ...scrapeCtx,
+      config: { monthWindows: config.monthWindows ?? 6 }
+    })
+  );
 }
+
+export const run = (env: IngestEnv, ctx: VenueRunContext): Promise<VenueRunResult> =>
+  runSaveMartWithConfig(env, ctx);
 
 export { config };

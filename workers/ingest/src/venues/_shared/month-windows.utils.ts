@@ -1,5 +1,18 @@
 const PACIFIC_TZ = "America/Los_Angeles";
 
+export interface SaveMartApiMonthRange {
+  startYmd: string;
+  endYmd: string;
+  start: Date;
+  end: Date;
+}
+
+function addDaysYmd(ymd: string, days: number): string {
+  const [year, month, day] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(year, month - 1, day + days));
+  return dt.toISOString().slice(0, 10);
+}
+
 function pacificYearMonth(now: Date): { year: number; monthIndex: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: PACIFIC_TZ,
@@ -43,4 +56,27 @@ export function buildSaveMartMonthListingUrls(baseListingUrl: string, monthWindo
   }
 
   return urls;
+}
+
+/** Pacific calendar month windows for Save Mart REST `date_range` queries. */
+export function buildSaveMartApiMonthRanges(monthWindows: number, now: Date): SaveMartApiMonthRange[] {
+  const { year, monthIndex } = pacificYearMonth(now);
+  const ranges: SaveMartApiMonthRange[] = [];
+
+  for (let i = 0; i < monthWindows; i += 1) {
+    const m = monthIndex + i;
+    const y = year + Math.floor(m / 12);
+    const mi = ((m % 12) + 12) % 12;
+    const startYmd = formatYmd(y, mi, 1);
+    const endYmd = formatYmd(y, mi, lastDayOfMonth(y, mi));
+    ranges.push({
+      startYmd,
+      endYmd,
+      // Save Mart API uses Pacific-midnight-style UTC anchors (e.g. 2026-06-05T07:00:00.000Z).
+      start: new Date(`${startYmd}T07:00:00.000Z`),
+      end: new Date(`${addDaysYmd(endYmd, 1)}T07:00:00.000Z`)
+    });
+  }
+
+  return ranges;
 }

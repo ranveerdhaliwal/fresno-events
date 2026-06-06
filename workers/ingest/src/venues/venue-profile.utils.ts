@@ -20,9 +20,6 @@ export function resolveDetailMode(config: VenueConfig): DetailMode {
   if (config.strategy === "api") {
     return "api_embedded";
   }
-  if (config.key === "gobulldogs") {
-    return "br_llm";
-  }
   return "br_llm";
 }
 

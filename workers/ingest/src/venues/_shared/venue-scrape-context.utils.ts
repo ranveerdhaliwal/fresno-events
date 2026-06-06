@@ -5,6 +5,7 @@ import type { VenueRunContext } from "@/venues/venue.types";
 
 const VENUE_SECRET_KEYS: ReadonlyArray<keyof IngestEnv> = [
   "VISIT_FRESNO_API_TOKEN",
+  "SAVE_MART_EVENTS_TOKEN",
   "CLOUDFLARE_ACCOUNT_ID",
   "CLOUDFLARE_API_TOKEN",
   "GEMINI_API_KEY",

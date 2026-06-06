@@ -6,6 +6,8 @@ export interface ExistingCandidateRow {
   source_event_id: string;
   status: EventCandidateStatus;
   content_fingerprint: string | null;
+  confidence_score: number;
+  raw_payload: Record<string, unknown>;
   matched_event_id: string | null;
   occurrence_id: string | null;
   canonical_candidate_id: string | null;

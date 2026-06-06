@@ -2,13 +2,8 @@
   "key": "fulton-55",
   "label": "Fulton 55",
   "enabled": true,
-  "strategy": "listing_then_detail",
+  "strategy": "html_parse",
   "listingUrl": "https://fulton55.com/",
-  "detailUrlCap": 40,
-  "llmCallCap": 50,
   "sourceHostname": "fulton55.com",
-  "extractorVariant": "default",
-  "listingDiscovery": "plain",
-  "detailMode": "none",
   "blockedDetailHosts": ["eventbrite.com", "www.eventbrite.com"]
 }

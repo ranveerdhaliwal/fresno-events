@@ -8,7 +8,8 @@ const SAVE_MART_EVENT_PATH = /^\/event\/[^/]+\/\d+\/?$/i;
 
 export function discoverTowerDetailUrls(html: string, listingUrl: string, _config: VenueConfig): string[] {
   const $ = load(html);
-  const urls = new Set<string>();
+  const seen = new Set<string>();
+  const ordered: string[] = [];
 
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href")?.trim();
@@ -21,15 +22,21 @@ export function discoverTowerDetailUrls(html: string, listingUrl: string, _confi
     }
     try {
       const path = new URL(abs).pathname;
-      if (TOWER_EVENT_PATH.test(path)) {
-        urls.add(abs.replace(/\/+$/, ""));
+      if (!TOWER_EVENT_PATH.test(path)) {
+        return;
       }
+      const normalized = abs.replace(/\/+$/, "");
+      if (seen.has(normalized)) {
+        return;
+      }
+      seen.add(normalized);
+      ordered.push(normalized);
     } catch {
       /* ignore bad URLs */
     }
   });
 
-  return [...urls];
+  return ordered;
 }
 
 export function discoverSaveMartDetailUrls(html: string, listingUrl: string, _config: VenueConfig): string[] {
@@ -94,6 +101,21 @@ export function discoverConventionCenterDetailUrls(
   return [...urls];
 }
 
+/** Strummers listing links include `?format=ical` feeds — same show as the canonical page URL. */
+export function canonicalStrummersShowUrl(abs: string): string | null {
+  try {
+    const u = new URL(abs);
+    if (!STRUMMERS_SHOW_PATH.test(u.pathname)) {
+      return null;
+    }
+    u.search = "";
+    u.hash = "";
+    return u.href.replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
+
 export function discoverStrummersDetailUrls(html: string, listingUrl: string, _config: VenueConfig): string[] {
   const $ = load(html);
   const urls = new Set<string>();
@@ -103,12 +125,9 @@ export function discoverStrummersDetailUrls(html: string, listingUrl: string, _c
     if (!href) return;
     const abs = absoluteUrl(href, listingUrl);
     if (!abs) return;
-    try {
-      if (STRUMMERS_SHOW_PATH.test(new URL(abs).pathname)) {
-        urls.add(abs.replace(/\/+$/, ""));
-      }
-    } catch {
-      /* ignore */
+    const canonical = canonicalStrummersShowUrl(abs);
+    if (canonical) {
+      urls.add(canonical);
     }
   });
 

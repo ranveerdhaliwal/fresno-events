@@ -2,15 +2,9 @@
   "key": "chaffee-zoo",
   "label": "Fresno Chaffee Zoo",
   "enabled": true,
-  "strategy": "listing_then_detail",
+  "strategy": "html_parse",
   "listingUrl": "https://fcz.org/events/",
-  "detailUrlCap": 40,
-  "llmCallCap": 50,
-  "allowedExternalHosts": ["ticketapp.org", "www.ticketapp.org"],
   "sourceHostname": "fcz.org",
-  "conditionalDetail": true,
-  "extractorVariant": "default",
-  "listingDiscovery": "plain",
-  "detailMode": "plain_html",
-  "blockedDetailHosts": ["ticketapp.org", "www.ticketapp.org"]
+  "ingestLane": "direct",
+  "detailMode": "none"
 }

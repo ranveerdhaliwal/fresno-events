@@ -81,6 +81,29 @@ function pacificYearMonth(now: Date): { year: number; monthIndex: number } {
   return { year, monthIndex: month - 1 };
 }
 
+function formatPacificDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: PACIFIC_TZ }).format(date);
+}
+
+/** Single listing URL with ?start=&end= for TicketSauce (chronological list view). */
+export function buildTicketsauceRangeUrl(
+  baseUrl: string,
+  opts: { now?: Date; horizonMonths?: number } = {}
+): string {
+  const now = opts.now ?? new Date();
+  const horizonMonths = opts.horizonMonths ?? DEFAULT_HORIZON_MONTHS;
+  const start = formatPacificDate(now);
+  const { year, monthIndex } = pacificYearMonth(now);
+  const endMonth = monthIndex + horizonMonths - 1;
+  const endYear = year + Math.floor(endMonth / 12);
+  const endMi = ((endMonth % 12) + 12) % 12;
+  const end = monthEnd(endYear, endMi);
+  const origin = new URL(baseUrl);
+  origin.searchParams.set("start", start);
+  origin.searchParams.set("end", end);
+  return origin.toString();
+}
+
 export function buildTicketsauceMonthUrls(
   baseUrl: string,
   opts: { now?: Date; horizonMonths?: number } = {}

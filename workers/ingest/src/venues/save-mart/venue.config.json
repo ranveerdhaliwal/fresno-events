@@ -2,14 +2,11 @@
   "key": "save-mart",
   "label": "Save Mart Center",
   "enabled": true,
-  "strategy": "month_windows_then_detail",
+  "strategy": "api",
   "listingUrl": "https://www.savemartcenter.com/events-tickets/?bounds=false&view=list&sort=date",
   "monthWindows": 6,
-  "detailUrlCap": 40,
-  "llmCallCap": 60,
-  "allowedExternalHosts": ["savemartcenter.com", "www.savemartcenter.com"],
   "sourceHostname": "www.savemartcenter.com",
-  "extractorVariant": "default",
-  "listingDiscovery": "br_if_empty",
-  "detailMode": "plain_html"
+  "eventSource": "scrape:www.savemartcenter.com",
+  "ingestLane": "direct",
+  "detailMode": "api_embedded"
 }

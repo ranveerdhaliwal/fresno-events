@@ -34,6 +34,8 @@ function existingRow(overrides: Partial<ExistingCandidateRow> = {}): ExistingCan
     source_event_id: "game-1",
     status: "approved",
     content_fingerprint: "abc",
+    confidence_score: 0.7,
+    raw_payload: {},
     matched_event_id: "e1",
     occurrence_id: "occ-1",
     canonical_candidate_id: null,

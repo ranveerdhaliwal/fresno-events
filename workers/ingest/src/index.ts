@@ -1,5 +1,6 @@
 import type { IngestEnv } from "@/env";
 import { getJsonPromptBackend } from "@/llm/registry";
+import { runDetailBackfill } from "@/detail-backfill";
 import { runIngest, runPostIngestEnrichment } from "@/runner";
 import { listRunnableSources } from "@/planner";
 import { INGEST_VALIDATION_POLICY } from "@/validation";
@@ -86,6 +87,27 @@ export default {
       }
 
       return jsonResponse({ ok: true, data: { summaries } });
+    }
+
+    if (url.pathname === "/detail-backfill/trigger") {
+      const auth = await checkAdminAuth(req, env);
+      if (auth) {
+        return jsonResponse({ ok: false, error: auth }, auth.status);
+      }
+
+      const dryRun = url.searchParams.get("dry_run") === "true";
+      const sourceFilter = url.searchParams.get("source") ?? undefined;
+      const limitParam = url.searchParams.get("limit");
+      const parsedLimit = limitParam ? Number(limitParam) : NaN;
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.trunc(parsedLimit) : undefined;
+
+      const summary = await runDetailBackfill(env, {
+        dryRun,
+        ...(sourceFilter ? { sourceFilter } : {}),
+        ...(limit !== undefined ? { limit } : {})
+      });
+
+      return jsonResponse({ ok: true, data: { summary, dry_run: dryRun, limit } });
     }
 
     if (url.pathname === "/enrichment/trigger") {

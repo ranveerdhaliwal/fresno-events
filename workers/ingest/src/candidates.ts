@@ -326,6 +326,8 @@ interface ExistingCandidateRowRaw {
   source_event_id: string;
   status: ExistingCandidateRow["status"];
   content_fingerprint: string | null;
+  confidence_score: number;
+  raw_payload: Record<string, unknown> | null;
   matched_event_id: string | null;
   occurrence_id: string | null;
   canonical_candidate_id: string | null;
@@ -361,7 +363,7 @@ async function fetchExistingCandidatesForSource(
 ): Promise<Map<string, ExistingCandidateRow>> {
   const params = new URLSearchParams({
     select:
-      "id,source,source_event_id,status,content_fingerprint,matched_event_id,occurrence_id,canonical_candidate_id,reviewed_at,reviewed_by,review_notes,title,start_ts,venue_name,normalized_event",
+      "id,source,source_event_id,status,content_fingerprint,confidence_score,raw_payload,matched_event_id,occurrence_id,canonical_candidate_id,reviewed_at,reviewed_by,review_notes,title,start_ts,venue_name,normalized_event",
     source: `eq.${source}`,
     limit: "2000"
   });
@@ -386,6 +388,8 @@ async function fetchExistingCandidatesForSource(
   for (const row of rows) {
     map.set(candidateKey(row.source, row.source_event_id), {
       ...row,
+      confidence_score: row.confidence_score ?? 0.7,
+      raw_payload: row.raw_payload ?? {},
       normalized_event: parseNormalizedEvent(row)
     });
   }

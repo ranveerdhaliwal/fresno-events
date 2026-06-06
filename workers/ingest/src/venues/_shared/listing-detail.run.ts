@@ -1,11 +1,12 @@
 import type { NormalizedEvent, ScrapeError } from "@fresno-events/shared";
 
 import { extractEventsFromMarkdown, type ExtractorVariant } from "@/ai/extractor";
+import { buildTicketsauceRangeUrl } from "@/browser-rendering/crawl-targets.utils";
 import { renderUrlToMarkdown } from "@/browser-rendering/render-page";
 import type { IngestEnv } from "@/env";
 import { getJsonPromptBackend } from "@/llm/registry";
 import type { VenueConfig, VenueRunContext, VenueRunResult } from "@/venues/venue.types";
-import { resolveDetailMode } from "@/venues/venue-profile.utils";
+import { resolveDetailMode, type DetailMode } from "@/venues/venue-profile.utils";
 
 import {
   discoverDetailUrlsFromListingMarkdown,
@@ -43,12 +44,110 @@ function canEnrichDetails(env: IngestEnv): boolean {
   return hasBr && hasLlm;
 }
 
+function canRunDetailEnrichment(env: IngestEnv, detailMode: DetailMode, useBrListing: boolean): boolean {
+  if (detailMode === "plain_html") {
+    return true;
+  }
+  if (detailMode === "none" || detailMode === "api_embedded") {
+    return true;
+  }
+  if (useBrListing) {
+    return canEnrichDetails(env);
+  }
+  return canEnrichDetails(env);
+}
+
+function isTicketsauceVenue(config: VenueConfig): boolean {
+  return Boolean(config.sourceHostname?.includes("ticketsauce.com"));
+}
+
 function resolveListingUrls(config: VenueConfig, now: Date): string[] {
   if (config.strategy === "month_windows_then_detail") {
     const months = config.monthWindows ?? 6;
     return buildSaveMartMonthListingUrls(config.listingUrl, months, now);
   }
+  if (isTicketsauceVenue(config)) {
+    return [
+      buildTicketsauceRangeUrl(config.listingUrl, {
+        now,
+        horizonMonths: config.monthWindows ?? 6
+      })
+    ];
+  }
   return [config.listingUrl];
+}
+
+function addDiscoveredDetailUrl(
+  ordered: string[],
+  seen: Set<string>,
+  url: string,
+  config: VenueConfig
+): void {
+  if (!hostAllowed(url, config)) {
+    return;
+  }
+  const key = url.replace(/\/+$/, "");
+  if (seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  ordered.push(key);
+}
+
+type VenueIngestLog = (payload: Record<string, unknown>) => void;
+
+async function extractAndNormalizeListingFromMarkdown(
+  env: IngestEnv,
+  config: VenueConfig,
+  listingUrl: string,
+  markdown: string,
+  variant: ExtractorVariant,
+  opts: { useItemExternalUrl: boolean; log: VenueIngestLog }
+): Promise<{ events: NormalizedEvent[]; llmCalled: boolean }> {
+  const markdownChars = markdown.length;
+  const hasLlm = Boolean(getJsonPromptBackend(env, "discovery"));
+
+  opts.log({ step: "listing_br_rendered", listingUrl, markdownChars, hasLlm });
+
+  if (!hasLlm) {
+    opts.log({ step: "listing_llm_skipped", listingUrl, reason: "no_llm_backend", markdownChars });
+    return { events: [], llmCalled: false };
+  }
+  if (markdownChars < 200) {
+    opts.log({ step: "listing_llm_skipped", listingUrl, reason: "markdown_too_short", markdownChars });
+    return { events: [], llmCalled: false };
+  }
+
+  const extracted = await extractEventsFromMarkdown(env, {
+    url: listingUrl,
+    label: config.label,
+    markdown,
+    variant
+  });
+
+  const events: NormalizedEvent[] = [];
+  let dropped = 0;
+  for (const item of extracted) {
+    const pageUrl =
+      opts.useItemExternalUrl && item.externalUrl?.startsWith("http") ? item.externalUrl : listingUrl;
+    const normalized = listingFromDiscoveryItem(item, pageUrl, config);
+    if (normalized) {
+      events.push(normalized);
+    } else {
+      dropped += 1;
+    }
+  }
+
+  opts.log({
+    step: "listing_llm_done",
+    listingUrl,
+    markdownChars,
+    rawCount: extracted.length,
+    keptCount: events.length,
+    droppedCount: dropped
+  });
+
+  return { events, llmCalled: true };
 }
 
 function indexListingsByExternalUrl(listings: NormalizedEvent[]): Map<string, NormalizedEvent> {
@@ -75,7 +174,8 @@ export async function runListingThenDetailPipeline(
   const detailCap = resolveDetailCap(config);
   const llmState = { count: 0, cap: resolveLlmCap(config) };
   const errors: ScrapeError[] = [];
-  const allDetailUrls = new Set<string>();
+  const allDetailUrls: string[] = [];
+  const seenDetailUrls = new Set<string>();
   const useBrListing =
     config.strategy === "month_windows_then_detail" ||
     config.strategy === "scroll_listing_then_detail";
@@ -92,13 +192,11 @@ export async function runListingThenDetailPipeline(
 
     if (useBrListing) {
       if (dryRun) {
-        const urlsBefore = allDetailUrls.size;
+        const urlsBefore = allDetailUrls.length;
         try {
           const html = await fetchListingHtml(listingUrl, ctx.userAgent, ctx.signal);
           for (const url of discoverDetailUrls(html, listingUrl, config)) {
-            if (hostAllowed(url, config)) {
-              allDetailUrls.add(url);
-            }
+            addDiscoveredDetailUrl(allDetailUrls, seenDetailUrls, url, config);
           }
         } catch (error) {
           errors.push({
@@ -109,7 +207,7 @@ export async function runListingThenDetailPipeline(
           });
         }
 
-        if (allDetailUrls.size === urlsBefore) {
+        if (allDetailUrls.length === urlsBefore) {
           const rendered = await renderUrlToMarkdown(
             env,
             listingUrl,
@@ -129,14 +227,12 @@ export async function runListingThenDetailPipeline(
               listingUrl,
               config
             )) {
-              if (hostAllowed(url, config)) {
-                allDetailUrls.add(url);
-              }
+              addDiscoveredDetailUrl(allDetailUrls, seenDetailUrls, url, config);
             }
             log({
               step: "listing_plan_br",
               listingUrl,
-              detailUrlsAdded: allDetailUrls.size - urlsBefore
+              detailUrlsAdded: allDetailUrls.length - urlsBefore
             });
           }
         } else {
@@ -161,22 +257,28 @@ export async function runListingThenDetailPipeline(
       }
 
       for (const url of discoverDetailUrlsFromListingMarkdown(rendered.markdown, listingUrl, config)) {
-        if (hostAllowed(url, config)) {
-          allDetailUrls.add(url);
-        }
+        addDiscoveredDetailUrl(allDetailUrls, seenDetailUrls, url, config);
       }
 
       if (llmState.count < llmState.cap) {
         try {
-          const extracted = await extractEventsFromMarkdown(env, {
-            url: listingUrl,
-            label: config.label,
-            markdown: rendered.markdown,
-            variant
-          });
-          llmState.count += 1;
-          log({ step: "listing_llm_done", listingUrl, rawCount: extracted.length });
+          const { llmCalled } = await extractAndNormalizeListingFromMarkdown(
+            env,
+            config,
+            listingUrl,
+            rendered.markdown,
+            variant,
+            { useItemExternalUrl: false, log }
+          );
+          if (llmCalled) {
+            llmState.count += 1;
+          }
         } catch (error) {
+          log({
+            step: "listing_llm_failed",
+            listingUrl,
+            message: error instanceof Error ? error.message : "listing LLM failed"
+          });
           errors.push({
             source: sourceKey,
             url: listingUrl,
@@ -199,10 +301,16 @@ export async function runListingThenDetailPipeline(
         continue;
       }
 
-      for (const url of discoverDetailUrls(html, listingUrl, config)) {
-        if (hostAllowed(url, config)) {
-          allDetailUrls.add(url);
-        }
+      const discovered = discoverDetailUrls(html, listingUrl, config);
+      for (const url of discovered) {
+        addDiscoveredDetailUrl(allDetailUrls, seenDetailUrls, url, config);
+      }
+      if (dryRun && discovered.length > 0) {
+        log({
+          step: "listing_plan_plain",
+          listingUrl,
+          detailUrlsFound: discovered.length
+        });
       }
     }
   }
@@ -211,14 +319,16 @@ export async function runListingThenDetailPipeline(
   const detailUrls =
     detailMode === "none" || detailMode === "api_embedded"
       ? []
-      : [...allDetailUrls].filter((url) => hostAllowed(url, config)).slice(0, detailCap);
+      : allDetailUrls.filter((url) => hostAllowed(url, config)).slice(0, detailCap);
 
   if (dryRun) {
     log({
       step: "dry_run_plan",
       listingUrls,
       detailUrlCount: detailUrls.length,
-      detailUrlsPlanned: allDetailUrls.size
+      detailUrlsPlanned: allDetailUrls.length,
+      detailUrlCap: detailCap,
+      note: "dry-run — listing BR/LLM and detail fetch run on promote only"
     });
     return {
       events: [],
@@ -228,14 +338,15 @@ export async function runListingThenDetailPipeline(
       llmCalls: llmState.count,
       debug: {
         listingUrls,
+        fetchUrls: listingUrls,
         detailUrls,
-        detailUrlsPlanned: allDetailUrls.size,
-        note: "dry-run — no detail BR jobs"
+        detailUrlsPlanned: allDetailUrls.length,
+        note: "dry-run — listing BR/LLM and detail fetch run on promote only"
       }
     };
   }
 
-  if (!canEnrichDetails(env)) {
+  if (!canRunDetailEnrichment(env, detailMode, useBrListing)) {
     log({ step: "detail_skip", reason: "BR or LLM not configured" });
     return {
       events: [],
@@ -250,22 +361,24 @@ export async function runListingThenDetailPipeline(
       listingUrlsFound,
       detailUrlsVisited: 0,
       llmCalls: llmState.count,
-      debug: { listingUrls, detailUrls, note: "listing-only — missing BR/LLM" }
+      debug: { listingUrls, fetchUrls: listingUrls, detailUrls, note: "listing-only — missing BR/LLM" }
     };
   }
 
   const listings: NormalizedEvent[] = [];
+  const scrapeSource = `scrape:${config.sourceHostname?.replace(/^www\./, "") ?? new URL(seedUrl).hostname.replace(/^www\./, "")}`;
 
-  for (const listingUrl of listingUrls) {
-    throwIfAborted(ctx.signal);
+  if (useBrListing) {
+    for (const listingUrl of listingUrls) {
+      throwIfAborted(ctx.signal);
 
-    if (useBrListing) {
       const rendered = await renderUrlToMarkdown(
         env,
         listingUrl,
         ctx.signal ? { signal: ctx.signal } : {}
       );
       if ("error" in rendered) {
+        log({ step: "listing_br_failed", listingUrl, error: rendered.error });
         continue;
       }
 
@@ -274,21 +387,24 @@ export async function runListingThenDetailPipeline(
       }
 
       try {
-        const extracted = await extractEventsFromMarkdown(env, {
-          url: listingUrl,
-          label: config.label,
-          markdown: rendered.markdown,
-          variant
-        });
-        llmState.count += 1;
-
-        for (const item of extracted) {
-          const normalized = listingFromDiscoveryItem(item, listingUrl, config);
-          if (normalized) {
-            listings.push(normalized);
-          }
+        const { events, llmCalled } = await extractAndNormalizeListingFromMarkdown(
+          env,
+          config,
+          listingUrl,
+          rendered.markdown,
+          variant,
+          { useItemExternalUrl: false, log }
+        );
+        if (llmCalled) {
+          llmState.count += 1;
         }
+        listings.push(...events);
       } catch (error) {
+        log({
+          step: "listing_llm_failed",
+          listingUrl,
+          message: error instanceof Error ? error.message : "listing LLM failed"
+        });
         errors.push({
           source: sourceKey,
           url: listingUrl,
@@ -305,7 +421,7 @@ export async function runListingThenDetailPipeline(
         if (!indexListingsByExternalUrl(listings).has(key) && !indexListingsByExternalUrl(listings).has(`${key}/`)) {
           const slug = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "event";
           listings.push({
-            source: `scrape:${config.sourceHostname?.replace(/^www\./, "") ?? new URL(seedUrl).hostname.replace(/^www\./, "")}`,
+            source: scrapeSource,
             sourceEventId: `venue:${config.key}:${slug}`,
             title: slug.replace(/-/g, " "),
             venueName: config.label,
@@ -316,69 +432,60 @@ export async function runListingThenDetailPipeline(
           });
         }
       }
-    } else {
-      const rendered = await renderUrlToMarkdown(
-        env,
-        listingUrl,
-        ctx.signal ? { signal: ctx.signal } : {}
-      );
-      if ("error" in rendered) {
-        errors.push({
-          source: sourceKey,
-          url: listingUrl,
-          message: rendered.error,
-          recoverable: true
-        });
-        continue;
-      }
+    }
+  } else {
+    log({
+      step: "listing_plain_promote",
+      listingUrls,
+      detailUrlsFound: detailUrls.length,
+      detailMode
+    });
+  }
 
-      if (llmState.count >= llmState.cap) {
-        break;
-      }
+  const pushListingStub = (url: string) => {
+    const key = url.replace(/\/+$/, "");
+    const indexed = indexListingsByExternalUrl(listings);
+    if (indexed.has(key) || indexed.has(`${key}/`)) {
+      return;
+    }
+    const slug = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "event";
+    listings.push({
+      source: scrapeSource,
+      sourceEventId: `venue:${config.key}:${slug}`,
+      title: slug.replace(/-/g, " "),
+      venueName: config.label,
+      venueCity: "Fresno",
+      startTs: new Date(now.getTime() + 7 * 86_400_000).toISOString(),
+      externalUrl: url,
+      category: "community"
+    });
+  };
 
-      try {
-        const extracted = await extractEventsFromMarkdown(env, {
-          url: listingUrl,
-          label: config.label,
-          markdown: rendered.markdown,
-          variant
-        });
-        llmState.count += 1;
+  for (const url of detailUrls) {
+    pushListingStub(url);
+  }
 
-        for (const item of extracted) {
-          const pageUrl = item.externalUrl?.startsWith("http") ? item.externalUrl : listingUrl;
-          const normalized = listingFromDiscoveryItem(item, pageUrl, config);
-          if (normalized) {
-            listings.push(normalized);
-          }
-        }
-      } catch (error) {
-        errors.push({
-          source: sourceKey,
-          url: listingUrl,
-          message: error instanceof Error ? error.message : "listing LLM failed",
-          recoverable: true
-        });
-      }
+  const detailUrlKeys = new Set(detailUrls.map((u) => u.replace(/\/+$/, "")));
+  let capSkipped = 0;
+  for (const url of allDetailUrls) {
+    const key = url.replace(/\/+$/, "");
+    if (detailUrlKeys.has(key)) {
+      continue;
+    }
+    const before = listings.length;
+    pushListingStub(url);
+    if (listings.length > before) {
+      capSkipped += 1;
     }
   }
 
-  const byUrl = indexListingsByExternalUrl(listings);
-  for (const url of detailUrls) {
-    const key = url.replace(/\/+$/, "");
-    if (!byUrl.has(key) && !byUrl.has(`${key}/`)) {
-      const slug = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "event";
-      listings.push({
-        source: `scrape:${config.sourceHostname?.replace(/^www\./, "") ?? new URL(seedUrl).hostname.replace(/^www\./, "")}`,
-        sourceEventId: `venue:${config.key}:${slug}`,
-        title: slug.replace(/-/g, " "),
-        venueName: config.label,
-        venueCity: "Fresno",
-        startTs: new Date(now.getTime() + 7 * 86_400_000).toISOString(),
-        externalUrl: url,
-        category: "community"
-      });
-    }
+  if (capSkipped > 0) {
+    log({
+      step: "detail_cap_skipped",
+      capSkipped,
+      detailUrlCap: detailCap,
+      detailUrlsPlanned: allDetailUrls.length
+    });
   }
 
   log({ step: "detail_enrich_start", listingCount: listings.length, detailUrlCount: detailUrls.length });
@@ -403,8 +510,9 @@ export async function runListingThenDetailPipeline(
     llmCalls: enriched.llmCalls,
     debug: {
       listingUrls,
+      fetchUrls: listingUrls,
       detailUrls,
-      detailUrlsPlanned: allDetailUrls.size,
+      detailUrlsPlanned: allDetailUrls.length,
       llmCalls: enriched.llmCalls
     }
   };

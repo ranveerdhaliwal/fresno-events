@@ -5,6 +5,9 @@ import type { IngestEnv } from "@/env";
 import { ensureIngestRunStarted, finishIngestRunRecord } from "@/ingest-runs";
 import { finishVenueRun, startVenueRun, type VenueRunStatus } from "@/venue-ingest-state";
 import { loadEnabledVenues, runVenue } from "@/venues/registry";
+import { venueIngestLane } from "@/venues/venue-lanes.utils";
+import { resolveDetailMode } from "@/venues/venue-profile.utils";
+import type { VenueConfig } from "@/venues/venue.types";
 
 /** Max URLs in preflight JSON (full list still in venue_ingest_runs.debug). */
 const PREFLIGHT_LINK_CAP = 2000;
@@ -13,15 +16,30 @@ function capPreflightLinks(urls: string[]): string[] {
   return [...new Set(urls.filter((u) => u.startsWith("http")))].slice(0, PREFLIGHT_LINK_CAP);
 }
 
+function titleFromDetailUrl(url: string): string {
+  try {
+    const slug = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "";
+    if (!slug) {
+      return "(untitled)";
+    }
+    return slug.replace(/-/g, " ");
+  } catch {
+    return "(untitled)";
+  }
+}
+
 function buildPreflightSeedLinks(
-  config: { listingUrl: string },
-  venueResult: { events: ScrapeResult["events"]; debug: { listingUrls?: string[]; detailUrls?: string[] } }
-): Pick<NonNullable<ScrapeResult["seedMetrics"]>[number], "listingUrls" | "detailUrls" | "eventLinks"> {
+  config: VenueConfig,
+  venueResult: {
+    events: ScrapeResult["events"];
+    debug: { listingUrls?: string[]; detailUrls?: string[]; fetchUrls?: string[] };
+  }
+): Pick<NonNullable<ScrapeResult["seedMetrics"]>[number], "listingUrls" | "detailUrls" | "eventLinks" | "fetchUrls"> {
   const listingUrls = capPreflightLinks(
     venueResult.debug.listingUrls?.length ? venueResult.debug.listingUrls : [config.listingUrl]
   );
   const detailFromDebug = capPreflightLinks(venueResult.debug.detailUrls ?? []);
-  const eventLinks = venueResult.events
+  const eventLinksFromRows = venueResult.events
     .filter((e) => e.externalUrl?.startsWith("http"))
     .slice(0, PREFLIGHT_LINK_CAP)
     .map((e) => ({
@@ -30,13 +48,30 @@ function buildPreflightSeedLinks(
       startTs: e.startTs
     }));
 
+  const eventLinksFromDetails = detailFromDebug.map((url) => ({
+    title: titleFromDetailUrl(url),
+    url
+  }));
+
+  const eventLinks =
+    eventLinksFromRows.length > 0 ? eventLinksFromRows : eventLinksFromDetails;
+
   const detailUrls =
     detailFromDebug.length > 0
       ? detailFromDebug
       : capPreflightLinks(eventLinks.map((e) => e.url));
 
+  const fetchUrls = capPreflightLinks(
+    venueResult.debug.fetchUrls?.length
+      ? venueResult.debug.fetchUrls
+      : listingUrls.length > 0
+        ? listingUrls
+        : [config.listingUrl]
+  );
+
   return {
     ...(listingUrls.length > 0 ? { listingUrls } : {}),
+    ...(fetchUrls.length > 0 ? { fetchUrls } : {}),
     ...(detailUrls.length > 0 ? { detailUrls } : {}),
     ...(eventLinks.length > 0 ? { eventLinks } : {})
   };
@@ -195,6 +230,9 @@ export function createVenueIngestRunner(env: IngestEnv) {
           label: config.label,
           eventsFound: reportCount,
           venueKey: config.key,
+          strategy: config.strategy,
+          ingestLane: venueIngestLane(config),
+          detailMode: resolveDetailMode(config),
           ...(config.eventSource ? { eventSource: config.eventSource } : {}),
           ...(dryRun && detailUrlsPlanned > 0 ? { detailUrlsPlanned } : {}),
           ...(dryRunPlan ? { dryRunPlan: true } : {}),

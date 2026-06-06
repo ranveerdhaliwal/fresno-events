@@ -1,5 +1,6 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 
+import { resolveCandidateDetailFields } from "@/candidates/detail-status.utils";
 import type { ExistingCandidateRow } from "@/candidates/content-fingerprint.utils";
 import type { OccurrencePersistFields } from "@/candidates/occurrence-resolve.utils";
 import type { PersistEventAuditKind } from "@/candidates/persist-analysis.utils";
@@ -48,6 +49,8 @@ function buildUnchangedUpsertRow(
 ): Record<string, unknown> {
   const { runId, event, status, existing, occurrence } = input;
 
+  const detail = resolveCandidateDetailFields(event);
+
   const row: Record<string, unknown> = {
     source: event.source,
     source_event_id: event.sourceEventId,
@@ -58,6 +61,8 @@ function buildUnchangedUpsertRow(
     venue_name: event.venueName,
     start_ts: event.startTs,
     normalized_event: event,
+    detail_status: detail.detail_status,
+    detail_page_url: detail.detail_page_url,
     updated_at: now,
     occurrence_id: occurrence.occurrenceId,
     occurrence_key: occurrence.occurrenceKey,
@@ -79,6 +84,8 @@ async function buildFullUpsertRow(
 ): Promise<Record<string, unknown>> {
   const { auditKind, runId, event, fingerprint, status, existing, contentChanged, occurrence } = input;
 
+  const detail = resolveCandidateDetailFields(event);
+
   const row: Record<string, unknown> = {
     run_id: runId,
     source: event.source,
@@ -88,6 +95,8 @@ async function buildFullUpsertRow(
     start_ts: event.startTs,
     source_url: event.externalUrl ?? null,
     ticket_url: event.ticketUrl ?? null,
+    detail_status: detail.detail_status,
+    detail_page_url: detail.detail_page_url,
     normalized_event: event,
     content_fingerprint: fingerprint,
     dedupe_hash: await legacyDedupeHash(event),
@@ -103,12 +112,12 @@ async function buildFullUpsertRow(
     review_notes: contentChanged && existing ? null : (existing?.review_notes ?? null)
   };
 
-  if (auditKind === "new") {
-    row.raw_payload = {};
-    row.confidence_score = defaultConfidenceScore(event.source);
-  } else if (shouldResetConfidenceOnChangedUpsert(status)) {
-    row.confidence_score = defaultConfidenceScore(event.source);
-  }
+  // PostgREST bulk upsert requires identical keys on every object (PGRST102).
+  row.raw_payload = auditKind === "new" ? {} : (existing?.raw_payload ?? {});
+  row.confidence_score =
+    auditKind === "new" || shouldResetConfidenceOnChangedUpsert(status)
+      ? defaultConfidenceScore(event.source)
+      : (existing?.confidence_score ?? defaultConfidenceScore(event.source));
 
   return row;
 }

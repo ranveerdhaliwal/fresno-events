@@ -5,10 +5,13 @@ import {
   candidateNeedsEnrichment,
   formatEnrichmentDoneLine,
   hasAiEnrichmentNotes,
+  isBlockedByPendingDetail,
   reasoningPreview,
   summarizeEnrichmentDelta,
   type EnrichmentCandidateRow
 } from "@/candidates/enrichment-candidate.utils";
+import { harmonizeSeriesSuggestedPriority } from "@/candidates/series-enrichment.utils";
+import { applyVenuePriorityOverride } from "@/candidates/venue-priority.utils";
 import type { IngestEnv } from "@/env";
 import type { SupabaseConfig } from "@/sources";
 
@@ -18,6 +21,7 @@ export interface EnrichmentSummary {
   auto_rejected: number;
   errors: number;
   skipped_sufficient_data: number;
+  skipped_pending_detail: number;
   skipped_no_backend: boolean;
   batches: number;
 }
@@ -67,7 +71,7 @@ export async function countPendingEnrichment(
   sourceFilter?: string
 ): Promise<PendingEnrichmentCounts> {
   const params = new URLSearchParams({
-    select: "id,status,review_notes,normalized_event,suggested_priority,confidence_score,matched_event_id",
+    select: "id,status,review_notes,normalized_event,suggested_priority,confidence_score,matched_event_id,detail_status",
     status: "in.(awaiting_enrichment,pending_review,needs_changes)",
     limit: "1000"
   });
@@ -118,19 +122,15 @@ export async function enrichRecentCandidates(
     auto_rejected: 0,
     errors: 0,
     skipped_sufficient_data: 0,
+    skipped_pending_detail: 0,
     skipped_no_backend: false,
     batches: 1
   };
 
-  if (!getAiBackend(env, "enrichment")) {
-    summary.skipped_no_backend = true;
-    return summary;
-  }
-
   const limit = Math.min(Math.max(batchSize, 1), 100);
 
   const params = new URLSearchParams({
-    select: "id,status,normalized_event,confidence_score,review_notes,suggested_priority,matched_event_id",
+    select: "id,status,normalized_event,confidence_score,review_notes,suggested_priority,matched_event_id,detail_status",
     status: "in.(awaiting_enrichment,needs_changes)",
     order: "created_at.asc",
     limit: String(limit)
@@ -142,12 +142,17 @@ export async function enrichRecentCandidates(
 
   const rows = await supabaseFetch<EnrichmentCandidateRow[]>(supabase, `/rest/v1/event_candidates?${params}`);
   const toProcess: EnrichmentCandidateRow[] = [];
+  const hasLlmBackend = Boolean(getAiBackend(env, "enrichment"));
   let batchTitleChanged = 0;
   let batchCategoryChanged = 0;
   let batchTagsAdded = 0;
   let batchNormalizedPatched = 0;
 
   for (const row of rows) {
+    if (isBlockedByPendingDetail(row)) {
+      summary.skipped_pending_detail += 1;
+      continue;
+    }
     if (candidateNeedsEnrichment(row)) {
       toProcess.push(row);
       continue;
@@ -172,7 +177,7 @@ export async function enrichRecentCandidates(
   }
 
   console.log(
-    `[ingest] enrichment batch: ${toProcess.length} to process, ${summary.skipped_sufficient_data} sufficient (skipped LLM), limit ${limit}${options.sourceFilter ? `, source ${options.sourceFilter}` : ""}${options.dryRun ? ", dry-run" : ""}`
+    `[ingest] enrichment batch: ${toProcess.length} to process, ${summary.skipped_sufficient_data} sufficient (skipped LLM), ${summary.skipped_pending_detail} pending detail, limit ${limit}${options.sourceFilter ? `, source ${options.sourceFilter}` : ""}${options.dryRun ? ", dry-run" : ""}`
   );
   logStruct(env, "ai_enrichment_batch_start", {
     fetched: rows.length,
@@ -180,8 +185,19 @@ export async function enrichRecentCandidates(
     skipped_sufficient_data: summary.skipped_sufficient_data,
     batch_limit: limit,
     dry_run: options.dryRun ?? false,
+    has_llm_backend: hasLlmBackend,
     ...(options.sourceFilter ? { source_filter: options.sourceFilter } : {})
   });
+
+  if (!hasLlmBackend) {
+    summary.skipped_no_backend = true;
+    if (toProcess.length > 0) {
+      console.log(
+        `[ingest] ${toProcess.length} candidate(s) still need LLM enrichment but no provider is configured`
+      );
+    }
+    return summary;
+  }
 
   for (const row of toProcess) {
     summary.processed += 1;
@@ -202,10 +218,13 @@ export async function enrichRecentCandidates(
         continue;
       }
 
+      const aiNotes = enrichment.reasoning ? `[ai] ${enrichment.reasoning}` : "[ai] enriched";
+      const venuePriority = applyVenuePriorityOverride(row.normalized_event, enrichment.suggested_priority, aiNotes);
+
       const patch: CandidatePatch = {
         confidence_score: enrichment.confidence,
-        suggested_priority: enrichment.suggested_priority,
-        review_notes: enrichment.reasoning ? `[ai] ${enrichment.reasoning}` : "[ai] enriched",
+        suggested_priority: venuePriority.suggested_priority,
+        review_notes: venuePriority.review_notes,
         updated_at: new Date().toISOString()
       };
 
@@ -260,12 +279,15 @@ export async function enrichRecentCandidates(
         confidence: enrichment.confidence,
         is_junk: enrichment.is_junk,
         category: delta.category_after,
-        suggested_priority: enrichment.suggested_priority,
+        suggested_priority: venuePriority.suggested_priority,
         changes: delta,
         db_fields: delta.db_fields,
         reasoning_preview: reasoningPreview(enrichment.reasoning)
       };
-      const doneLine = formatEnrichmentDoneLine(ev.title, delta, enrichment, progress);
+      const doneLine = formatEnrichmentDoneLine(ev.title, delta, {
+        ...enrichment,
+        suggested_priority: venuePriority.suggested_priority
+      }, progress);
 
       if (options.dryRun) {
         console.log(`${doneLine} (dry-run)`);
@@ -273,8 +295,26 @@ export async function enrichRecentCandidates(
       } else {
         await patchCandidate(supabase, row.id, patch);
         summary.updated += 1;
+
+        const harmonized = await harmonizeSeriesSuggestedPriority(
+          supabase,
+          row,
+          venuePriority.suggested_priority
+        );
+        if (harmonized.unified !== venuePriority.suggested_priority) {
+          await patchCandidate(supabase, row.id, {
+            suggested_priority: harmonized.unified,
+            updated_at: new Date().toISOString()
+          });
+        }
+        summary.updated += harmonized.siblingsUpdated;
+
         console.log(doneLine);
-        logStruct(env, "ai_enrichment_item_done", doneLog);
+        logStruct(env, "ai_enrichment_item_done", {
+          ...doneLog,
+          series_priority_unified: harmonized.unified,
+          series_siblings_updated: harmonized.siblingsUpdated
+        });
       }
     } catch (error) {
       summary.errors += 1;
@@ -330,6 +370,7 @@ export async function runEnrichmentPipeline(
     auto_rejected: 0,
     errors: 0,
     skipped_sufficient_data: 0,
+    skipped_pending_detail: 0,
     skipped_no_backend: false,
     batches: 0
   };
@@ -337,11 +378,42 @@ export async function runEnrichmentPipeline(
   if (!getAiBackend(env, "enrichment")) {
     total.skipped_no_backend = true;
     logPhase(env, "AI enrichment skipped (no LLM provider configured)", {});
+    const promoted = await enrichRecentCandidates(env, supabase, batchSize, options);
+    total.updated += promoted.updated;
+    total.skipped_sufficient_data += promoted.skipped_sufficient_data;
+    total.batches = 1;
+    if (promoted.updated > 0) {
+      logPhase(env, "Promoted sufficient candidates to pending_review without LLM", {
+        updated: promoted.updated
+      });
+    }
     return total;
   }
 
   if (counts.awaiting_enrichment === 0) {
-    logPhase(env, "AI enrichment skipped (no candidates need enrichment)", { ...counts });
+    let promoteRound = 0;
+    do {
+      promoteRound += 1;
+      const promoted = await enrichRecentCandidates(env, supabase, batchSize, options);
+      total.updated += promoted.updated;
+      total.skipped_sufficient_data += promoted.skipped_sufficient_data;
+      total.batches = promoteRound;
+      if (promoted.updated === 0 && promoted.skipped_sufficient_data === 0) {
+        if (promoteRound === 1) {
+          logPhase(env, "AI enrichment skipped (no candidates need enrichment)", { ...counts });
+        }
+        break;
+      }
+      if (!enrichAll || options.dryRun) {
+        break;
+      }
+    } while (promoteRound < 500);
+
+    if (total.updated > 0) {
+      logPhase(env, "Promoted sufficient candidates to pending_review without LLM", {
+        updated: total.updated
+      });
+    }
     return total;
   }
 
@@ -360,6 +432,7 @@ export async function runEnrichmentPipeline(
     total.auto_rejected += batch.auto_rejected;
     total.errors += batch.errors;
     total.skipped_sufficient_data += batch.skipped_sufficient_data;
+    total.skipped_pending_detail += batch.skipped_pending_detail;
 
     if (batch.skipped_no_backend) {
       total.skipped_no_backend = true;

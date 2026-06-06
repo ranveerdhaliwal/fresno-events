@@ -85,17 +85,15 @@ while true; do
   ROUND=$((ROUND + 1))
   RESP="$(ingest_enrich_once "$BATCH_LIMIT")"
 
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "$RESP"
-    echo "Install jq to use --all batching." >&2
-    exit 0
+  PROCESSED="$(ingest_json_summary_field "$RESP" "processed")"
+  UPDATED="$(ingest_json_summary_field "$RESP" "updated")"
+  SKIPPED="$(ingest_json_summary_bool "$RESP" "skipped_no_backend")"
+
+  if command -v jq >/dev/null 2>&1; then
+    echo "$RESP" | jq --arg round "$ROUND" '{round: ($round | tonumber), summary: .data.summary}'
+  else
+    echo "round=$ROUND processed=$PROCESSED updated=$UPDATED" >&2
   fi
-
-  PROCESSED="$(echo "$RESP" | jq -r '.data.summary.processed // 0')"
-  UPDATED="$(echo "$RESP" | jq -r '.data.summary.updated // 0')"
-  SKIPPED="$(echo "$RESP" | jq -r '.data.summary.skipped_no_backend // false')"
-
-  echo "$RESP" | jq --arg round "$ROUND" '{round: ($round | tonumber), summary: .data.summary}'
 
   if [[ "$SKIPPED" == "true" ]]; then
     exit 1

@@ -1,5 +1,7 @@
 import type { EventCandidateStatus, EventCategory, NormalizedEvent } from "@fresno-events/shared";
 
+import { needsDetailBackfill } from "@/candidates/detail-status.utils";
+
 export interface EnrichmentCandidateRow {
   id: string;
   status: EventCandidateStatus;
@@ -8,6 +10,7 @@ export interface EnrichmentCandidateRow {
   review_notes: string | null;
   suggested_priority: number | null;
   matched_event_id?: string | null;
+  detail_status?: string | null;
 }
 
 const AI_REVIEW_PREFIX = "[ai]";
@@ -32,6 +35,9 @@ export function hasSufficientReviewData(event: NormalizedEvent): boolean {
 }
 
 export function candidateNeedsEnrichment(row: EnrichmentCandidateRow): boolean {
+  if (isBlockedByPendingDetail(row)) {
+    return false;
+  }
   if (row.status === "needs_changes") {
     return true;
   }
@@ -42,6 +48,10 @@ export function candidateNeedsEnrichment(row: EnrichmentCandidateRow): boolean {
     return false;
   }
   return true;
+}
+
+export function isBlockedByPendingDetail(row: EnrichmentCandidateRow): boolean {
+  return row.detail_status === "pending" && needsDetailBackfill(row.normalized_event);
 }
 
 /** LLM enrichment output shape (matches AiEnrichment in ai.ts). */

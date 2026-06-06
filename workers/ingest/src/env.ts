@@ -27,6 +27,8 @@ export interface IngestEnv {
   MAX_PAGES_PER_SEED?: string;
   MAX_CRAWL_DEPTH?: string;
   VISIT_FRESNO_API_TOKEN?: string;
+  /** Save Mart Saffire REST token (optional; scraped from listing page when omitted). */
+  SAVE_MART_EVENTS_TOKEN?: string;
   /** When true, skip scrape validation (logs ingest_validation_skipped). */
   INGEST_SKIP_VALIDATION?: string;
   /** When true or 1, link cross-source duplicates (status/canonical). Keys always computed. */

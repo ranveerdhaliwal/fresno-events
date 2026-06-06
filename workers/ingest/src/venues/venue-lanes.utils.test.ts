@@ -16,7 +16,7 @@ describe("venueIngestLane", () => {
     expect(venueIngestLane({ strategy: "scroll_listing_then_detail" })).toBe("browser");
   });
 
-  it("honors ingestLane override (gobulldogs SPA → browser)", () => {
+  it("honors ingestLane override", () => {
     expect(venueIngestLane({ strategy: "html_parse", ingestLane: "browser" })).toBe("browser");
   });
 });
@@ -29,21 +29,24 @@ describe("venueKeysByLane", () => {
     expect(direct).toContain("visit-fresno-county");
     expect(direct).toContain("downtown-fresno");
     expect(direct).toContain("milb-grizzlies");
-    expect(direct).not.toContain("strummers");
-    expect(direct).not.toContain("gobulldogs");
+    expect(direct).toContain("strummers");
+    expect(direct).toContain("gobulldogs");
   });
 
-  it("puts gobulldogs in browser lane via ingestLane override", () => {
-    const browser = venueKeysByLane(configs, "browser");
-    expect(browser).toContain("gobulldogs");
+  it("puts plain-html and API venues in direct lane", () => {
+    const direct = venueKeysByLane(configs, "direct");
+    expect(direct).toContain("chaffee-zoo");
+    expect(direct).toContain("fresno-convention-center");
+    expect(direct).toContain("rainbow-ballroom");
+    expect(direct).toContain("save-mart");
+    expect(direct).toContain("big-fresno-fair");
   });
 
-  it("puts BR crawl venues in browser lane", () => {
+  it("keeps tower on direct lane when plain HTML is configured", () => {
+    const direct = venueKeysByLane(configs, "direct");
+    expect(direct).toContain("tower-theatre");
     const browser = venueKeysByLane(configs, "browser");
-    expect(browser).toContain("strummers");
-    expect(browser).toContain("tower-theatre");
-    expect(browser).toContain("save-mart");
-    expect(browser).not.toContain("visit-fresno-county");
+    expect(browser).not.toContain("tower-theatre");
   });
 
   it("enabled configs partition into direct + browser", () => {

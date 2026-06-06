@@ -44,6 +44,10 @@ export async function runApiVenue(
     llmCalls: 0,
     debug: {
       listingUrls: [config.listingUrl],
+      fetchUrls:
+        result.metrics.fetchUrls && result.metrics.fetchUrls.length > 0
+          ? result.metrics.fetchUrls
+          : [config.listingUrl],
       note: config.eventSource ? `api venue (${config.eventSource})` : "api venue"
     }
   };

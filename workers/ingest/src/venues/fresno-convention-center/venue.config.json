@@ -2,12 +2,9 @@
   "key": "fresno-convention-center",
   "label": "Fresno Convention Center",
   "enabled": true,
-  "strategy": "listing_then_detail",
+  "strategy": "html_parse",
   "listingUrl": "https://events.fresnoconventioncenter.com/",
-  "detailUrlCap": 40,
-  "llmCallCap": 50,
   "sourceHostname": "events.fresnoconventioncenter.com",
-  "extractorVariant": "default",
-  "listingDiscovery": "plain",
-  "detailMode": "plain_html"
+  "ingestLane": "direct",
+  "detailMode": "none"
 }

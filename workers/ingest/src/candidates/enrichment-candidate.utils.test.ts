@@ -7,6 +7,7 @@ import {
   formatEnrichmentDoneLine,
   hasAiEnrichmentNotes,
   hasSufficientReviewData,
+  isBlockedByPendingDetail,
   summarizeEnrichmentDelta
 } from "./enrichment-candidate.utils";
 
@@ -28,6 +29,41 @@ describe("enrichment-candidate.utils", () => {
   it("hasSufficientReviewData when description present", () => {
     expect(hasSufficientReviewData({ ...base, descriptionText: "Details here" })).toBe(true);
     expect(hasSufficientReviewData(base)).toBe(false);
+  });
+
+  it("isBlockedByPendingDetail only blocks Visit Fresno without price", () => {
+    const milbRow = {
+      id: "milb-1",
+      status: "awaiting_enrichment" as const,
+      normalized_event: {
+        source: "api:milb" as const,
+        sourceEventId: "milb:1",
+        title: "Grizzlies game",
+        venueName: "Chukchansi Park",
+        startTs: "2026-06-15T02:00:00.000Z",
+        category: "sports" as const
+      },
+      confidence_score: 0.5,
+      review_notes: null,
+      suggested_priority: null,
+      detail_status: "pending"
+    };
+    expect(isBlockedByPendingDetail(milbRow)).toBe(false);
+
+    expect(
+      isBlockedByPendingDetail({
+        ...milbRow,
+        normalized_event: {
+          source: "api:visitfresnocounty",
+          sourceEventId: "vf-1",
+          title: "Festival",
+          venueName: "Plaza",
+          startTs: "2026-06-15T02:00:00.000Z",
+          category: "festival",
+          externalUrl: "https://www.visitfresnocounty.org/event/foo/1/"
+        }
+      })
+    ).toBe(true);
   });
 
   it("candidateNeedsEnrichment always runs for needs_changes", () => {

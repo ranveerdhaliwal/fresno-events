@@ -15,12 +15,14 @@ Each venue has:
 
 Operational state: `venue_ingest_state`, history: `venue_ingest_runs` (dry-runs use `status = dry_run`).
 
+**Detail tracking on candidates:** `event_candidates.detail_status` (`complete` \| `pending`) and `detail_page_url` (canonical show URL for backfill). Set on upsert from ingest; cap-skipped listing URLs persist as `pending`. Planned: detail backfill job (see multi-tier ingest plan).
+
 ## Ingest lanes
 
 | Lane | Venues (enabled) | `strategy` values | Promote needs BR + LLM? |
 | --- | --- | --- | --- |
-| **direct** | visit-fresno-county, downtown-fresno, milb-grizzlies | `api` | No |
-| **browser** | tower, save-mart, strummers, fulton-55, chaffee-zoo, convention center, rainbow, big fair, **gobulldogs** (Sidearm SPA) | listing / scroll strategies + `html_parse` with `ingestLane: browser` | Yes |
+| **direct** | visit-fresno-county, downtown-fresno, milb-grizzlies, **gobulldogs**, fulton-55, strummers | `api`, plain `html_parse` | No |
+| **browser** | tower, save-mart, chaffee-zoo, convention center, rainbow, big fair | listing / scroll strategies | Yes |
 
 Lane is derived from `strategy` in code (`venue-lanes.utils.ts`); no extra config field.
 
@@ -32,11 +34,11 @@ Lane is derived from `strategy` in code (`venue-lanes.utils.ts`); no extra confi
 | `save-mart` | `month_windows_then_detail` | `scrape:www.savemartcenter.com` |
 | `fresno-convention-center` | `listing_then_detail` | scrape host |
 | `chaffee-zoo` | `listing_then_detail` | scrape host |
-| `fulton-55` | `listing_then_detail` | scrape host |
-| `strummers` | `listing_then_detail` | scrape host |
+| `fulton-55` | `html_parse` (WFEA listing on homepage; Eventbrite ticket URLs) | `scrape:fulton55.com` |
+| `strummers` | `html_parse` (Squarespace eventlist on `/shows`) | `scrape:www.strummersclub.com` |
 | `rainbow-ballroom` | `scroll_listing_then_detail` | scrape host |
 | `big-fresno-fair` | `scroll_listing_then_detail` | scrape host |
-| `gobulldogs` | `html_parse` | scrape host |
+| `gobulldogs` | `api` (Sidearm `/api/v2/Calendar/from/.../to/...`) | `api:gobulldogs` |
 | `visit-fresno-county` | `api` | `api:visitfresnocounty` |
 | `downtown-fresno` | `api` | `api:downtownfresno` |
 | `milb-grizzlies` | `api` | `api:milb` |

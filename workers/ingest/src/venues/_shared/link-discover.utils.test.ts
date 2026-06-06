@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import towerConfig from "@/venues/tower-theatre/venue.config.json";
 import type { VenueConfig } from "@/venues/venue.types";
 import {
+  canonicalStrummersShowUrl,
   discoverSaveMartDetailUrlsFromMarkdown,
+  discoverStrummersDetailUrls,
   discoverTowerDetailUrls
 } from "./link-discover.utils";
 
@@ -19,9 +21,31 @@ describe("discoverTowerDetailUrls", () => {
       </body></html>
     `;
     const urls = discoverTowerDetailUrls(html, "https://towertheatre.ticketsauce.com/", tower);
-    expect(urls).toContain("https://towertheatre.ticketsauce.com/e/some-show");
-    expect(urls).toContain("https://towertheatre.ticketsauce.com/e/other");
-    expect(urls).toHaveLength(2);
+    expect(urls).toEqual([
+      "https://towertheatre.ticketsauce.com/e/some-show",
+      "https://towertheatre.ticketsauce.com/e/other"
+    ]);
+  });
+});
+
+describe("discoverStrummersDetailUrls", () => {
+  it("dedupes ical feed links to canonical show URLs", () => {
+    const html = `
+      <a href="/shows/2026/6/6/agent-orange">Show</a>
+      <a href="/shows/2026/6/6/agent-orange?format=ical">ICAL</a>
+    `;
+    const urls = discoverStrummersDetailUrls(html, "https://www.strummersclub.com/shows", tower);
+    expect(urls).toEqual(["https://www.strummersclub.com/shows/2026/6/6/agent-orange"]);
+  });
+});
+
+describe("canonicalStrummersShowUrl", () => {
+  it("strips query and hash", () => {
+    expect(
+      canonicalStrummersShowUrl(
+        "https://www.strummersclub.com/shows/2026/6/6/agent-orange?format=ical"
+      )
+    ).toBe("https://www.strummersclub.com/shows/2026/6/6/agent-orange");
   });
 });
 

@@ -4,11 +4,13 @@
   "enabled": true,
   "strategy": "listing_then_detail",
   "listingUrl": "https://towertheatre.ticketsauce.com/",
+  "monthWindows": 6,
   "detailUrlCap": 40,
   "llmCallCap": 50,
   "allowedExternalHosts": [],
   "sourceHostname": "towertheatre.ticketsauce.com",
   "extractorVariant": "default",
-  "listingDiscovery": "br_if_empty",
-  "detailMode": "plain_html"
+  "listingDiscovery": "plain",
+  "detailMode": "plain_html",
+  "ingestLane": "direct"
 }

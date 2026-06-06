@@ -23,7 +23,7 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
           message: `HTTP ${response.status}`,
           recoverable: response.status >= 500 || response.status === 429
         }
-      ], 1);
+      ], 1, [url]);
     }
 
     const json: unknown = await response.json();
@@ -32,7 +32,7 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
 
     log({ step: "run_end", eventsFound: events.length, horizonDays: 365 });
 
-    return finish(ctx, started, events, [], 1);
+    return finish(ctx, started, events, [], 1, [url]);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error;
@@ -45,7 +45,7 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
         message: error instanceof Error ? error.message : "milb-api fetch failed",
         recoverable: true
       }
-    ], 1);
+    ], 1, [url]);
   }
 }
 
@@ -54,7 +54,8 @@ function finish(
   started: number,
   events: ScrapeResult["events"],
   errors: ScrapeError[],
-  pages: number
+  pages: number,
+  fetchUrls: string[]
 ): ScrapeResult {
   return {
     source: "milb-api",
@@ -63,7 +64,8 @@ function finish(
     errors,
     metrics: {
       pagesVisited: pages,
-      durationMs: Math.round(performance.now() - started)
+      durationMs: Math.round(performance.now() - started),
+      fetchUrls
     }
   };
 }

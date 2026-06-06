@@ -13,7 +13,8 @@ export interface SourceValidationProfile {
 export const VENUE_EVENT_SOURCE_WARN_THRESHOLDS: Record<string, number> = {
   "api:visitfresnocounty": 150,
   "api:milb": 60,
-  "api:downtownfresno": 5
+  "api:downtownfresno": 5,
+  "api:gobulldogs": 5
 };
 
 export const SOURCE_VALIDATION_PROFILES: SourceValidationProfile[] = [
