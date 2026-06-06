@@ -4,10 +4,6 @@ import type { ReviewQueueTab } from "../admin/admin-api";
 
 import styles from "./AdminReviewWorkspace.module.css";
 
-export const btnClickable = "cursor-pointer disabled:cursor-not-allowed";
-
-export const inputClass = styles.input;
-
 export const PRIMARY_TABS: Array<{ id: ReviewQueueTab; label: string }> = [
   { id: "new", label: "New" },
   { id: "updates", label: "Updates" }
@@ -57,6 +53,8 @@ export type CandidateDetailProps = {
   displayPriority: number;
   onPriorityChange: (candidateId: string, priority: number) => void;
   onAfterDecision: (candidateId?: string) => void;
+  onSeriesUpdated: () => void;
+  onSelectCandidate: (id: string) => void;
 };
 
 export type TokenGateProps = {

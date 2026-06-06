@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, LogOut, RefreshCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { cn } from "@/lib/cn";
+import { Button } from "@/components/Button/Button";
 import {
   AdminApiError,
   bulkApproveAllPending,
@@ -16,6 +16,7 @@ import {
   reviewTabToStatus
 } from "../admin/admin-api";
 import {
+  buildSeriesDisplayPriorities,
   clearPriorityOverride,
   effectivePriority,
   groupCandidatesByPriority,
@@ -26,7 +27,6 @@ import {
 
 import { DetailLoading, EmptyDetail, ErrorBanner } from "./AdminReviewDetail.shared";
 import {
-  btnClickable,
   PRIMARY_TABS,
   SECONDARY_TABS,
   TAB_COPY,
@@ -73,9 +73,13 @@ export function ReviewWorkspace({
     () => sortCandidatesForReview(items, priorityOverrides),
     [items, priorityOverrides]
   );
+  const seriesDisplayPriorities = useMemo(
+    () => buildSeriesDisplayPriorities(items, priorityOverrides),
+    [items, priorityOverrides]
+  );
   const priorityGroups = useMemo(
-    () => groupCandidatesByPriority(sortedItems, priorityOverrides),
-    [sortedItems, priorityOverrides]
+    () => groupCandidatesByPriority(sortedItems, priorityOverrides, seriesDisplayPriorities),
+    [sortedItems, priorityOverrides, seriesDisplayPriorities]
   );
   const activeId = selectedId ?? sortedItems[0]?.id ?? null;
 
@@ -97,6 +101,10 @@ export function ReviewWorkspace({
     }
     queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
     queryClient.invalidateQueries({ queryKey: ["admin", "candidate"] });
+  };
+
+  const handleSeriesUpdated = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin", "candidate", activeId, token] });
   };
 
   const handlePriorityChange = (candidateId: string, priority: number) => {
@@ -237,48 +245,39 @@ export function ReviewWorkspace({
           <p className={styles.eyebrow}>Admin</p>
           <h1 className={styles.title}>{TAB_COPY[activeTab].title}</h1>
           <p className={styles.subtitle}>{TAB_COPY[activeTab].subtitle}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className={styles.tabRow}>
             {PRIMARY_TABS.map((tab) => (
-              <button
+              <Button
                 key={tab.id}
-                type="button"
+                size="sm"
+                variant={activeTab === tab.id ? "approve" : "secondary"}
                 onClick={() => onActiveTabChange(tab.id)}
-                className={cn(
-                  "rounded-full px-4 py-1.5 text-sm font-medium transition",
-                  btnClickable,
-                  activeTab === tab.id
-                    ? "bg-amber-300 text-neutral-900"
-                    : "border border-neutral-700 text-neutral-300 hover:border-neutral-500"
-                )}
               >
                 {tab.label}
                 {tab.id === "new" && activeTab === "new" ? ` (${items.length})` : ""}
                 {tab.id === "updates" && activeTab === "updates" ? ` (${items.length})` : ""}
-              </button>
+              </Button>
             ))}
-            <span className="text-neutral-600">|</span>
+            <span className={styles.tabDivider} aria-hidden>
+              |
+            </span>
             {SECONDARY_TABS.map((tab) => (
-              <button
+              <Button
                 key={tab.id}
-                type="button"
+                size="xs"
+                variant={activeTab === tab.id ? "secondaryActive" : "secondary"}
                 onClick={() => onActiveTabChange(tab.id)}
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs uppercase tracking-wide transition",
-                  btnClickable,
-                  activeTab === tab.id
-                    ? "border border-neutral-400 text-neutral-100"
-                    : "border border-neutral-800 text-neutral-500 hover:border-neutral-600"
-                )}
               >
                 {tab.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
         <div className={styles.headerActions}>
           {activeTab === "new" ? (
-            <button
-              type="button"
+            <Button
+              variant="approve"
+              size="sm"
               disabled={bulkActionPending || candidatesQuery.isLoading}
               onClick={() => {
                 const count = items.length;
@@ -290,61 +289,46 @@ export function ReviewWorkspace({
                   approveAllMutation.mutate();
                 }
               }}
-              className={cn(
-                "inline-flex h-9 items-center gap-1 rounded-full border border-emerald-500/60 bg-emerald-950/40 px-4 text-sm text-emerald-100 hover:border-emerald-400",
-                btnClickable
-              )}
             >
               {approveAllMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
-                <CheckCircle2 className="size-3.5" />
+                <CheckCircle2 className="size-3.5" aria-hidden />
               )}
               Approve all pending
-            </button>
+            </Button>
           ) : null}
           {activeTab === "updates" ? (
-            <button
-              type="button"
+            <Button
+              variant="approve"
+              size="sm"
               disabled={bulkActionPending || candidatesQuery.isLoading}
               onClick={() => {
                 if (window.confirm(`Approve all ${items.length} listed update(s)?`)) {
                   approveAllUpdatesMutation.mutate();
                 }
               }}
-              className={cn(
-                "inline-flex h-9 items-center gap-1 rounded-full border border-emerald-500/60 bg-emerald-950/40 px-4 text-sm text-emerald-100 hover:border-emerald-400",
-                btnClickable
-              )}
             >
               {approveAllUpdatesMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
-                <CheckCircle2 className="size-3.5" />
+                <CheckCircle2 className="size-3.5" aria-hidden />
               )}
               Approve all updates
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => candidatesQuery.refetch()}
-            className={cn(
-              "inline-flex h-9 items-center gap-1 rounded-full border border-neutral-700 px-4 text-sm hover:border-neutral-500",
-              btnClickable
-            )}
           >
-            <RefreshCcw className="size-3.5" /> Refresh
-          </button>
-          <button
-            type="button"
-            onClick={onChangeToken}
-            className={cn(
-              "inline-flex h-9 items-center gap-1 rounded-full border border-neutral-700 px-4 text-sm text-neutral-300 hover:border-rose-500/60 hover:text-rose-200",
-              btnClickable
-            )}
-          >
-            <LogOut className="size-3.5" /> Change token
-          </button>
+            <RefreshCcw className="size-3.5" aria-hidden />
+            Refresh
+          </Button>
+          <Button variant="secondary" size="sm" onClick={onChangeToken}>
+            <LogOut className="size-3.5" aria-hidden />
+            Change token
+          </Button>
         </div>
       </header>
 
@@ -358,10 +342,11 @@ export function ReviewWorkspace({
 
       {selectedIds.size > 0 ? (
         <div className={styles.bulkBar}>
-          <span className="text-sm text-neutral-200">{selectedIds.size} selected</span>
+          <span className={styles.bulkBarLabel}>{selectedIds.size} selected</span>
           {activeTab === "new" ? (
-            <button
-              type="button"
+            <Button
+              variant="approve"
+              size="sm"
               disabled={bulkActionPending}
               onClick={() => {
                 if (
@@ -372,58 +357,50 @@ export function ReviewWorkspace({
                   approveSelectedMutation.mutate([...selectedIds]);
                 }
               }}
-              className={cn(
-                "inline-flex h-8 items-center gap-1 rounded-full border border-emerald-500/60 bg-emerald-950/40 px-3 text-sm text-emerald-100 hover:border-emerald-400",
-                btnClickable
-              )}
             >
               {approveSelectedMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
-                <CheckCircle2 className="size-3.5" />
+                <CheckCircle2 className="size-3.5" aria-hidden />
               )}
               Approve selected
-            </button>
+            </Button>
           ) : null}
           {activeTab === "updates" ? (
-            <button
-              type="button"
+            <Button
+              variant="approve"
+              size="sm"
               disabled={bulkActionPending}
               onClick={() => {
                 if (window.confirm(`Approve ${selectedIds.size} selected update(s)?`)) {
                   approveSelectedUpdatesMutation.mutate([...selectedIds]);
                 }
               }}
-              className={cn(
-                "inline-flex h-8 items-center gap-1 rounded-full border border-emerald-500/60 bg-emerald-950/40 px-3 text-sm text-emerald-100 hover:border-emerald-400",
-                btnClickable
-              )}
             >
               {approveSelectedUpdatesMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
-                <CheckCircle2 className="size-3.5" />
+                <CheckCircle2 className="size-3.5" aria-hidden />
               )}
               Approve selected updates
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
+          <Button
+            variant="reject"
+            size="sm"
             disabled={bulkActionPending}
             onClick={() => {
               if (window.confirm(`Delete ${selectedIds.size} candidate(s)? This cannot be undone.`)) {
                 deleteMutation.mutate({ ids: [...selectedIds], force: false });
               }
             }}
-            className={cn(
-              "inline-flex h-8 items-center gap-1 rounded-full border border-rose-500/60 px-3 text-sm text-rose-200 hover:bg-rose-500/10",
-              btnClickable
-            )}
           >
-            <Trash2 className="size-3.5" /> Delete selected
-          </button>
-          <button
-            type="button"
+            <Trash2 className="size-3.5" aria-hidden />
+            Delete selected
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={bulkActionPending}
             onClick={() => {
               if (
@@ -434,20 +411,12 @@ export function ReviewWorkspace({
                 deleteMutation.mutate({ ids: [...selectedIds], force: true });
               }
             }}
-            className={cn(
-              "inline-flex h-8 items-center gap-1 rounded-full border border-neutral-600 px-3 text-sm text-neutral-300 hover:border-neutral-400",
-              btnClickable
-            )}
           >
             Force delete
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedIds(new Set())}
-            className={cn("text-sm text-neutral-400 hover:text-neutral-200", btnClickable)}
-          >
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
             Clear selection
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -461,6 +430,7 @@ export function ReviewWorkspace({
           statusFilter={statusFilter}
           selectedIds={selectedIds}
           priorityOverrides={priorityOverrides}
+          seriesDisplayPriorities={seriesDisplayPriorities}
           onToggleSelected={(id) => {
             setSelectedIds((prev) => {
               const next = new Set(prev);
@@ -514,6 +484,8 @@ export function ReviewWorkspace({
                 displayPriority={effectivePriority(candidateQuery.data.candidate, priorityOverrides)}
                 onPriorityChange={handlePriorityChange}
                 onAfterDecision={handleAfterDecision}
+                onSeriesUpdated={handleSeriesUpdated}
+                onSelectCandidate={onSelect}
               />
             )
           ) : null}

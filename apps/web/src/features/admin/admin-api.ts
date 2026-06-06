@@ -4,6 +4,7 @@ import type {
   AdminPublishedEventResponse,
   ApiResponse,
   EventCandidate,
+  EventCandidateDetailResponse,
   CandidateBulkApproveChangesResponse,
   CandidateBulkApproveResponse,
   CandidateBulkDeleteResponse,
@@ -66,11 +67,49 @@ export async function listCandidates(
   status: CandidateStatusFilter,
   opts?: { limit?: number; offset?: number }
 ) {
-  const params = new URLSearchParams({ status, limit: String(opts?.limit ?? 100) });
-  if (opts?.offset) {
-    params.set("offset", String(opts.offset));
+  const pageSize = 500;
+  const maxItems = opts?.limit ?? 5000;
+  const all: EventCandidateListResponse["items"] = [];
+  let offset = opts?.offset ?? 0;
+  let generatedAt = new Date().toISOString();
+
+  while (all.length < maxItems) {
+    const params = new URLSearchParams({
+      status,
+      limit: String(Math.min(pageSize, maxItems - all.length)),
+      offset: String(offset)
+    });
+    const page = await adminFetch<EventCandidateListResponse>(token, `/review/candidates?${params}`);
+    generatedAt = page.generatedAt;
+    all.push(...page.items);
+    if (page.items.length < pageSize) {
+      break;
+    }
+    offset += page.items.length;
   }
-  return adminFetch<EventCandidateListResponse>(token, `/review/candidates?${params}`);
+
+  return {
+    items: all,
+    generatedAt,
+    offset: opts?.offset ?? 0,
+    limit: all.length
+  } satisfies EventCandidateListResponse;
+}
+
+export async function linkCandidatesAsSeries(token: string, id: string, otherCandidateId: string) {
+  return adminFetch<EventCandidateDetailResponse>(token, `/review/candidates/${encodeURIComponent(id)}/series-link`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ otherCandidateId })
+  });
+}
+
+export async function unlinkCandidateFromSeries(token: string, id: string, candidateId: string) {
+  return adminFetch<EventCandidateDetailResponse>(token, `/review/candidates/${encodeURIComponent(id)}/series-unlink`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ candidateId })
+  });
 }
 
 export async function getCandidate(token: string, id: string) {

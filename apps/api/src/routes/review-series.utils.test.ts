@@ -25,6 +25,7 @@ describe("toSeriesSiblingCandidate", () => {
       rawPayload: {},
       dedupeHash: "hash",
       confidenceScore: 0.9,
+      detailStatus: "complete",
       status: "pending_review",
       occurrenceId: "occ-id",
       createdAt: "2026-05-01T00:00:00.000Z",

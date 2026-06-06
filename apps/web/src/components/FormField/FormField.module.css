@@ -1,0 +1,45 @@
+.field {
+  display: block;
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-label-on-card);
+}
+
+.controlWrap {
+  display: block;
+}
+
+.hint {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-secondary-on-card);
+}
+
+.link {
+  display: inline-block;
+  margin-top: 6px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-label-on-card);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link:hover {
+  color: var(--ink);
+}

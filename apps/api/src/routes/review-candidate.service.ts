@@ -1,5 +1,6 @@
 import type {
   CandidateBulkDeleteResponse,
+  CandidateDetailStatus,
   EventCandidate,
   EventCandidateStatus,
   NormalizedEvent
@@ -12,6 +13,10 @@ import { candidateSelect } from "@/routes/review.constants";
 import { toCandidateStatus, toRecord } from "@/routes/review-mappers.utils";
 import { supabaseReviewRequest } from "@/routes/review-supabase.utils";
 import type { CandidatePatch, SupabaseCandidateRow } from "@/routes/review.types";
+
+function toDetailStatus(raw: string): CandidateDetailStatus {
+  return raw === "complete" ? "complete" : "pending";
+}
 
 export function mapCandidateRow(row: SupabaseCandidateRow): EventCandidate {
   return {
@@ -32,6 +37,8 @@ export function mapCandidateRow(row: SupabaseCandidateRow): EventCandidate {
     ...(row.run_id ? { runId: row.run_id } : {}),
     ...(row.source_url ? { sourceUrl: row.source_url } : {}),
     ...(row.ticket_url ? { ticketUrl: row.ticket_url } : {}),
+    detailStatus: toDetailStatus(row.detail_status),
+    ...(row.detail_page_url ? { detailPageUrl: row.detail_page_url } : {}),
     ...(row.review_notes ? { reviewNotes: row.review_notes } : {}),
     ...(row.reviewed_at ? { reviewedAt: row.reviewed_at } : {}),
     ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
@@ -87,6 +94,49 @@ export async function fetchCandidatesByOccurrenceId(
   return rows.filter((row) => row.id !== excludeId).map(mapCandidateRow);
 }
 
+function normalizeListingUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = "";
+    if (parsed.searchParams.get("format") === "ical") {
+      parsed.search = "";
+    }
+    return parsed.href.replace(/\/+$/, "");
+  } catch {
+    return url.replace(/\/+$/, "");
+  }
+}
+
+export async function fetchCandidatesByListingUrl(
+  env: Env,
+  listingUrl: string,
+  excludeId: string,
+  options?: { status?: EventCandidateStatus; statuses?: EventCandidateStatus[] }
+): Promise<EventCandidate[]> {
+  const canonical = normalizeListingUrl(listingUrl);
+  const withTrailingSlash = `${canonical}/`;
+  const quoted = `"${canonical.replace(/"/g, '""')}"`;
+  const quotedSlash = `"${withTrailingSlash.replace(/"/g, '""')}"`;
+  const params = new URLSearchParams({
+    select: candidateSelect,
+    or: `(detail_page_url.eq.${quoted},detail_page_url.eq.${quotedSlash},source_url.eq.${quoted},source_url.eq.${quotedSlash},normalized_event->>externalUrl.eq.${quoted},normalized_event->>externalUrl.eq.${quotedSlash})`,
+    id: `neq.${excludeId}`,
+    order: "start_ts.asc",
+    limit: "40"
+  });
+  if (options?.statuses && options.statuses.length > 0) {
+    params.set("status", `in.(${options.statuses.join(",")})`);
+  } else if (options?.status) {
+    params.set("status", `eq.${options.status}`);
+  }
+
+  const rows = await supabaseReviewRequest<SupabaseCandidateRow[]>(
+    env,
+    `/rest/v1/event_candidates?${params}`
+  );
+  return rows.map(mapCandidateRow);
+}
+
 export async function fetchCandidatesBySeriesId(
   env: Env,
   seriesId: string,
@@ -96,7 +146,7 @@ export async function fetchCandidatesBySeriesId(
   const params = new URLSearchParams({
     select: candidateSelect,
     "normalized_event->>seriesId": `eq.${seriesId}`,
-    status: "eq.pending_review",
+    status: "in.(pending_review,approved)",
     canonical_candidate_id: "is.null",
     id: `neq.${excludeId}`,
     order: "start_ts.asc",

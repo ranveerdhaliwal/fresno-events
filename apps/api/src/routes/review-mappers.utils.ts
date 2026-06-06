@@ -41,7 +41,7 @@ export function parseLimit(value: string | undefined) {
     return 50;
   }
 
-  return Math.min(Math.max(Math.trunc(parsed), 1), 200);
+  return Math.min(Math.max(Math.trunc(parsed), 1), 5000);
 }
 
 export function parseOffset(value: string | undefined) {
@@ -139,7 +139,9 @@ export function toNumber(value: number | string) {
   return typeof value === "number" ? value : Number(value);
 }
 
-export function slugify(value: string) {
+const DEFAULT_SLUG_MAX_LENGTH = 80;
+
+export function slugify(value: string, maxLength = DEFAULT_SLUG_MAX_LENGTH) {
   return (
     value
       .toLowerCase()
@@ -147,6 +149,41 @@ export function slugify(value: string) {
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "event"
+      .slice(0, maxLength) || "event"
   );
+}
+
+function truncateSlugMiddle(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  if (maxLength <= 3) {
+    return value.slice(0, maxLength);
+  }
+
+  const head = Math.ceil((maxLength - 1) / 2);
+  const tail = maxLength - head - 1;
+  return `${value.slice(0, head)}-${value.slice(value.length - tail)}`;
+}
+
+/** Event slugs end with the occurrence date so recurring titles stay unique within 80 chars. */
+export function buildEventSlug(
+  title: string,
+  startTs: string,
+  maxLength = DEFAULT_SLUG_MAX_LENGTH
+): string {
+  const datePart = startTs.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return slugify(`${title}-${startTs}`, maxLength);
+  }
+
+  const dateSuffix = `-${datePart}`;
+  const maxTitleLength = maxLength - dateSuffix.length;
+  if (maxTitleLength < 8) {
+    return slugify(datePart, maxLength);
+  }
+
+  const titleSlug = slugify(title, maxTitleLength * 4);
+  const truncatedTitle = truncateSlugMiddle(titleSlug, maxTitleLength);
+  return `${truncatedTitle}${dateSuffix}`;
 }

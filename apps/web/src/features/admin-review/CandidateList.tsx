@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { EventRow } from "@/components/EventRow";
 import { SecHead } from "@/components/SecHead";
 import { getEventDisplayPriorityLabel } from "@fresno-events/shared";
-import { effectivePriority, type PriorityGroup } from "../admin/admin-priority.utils";
+import { listDisplayPriority, type PriorityGroup } from "../admin/admin-priority.utils";
 import type { CandidateStatusFilter } from "../admin/admin-api";
 
 import { toCandidateEventRowViewModel } from "./admin-candidate.utils";
@@ -17,6 +17,7 @@ export interface CandidateListProps {
   onSelect: (id: string) => void;
   selectedIds: Set<string>;
   priorityOverrides: Record<string, number>;
+  seriesDisplayPriorities: Map<string, number>;
   onToggleSelected: (id: string) => void;
   onSelectAll: () => void;
 }
@@ -29,6 +30,7 @@ export function CandidateList({
   onSelect,
   selectedIds,
   priorityOverrides,
+  seriesDisplayPriorities,
   onToggleSelected,
   onSelectAll
 }: CandidateListProps) {
@@ -62,8 +64,8 @@ export function CandidateList({
         <span className={styles.count}>{items.length} rows</span>
       </div>
 
-      {groups.map((group) => (
-        <section key={group.priority} className={styles.group}>
+      {groups.map((group, groupIndex) => (
+        <section key={`${group.priority}-${groupIndex}`} className={styles.group}>
           <SecHead
             title={`PRIORITY ${group.priority}`}
             script={getEventDisplayPriorityLabel(group.priority).toLowerCase()}
@@ -71,7 +73,7 @@ export function CandidateList({
           />
           <ul className={styles.rows}>
             {group.items.map((candidate) => {
-              const priority = effectivePriority(candidate, priorityOverrides);
+              const priority = listDisplayPriority(candidate, seriesDisplayPriorities, priorityOverrides);
               const aiSuggested =
                 candidate.suggestedPriority !== undefined && priorityOverrides[candidate.id] === undefined;
               const row = toCandidateEventRowViewModel(candidate, priority, { aiSuggested });

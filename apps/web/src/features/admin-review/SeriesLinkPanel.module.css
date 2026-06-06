@@ -1,0 +1,158 @@
+.panel {
+  border: var(--border-card);
+  background: var(--surface-muted);
+  box-shadow: var(--shadow-xs);
+  padding: 16px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-label-on-card);
+}
+
+.meta {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--text-secondary-on-card);
+}
+
+.seriesId {
+  margin: 0;
+  word-break: break-all;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-label-on-card);
+}
+
+.listingLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  font-size: 12px;
+  color: var(--text-label-on-card);
+  text-decoration: none;
+}
+
+.listingLink:hover {
+  color: var(--ink);
+}
+
+.empty {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-label-on-card);
+}
+
+.list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+  border: var(--border-card);
+  background: var(--surface-card);
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.rowMain {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rowOpen {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.rowOpen:hover .rowTitle {
+  color: var(--ink);
+}
+
+.rowTitle {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.rowMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-label-on-card);
+}
+
+.rowMetaIcon {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+
+.spin {
+  animation: seriesLinkSpin 1s linear infinite;
+}
+
+@keyframes seriesLinkSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rowAction {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.searchSection {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.searchHint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-label-on-card);
+}
+
+.searchField {
+  margin-top: 12px;
+}
+
+.loading {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-label-on-card);
+}
+
+.error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--coral-dark);
+}

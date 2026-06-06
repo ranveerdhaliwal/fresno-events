@@ -33,6 +33,7 @@ export function normalizedEventToFormState(
     externalUrl: event.externalUrl ?? "",
     priceMin: event.priceMin?.toString() ?? "",
     priceMax: event.priceMax?.toString() ?? "",
+    priceNotes: event.priceNotes ?? "",
     priority
   };
 }
@@ -82,6 +83,7 @@ export function formStateToEventPatch(
 
   assignNumberOptional(patch, "priceMin", draft.priceMin, original.priceMin);
   assignNumberOptional(patch, "priceMax", draft.priceMax, original.priceMax);
+  assignOptional(patch, "priceNotes", draft.priceNotes, original.priceNotes);
 
   const startTs = encodeStartInstant(draft);
   if (startTs && startTs !== original.startTs) {

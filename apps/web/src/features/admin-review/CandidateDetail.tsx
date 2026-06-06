@@ -2,6 +2,13 @@ import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2, ExternalLink, Loader2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { Button } from "@/components/Button/Button";
+import { DateInput } from "@/components/DateInput/DateInput";
+import { FormField } from "@/components/FormField/FormField";
+import { SelectInput } from "@/components/SelectInput/SelectInput";
+import { TextArea } from "@/components/TextArea/TextArea";
+import { TextInput } from "@/components/TextInput/TextInput";
+import { TimeInput } from "@/components/TimeInput/TimeInput";
 import { cn } from "@/lib/cn";
 import { approveCandidate, rejectCandidate } from "../admin/admin-api";
 import {
@@ -12,10 +19,11 @@ import { formStateToEventPatch, normalizedEventToFormState } from "../admin/admi
 import { EVENT_DISPLAY_PRIORITY, type EventCategory } from "@fresno-events/shared";
 import { formatPacificDateTimeLabel } from "@/lib/pacific-time";
 
-import { ErrorBanner, Field } from "./AdminReviewDetail.shared";
-import { btnClickable, inputClass, type CandidateDetailProps } from "./AdminReviewWorkspace.types";
+import { ErrorBanner } from "./AdminReviewDetail.shared";
+import { type CandidateDetailProps } from "./AdminReviewWorkspace.types";
+import styles from "./AdminReviewWorkspace.module.css";
 import { LinkedSourcesSection } from "./LinkedSourcesSection";
-import { SeriesSection } from "./SeriesSection";
+import { SeriesLinkPanel } from "./SeriesLinkPanel";
 
 export function CandidateDetail({
   token,
@@ -24,7 +32,9 @@ export function CandidateDetail({
   seriesSiblings,
   displayPriority,
   onPriorityChange,
-  onAfterDecision
+  onAfterDecision,
+  onSeriesUpdated,
+  onSelectCandidate
 }: CandidateDetailProps) {
   const [draft, setDraft] = useState<AdminEventFormState>(() =>
     normalizedEventToFormState(candidate.normalizedEvent, displayPriority)
@@ -75,264 +85,237 @@ export function CandidateDetail({
 
   const isBusy = approveMutation.isPending || rejectMutation.isPending;
   const decisionError = approveMutation.error ?? rejectMutation.error;
-
+  const externalUrl = draft.externalUrl.trim();
+  const ticketUrl = draft.ticketUrl.trim();
   return (
-    <div className="space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-neutral-400">
-            <span className="rounded-full border border-neutral-700 px-2 py-0.5">{candidate.source}</span>
+    <div className={styles.detailForm}>
+      <header className={styles.detailHeader}>
+        <div>
+          <div className={styles.detailMeta}>
+            <span className={styles.detailMetaTag}>{candidate.source}</span>
             <span>Status: {candidate.status}</span>
+            {candidate.detailStatus === "pending" ? <span>Detail pending</span> : null}
             <span>Score {(candidate.confidenceScore * 100).toFixed(0)}%</span>
           </div>
-          <h2 className="mt-1 text-xl font-semibold text-neutral-50">{candidate.title}</h2>
-          <p className="mt-1 text-sm text-neutral-300">
+          <h2 className={styles.detailTitle}>{candidate.title}</h2>
+          <p className={styles.detailSubtitle}>
             {formatPacificDateTimeLabel(candidate.startTs)} · {candidate.venueName}
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={() => rejectMutation.mutate()}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-full border border-rose-500/60 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-200 transition hover:bg-rose-500/20",
-              btnClickable,
-              "disabled:opacity-60"
-            )}
-          >
-            <X className="size-4" /> Reject
-          </button>
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={() => approveMutation.mutate()}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-full bg-amber-300 px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-amber-200",
-              btnClickable,
-              "disabled:opacity-60"
-            )}
-          >
-            {isBusy ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-            {Object.keys(eventDiff).length > 0 ? "Approve with edits" : "Approve"}
-          </button>
-        </div>
       </header>
 
-      {candidate.normalizedEvent.seriesId ? (
-        <SeriesSection
-          seriesId={candidate.normalizedEvent.seriesId}
-          {...(candidate.normalizedEvent.seriesName
-            ? { seriesName: candidate.normalizedEvent.seriesName }
-            : {})}
-          {...(candidate.normalizedEvent.seriesListingRecId
-            ? { seriesListingRecId: candidate.normalizedEvent.seriesListingRecId }
-            : {})}
-          {...(candidate.normalizedEvent.seriesPresentedBy
-            ? { seriesPresentedBy: candidate.normalizedEvent.seriesPresentedBy }
-            : {})}
-          seriesSiblings={seriesSiblings ?? []}
-        />
-      ) : null}
+      <div className={styles.detailActions}>
+        <div className={styles.detailActionsPrimary}>
+          <Button variant="reject" disabled={isBusy} onClick={() => rejectMutation.mutate()}>
+            <X className="size-4" aria-hidden />
+            Reject
+          </Button>
+          <Button variant="approve" disabled={isBusy} onClick={() => approveMutation.mutate()}>
+            {isBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />}
+            {Object.keys(eventDiff).length > 0 ? "Approve with edits" : "Approve"}
+          </Button>
+        </div>
+        <div className={styles.detailActionsSecondary}>
+          {candidate.sourceUrl ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              href={candidate.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink className="size-3.5" aria-hidden />
+              Source
+            </Button>
+          ) : null}
+          <Button variant="secondary" size="sm" onClick={() => setShowRaw((value) => !value)}>
+            {showRaw ? "Hide" : "Show"} raw JSON
+          </Button>
+        </div>
+      </div>
 
       <LinkedSourcesSection linkedCandidates={linkedCandidates} />
 
-      <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400">
-        {candidate.sourceUrl ? (
-          <a
-            href={candidate.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-neutral-700 px-3 py-1 hover:border-amber-300/70"
-          >
-            <ExternalLink className="size-3" /> Source
-          </a>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => setShowRaw((value) => !value)}
-          className={cn("rounded-full border border-neutral-700 px-3 py-1 hover:border-neutral-500", btnClickable)}
-        >
-          {showRaw ? "Hide" : "Show"} raw JSON
-        </button>
-      </div>
-
       {decisionError ? <ErrorBanner error={decisionError} /> : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Title">
-          <input
+      <div className={styles.detailFormGrid}>
+        <FormField label="Title" fullWidth>
+          <TextInput
             value={draft.title}
             onChange={(event) => setDraft((d) => ({ ...d, title: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Category">
-          <select
+        </FormField>
+        <FormField label="Category">
+          <SelectInput
             value={draft.category}
             onChange={(event) => setDraft((d) => ({ ...d, category: event.target.value as EventCategory }))}
-            className={inputClass}
           >
             {ADMIN_EVENT_CATEGORIES.map((option) => (
               <option key={option} value={option}>
                 {option.replace("_", " ")}
               </option>
             ))}
-          </select>
-        </Field>
-        <Field label="Start date (Pacific)">
-          <input
-            type="date"
+          </SelectInput>
+        </FormField>
+        <FormField label="Start date (Pacific)">
+          <DateInput
             value={draft.startDate}
             onChange={(event) => setDraft((d) => ({ ...d, startDate: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Start time (Pacific, empty = all day)">
-          <input
-            type="time"
+        </FormField>
+        <FormField label="Start time (Pacific, empty = all day)">
+          <TimeInput
             value={draft.startTime}
             onChange={(event) => setDraft((d) => ({ ...d, startTime: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="End date (Pacific, optional)">
-          <input
-            type="date"
+        </FormField>
+        <FormField label="End date (Pacific, optional)">
+          <DateInput
             value={draft.endDate}
             onChange={(event) => setDraft((d) => ({ ...d, endDate: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="End time (Pacific, empty = end of day)">
-          <input
-            type="time"
+        </FormField>
+        <FormField label="End time (Pacific, empty = end of day)">
+          <TimeInput
             value={draft.endTime}
             onChange={(event) => setDraft((d) => ({ ...d, endTime: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Venue name">
-          <input
+        </FormField>
+        <FormField label="Venue name" fullWidth>
+          <TextInput
             value={draft.venueName}
             onChange={(event) => setDraft((d) => ({ ...d, venueName: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Venue city">
-          <input
+        </FormField>
+        <FormField label="Venue city">
+          <TextInput
             value={draft.venueCity}
             onChange={(event) => setDraft((d) => ({ ...d, venueCity: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Venue address">
-          <input
+        </FormField>
+        <FormField label="Venue address">
+          <TextInput
             value={draft.venueAddress}
             onChange={(event) => setDraft((d) => ({ ...d, venueAddress: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Image URL">
-          <input
+        </FormField>
+        <FormField label="Image URL">
+          <TextInput
             value={draft.imageUrl}
             onChange={(event) => setDraft((d) => ({ ...d, imageUrl: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Ticket URL">
-          <input
+        </FormField>
+        <FormField
+          label="Ticket URL"
+          {...(ticketUrl ? { link: { href: ticketUrl } } : {})}
+        >
+          <TextInput
             value={draft.ticketUrl}
             onChange={(event) => setDraft((d) => ({ ...d, ticketUrl: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="External URL">
-          <input
+        </FormField>
+        <FormField
+          label="External URL"
+          {...(externalUrl ? { link: { href: externalUrl } } : {})}
+        >
+          <TextInput
             value={draft.externalUrl}
             onChange={(event) => setDraft((d) => ({ ...d, externalUrl: event.target.value }))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Price min ($)">
-          <input
+        </FormField>
+        <FormField label="Price min ($)">
+          <TextInput
             value={draft.priceMin}
             onChange={(event) => setDraft((d) => ({ ...d, priceMin: event.target.value }))}
-            className={inputClass}
             inputMode="decimal"
           />
-        </Field>
-        <Field label="Price max ($)">
-          <input
+        </FormField>
+        <FormField label="Price max ($)">
+          <TextInput
             value={draft.priceMax}
             onChange={(event) => setDraft((d) => ({ ...d, priceMax: event.target.value }))}
-            className={inputClass}
             inputMode="decimal"
           />
-        </Field>
+        </FormField>
+        <FormField label="Price notes (CMS text)" fullWidth>
+          <TextInput
+            value={draft.priceNotes}
+            onChange={(event) => setDraft((d) => ({ ...d, priceNotes: event.target.value }))}
+            placeholder='e.g. "Free", "see website for details"'
+          />
+        </FormField>
       </div>
 
-      <Field label="Description">
-        <textarea
+      <FormField label="Description">
+        <TextArea
+          variant="description"
+          rows={10}
           value={draft.descriptionText}
           onChange={(event) => setDraft((d) => ({ ...d, descriptionText: event.target.value }))}
-          rows={5}
-          className={cn(inputClass, "resize-y")}
         />
-      </Field>
+      </FormField>
 
-      <Field label="Display priority (published event)">
-        <select
+      <FormField
+        label="Display priority (published event)"
+        hint={
+          candidate.suggestedPriority !== undefined ? (
+            <>
+              AI suggested P{candidate.suggestedPriority}
+              {candidate.suggestedPriority !== draft.priority ? " · you overrode" : ""}
+            </>
+          ) : undefined
+        }
+      >
+        <SelectInput
           value={draft.priority}
           onChange={(event) => {
             const next = Number(event.target.value);
             setDraft((d) => ({ ...d, priority: next }));
             onPriorityChange(candidate.id, next);
           }}
-          className={inputClass}
         >
           {EVENT_DISPLAY_PRIORITY.map((tier) => (
             <option key={tier.value} value={tier.value}>
               {tier.value} — {tier.label} ({tier.description})
             </option>
           ))}
-        </select>
-        {candidate.suggestedPriority !== undefined ? (
-          <p className="mt-1 text-[11px] normal-case tracking-normal text-neutral-500">
-            AI suggested P{candidate.suggestedPriority}
-            {candidate.suggestedPriority !== draft.priority ? " · you overrode" : ""}
-          </p>
-        ) : null}
-      </Field>
+        </SelectInput>
+      </FormField>
 
-      <div className="grid gap-4 md:grid-cols-[1fr_220px]">
-        <Field label="Notes for review log">
-          <textarea
+      <div className={cn(styles.detailFormGrid, styles.detailFormGridNotes)}>
+        <FormField label="Notes for review log">
+          <TextArea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             rows={3}
             placeholder="What did you change or why are you rejecting?"
-            className={cn(inputClass, "resize-y")}
           />
-        </Field>
-        <Field label="Reviewer">
-          <input
+        </FormField>
+        <FormField label="Reviewer">
+          <TextInput
             value={reviewerName}
             onChange={(event) => setReviewerName(event.target.value)}
             placeholder="your name"
-            className={inputClass}
           />
-        </Field>
+        </FormField>
       </div>
 
       {showRaw ? (
-        <details open className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3 text-xs">
-          <summary className="cursor-pointer text-neutral-300">Normalized event JSON</summary>
-          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[11px] text-neutral-200">
-            {JSON.stringify(candidate.normalizedEvent, null, 2)}
-          </pre>
+        <details open className={styles.rawJson}>
+          <summary>Normalized event JSON</summary>
+          <pre>{JSON.stringify(candidate.normalizedEvent, null, 2)}</pre>
         </details>
       ) : null}
+
+      <footer className={styles.detailSeriesFooter}>
+        <SeriesLinkPanel
+          token={token}
+          candidate={candidate}
+          seriesSiblings={seriesSiblings ?? []}
+          onSelectCandidate={onSelectCandidate}
+          onSeriesUpdated={onSeriesUpdated}
+        />
+      </footer>
     </div>
   );
 }

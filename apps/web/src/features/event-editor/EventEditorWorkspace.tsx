@@ -3,6 +3,12 @@ import { CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 
+import { DateInput } from "@/components/DateInput/DateInput";
+import { FormField } from "@/components/FormField/FormField";
+import { SelectInput } from "@/components/SelectInput/SelectInput";
+import { TextArea } from "@/components/TextArea/TextArea";
+import { TextInput } from "@/components/TextInput/TextInput";
+import { TimeInput } from "@/components/TimeInput/TimeInput";
 import {
   ADMIN_EVENT_CATEGORIES,
   type AdminEventFormState
@@ -10,11 +16,9 @@ import {
 import { formStateToEventPatch, normalizedEventToFormState } from "@/features/admin/admin-form.utils";
 import { adminKeys } from "@/features/admin/admin.queryKeys";
 import { getPublishedEvent, isAdminAuthError, patchPublishedEvent } from "@/features/admin/admin-api";
-import { ErrorBanner, Field } from "@/features/admin-review/AdminReviewDetail.shared";
-import { btnClickable, inputClass } from "@/features/admin-review/AdminReviewWorkspace.types";
+import { ErrorBanner } from "@/features/admin-review/AdminReviewDetail.shared";
 import { broadcastAdminCache } from "@/features/admin-mode/admin-cache";
 import { formatPacificDateTimeLabel } from "@/lib/pacific-time";
-import { cn } from "@/lib/cn";
 import { EVENT_DISPLAY_PRIORITY, type Event, type EventCategory, type NormalizedEvent, type Venue } from "@fresno-events/shared";
 
 import styles from "./EventEditorWorkspace.module.css";
@@ -140,6 +144,8 @@ export function EventEditorWorkspace({ token, eventId, onAuthFailure }: EventEdi
   }
 
   const { event, venue } = eventQuery.data;
+  const externalUrl = draft.externalUrl.trim();
+  const ticketUrl = draft.ticketUrl.trim();
 
   return (
     <div className={styles.workspace}>
@@ -172,155 +178,143 @@ export function EventEditorWorkspace({ token, eventId, onAuthFailure }: EventEdi
         <div className={styles.successBanner}>Changes saved.</div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Title">
-          <input
+      <div className={styles.formBody}>
+      <div className={styles.formGrid}>
+        <FormField label="Title" fullWidth>
+          <TextInput
             value={draft.title}
             onChange={(event) => setDraft((d) => (d ? { ...d, title: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Category">
-          <select
+        </FormField>
+        <FormField label="Category">
+          <SelectInput
             value={draft.category}
             onChange={(event) =>
               setDraft((d) => (d ? { ...d, category: event.target.value as EventCategory } : d))
             }
-            className={inputClass}
           >
             {ADMIN_EVENT_CATEGORIES.map((option) => (
               <option key={option} value={option}>
                 {option.replace("_", " ")}
               </option>
             ))}
-          </select>
-        </Field>
-        <Field label="Start date (Pacific)">
-          <input
-            type="date"
+          </SelectInput>
+        </FormField>
+        <FormField label="Start date (Pacific)">
+          <DateInput
             value={draft.startDate}
             onChange={(event) => setDraft((d) => (d ? { ...d, startDate: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Start time (Pacific, empty = all day)">
-          <input
-            type="time"
+        </FormField>
+        <FormField label="Start time (Pacific, empty = all day)">
+          <TimeInput
             value={draft.startTime}
             onChange={(event) => setDraft((d) => (d ? { ...d, startTime: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="End date (Pacific, optional)">
-          <input
-            type="date"
+        </FormField>
+        <FormField label="End date (Pacific, optional)">
+          <DateInput
             value={draft.endDate}
             onChange={(event) => setDraft((d) => (d ? { ...d, endDate: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="End time (Pacific, empty = end of day)">
-          <input
-            type="time"
+        </FormField>
+        <FormField label="End time (Pacific, empty = end of day)">
+          <TimeInput
             value={draft.endTime}
             onChange={(event) => setDraft((d) => (d ? { ...d, endTime: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Venue name">
-          <input
+        </FormField>
+        <FormField label="Venue name" fullWidth>
+          <TextInput
             value={draft.venueName}
             onChange={(event) => setDraft((d) => (d ? { ...d, venueName: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Venue city">
-          <input
+        </FormField>
+        <FormField label="Venue city">
+          <TextInput
             value={draft.venueCity}
             onChange={(event) => setDraft((d) => (d ? { ...d, venueCity: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Venue address">
-          <input
+        </FormField>
+        <FormField label="Venue address">
+          <TextInput
             value={draft.venueAddress}
             onChange={(event) => setDraft((d) => (d ? { ...d, venueAddress: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Image URL">
-          <input
+        </FormField>
+        <FormField label="Image URL">
+          <TextInput
             value={draft.imageUrl}
             onChange={(event) => setDraft((d) => (d ? { ...d, imageUrl: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Ticket URL">
-          <input
+        </FormField>
+        <FormField
+          label="Ticket URL"
+          {...(ticketUrl ? { link: { href: ticketUrl } } : {})}
+        >
+          <TextInput
             value={draft.ticketUrl}
             onChange={(event) => setDraft((d) => (d ? { ...d, ticketUrl: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="External URL">
-          <input
+        </FormField>
+        <FormField
+          label="External URL"
+          {...(externalUrl ? { link: { href: externalUrl } } : {})}
+        >
+          <TextInput
             value={draft.externalUrl}
             onChange={(event) => setDraft((d) => (d ? { ...d, externalUrl: event.target.value } : d))}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Price min ($)">
-          <input
+        </FormField>
+        <FormField label="Price min ($)">
+          <TextInput
             value={draft.priceMin}
             onChange={(event) => setDraft((d) => (d ? { ...d, priceMin: event.target.value } : d))}
-            className={inputClass}
             inputMode="decimal"
           />
-        </Field>
-        <Field label="Price max ($)">
-          <input
+        </FormField>
+        <FormField label="Price max ($)">
+          <TextInput
             value={draft.priceMax}
             onChange={(event) => setDraft((d) => (d ? { ...d, priceMax: event.target.value } : d))}
-            className={inputClass}
             inputMode="decimal"
           />
-        </Field>
+        </FormField>
       </div>
 
-      <Field label="Description">
-        <textarea
+      <FormField label="Description">
+        <TextArea
+          variant="description"
+          rows={10}
           value={draft.descriptionText}
           onChange={(event) => setDraft((d) => (d ? { ...d, descriptionText: event.target.value } : d))}
-          rows={5}
-          className={cn(inputClass, "resize-y")}
         />
-      </Field>
+      </FormField>
 
-      <Field label="Display priority">
-        <select
+      <FormField label="Display priority">
+        <SelectInput
           value={draft.priority}
           onChange={(event) => {
             const next = Number(event.target.value);
             setDraft((d) => (d ? { ...d, priority: next } : d));
           }}
-          className={inputClass}
         >
           {EVENT_DISPLAY_PRIORITY.map((tier) => (
             <option key={tier.value} value={tier.value}>
               {tier.value} — {tier.label} ({tier.description})
             </option>
           ))}
-        </select>
-      </Field>
+        </SelectInput>
+      </FormField>
 
-      <Field label="Reviewer">
-        <input
+      <FormField label="Reviewer">
+        <TextInput
           value={reviewerName}
           onChange={(event) => setReviewerName(event.target.value)}
           placeholder="your name"
-          className={inputClass}
         />
-      </Field>
+      </FormField>
+      </div>
     </div>
   );
 }

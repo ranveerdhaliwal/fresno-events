@@ -18,6 +18,7 @@ export interface AdminEventFormState {
   externalUrl: string;
   priceMin: string;
   priceMax: string;
+  priceNotes: string;
   priority: number;
 }
 

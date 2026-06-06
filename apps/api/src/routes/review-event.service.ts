@@ -14,6 +14,7 @@ import {
 } from "@/routes/review-occurrence.utils";
 import { ReviewRouteError } from "@/routes/review.errors";
 import {
+  buildEventSlug,
   compactRecord,
   slugify,
   toEventCategory,
@@ -147,7 +148,7 @@ export async function upsertEvent(
   existingSlug?: string,
   siblings: EventCandidate[] = []
 ): Promise<Event> {
-  const eventSlug = existingSlug ?? slugify(`${normalized.title}-${candidate.id.slice(0, 8)}`);
+  const eventSlug = existingSlug ?? buildEventSlug(normalized.title, normalized.startTs);
   return await postApprovedEvent(
     env,
     candidate,

@@ -19,6 +19,8 @@ export const candidateSelect = [
   "start_ts",
   "source_url",
   "ticket_url",
+  "detail_status",
+  "detail_page_url",
   "normalized_event",
   "raw_payload",
   "dedupe_hash",

@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { adminKeys } from "@/features/admin/admin.queryKeys";
 import { getHomepageSlots, isAdminAuthError, saveHomepageSlots, searchPublishedEvents } from "@/features/admin/admin-api";
-import { ErrorBanner, Field } from "@/features/admin-review/AdminReviewDetail.shared";
-import { inputClass } from "@/features/admin-review/AdminReviewWorkspace.types";
+import { FormField } from "@/components/FormField/FormField";
+import { TextInput } from "@/components/TextInput/TextInput";
+import { ErrorBanner } from "@/features/admin-review/AdminReviewDetail.shared";
 import { broadcastAdminCache } from "@/features/admin-mode/admin-cache";
 import { formatPacificDateTimeLabel } from "@/lib/pacific-time";
 import { cn } from "@/lib/cn";
@@ -166,14 +167,13 @@ export function HomepageCurationWorkspace({ token, onAuthFailure }: HomepageCura
           </p>
         </div>
         <div className={styles.actions}>
-          <Field label="Reviewer">
-            <input
+          <FormField label="Reviewer">
+            <TextInput
               value={reviewerName}
               onChange={(event) => setReviewerName(event.target.value)}
               placeholder="your name"
-              className={inputClass}
             />
-          </Field>
+          </FormField>
           <button
             type="button"
             disabled={saveMutation.isPending}
@@ -251,11 +251,10 @@ export function HomepageCurationWorkspace({ token, onAuthFailure }: HomepageCura
 
                     {isSearching ? (
                       <div className={styles.searchPanel}>
-                        <input
+                        <TextInput
                           value={searchQuery}
                           onChange={(event) => setSearchQuery(event.target.value)}
                           placeholder="Search published events…"
-                          className={inputClass}
                           autoFocus
                         />
                         {searchResultsQuery.isFetching ? (

@@ -23,7 +23,6 @@ import { requireReviewAuth } from "@/routes/review-auth.utils";
 import {
   deleteCandidates,
   fetchCandidatesByOccurrenceId,
-  fetchCandidatesBySeriesId,
   getCandidate,
   listAllCandidatesByStatus,
   mapCandidateRow,
@@ -41,7 +40,11 @@ import {
   toCandidateStatus
 } from "@/routes/review-mappers.utils";
 import { toLinkedCandidate } from "@/routes/review-occurrence.utils";
-import { toSeriesSiblingCandidate } from "@/routes/review-series.utils";
+import {
+  linkCandidatesAsSeries,
+  resolveSeriesSiblingsForCandidate,
+  unlinkCandidateFromSeries
+} from "@/routes/review-series-link.utils";
 import {
   approveCandidateCore,
   approveCandidatesByIds,
@@ -128,10 +131,7 @@ reviewRoute
       const siblings = await fetchCandidatesByOccurrenceId(c.env, candidate.occurrenceId, candidate.id);
       const linkedCandidates = siblings.map(toLinkedCandidate);
 
-      const seriesId = candidate.normalizedEvent.seriesId;
-      const seriesSiblings = seriesId
-        ? (await fetchCandidatesBySeriesId(c.env, seriesId, candidate.id)).map(toSeriesSiblingCandidate)
-        : [];
+      const seriesSiblings = await resolveSeriesSiblingsForCandidate(c.env, candidate);
 
       return ok<EventCandidateDetailResponse>(c, {
         candidate,
@@ -142,6 +142,53 @@ reviewRoute
       });
     } catch (error) {
       return handleReviewError(c, error, "Review candidate could not be loaded.");
+    }
+  })
+  .post("/candidates/:id/series-link", async (c) => {
+    const body = await readJsonBody(c.req.raw);
+    const otherCandidateId =
+      typeof body.otherCandidateId === "string" ? body.otherCandidateId.trim() : "";
+
+    if (!otherCandidateId) {
+      return fail(c, "invalid_body", "otherCandidateId is required.", 400);
+    }
+
+    try {
+      const result = await linkCandidatesAsSeries(c.env, c.req.param("id"), otherCandidateId);
+      const seriesSiblings = await resolveSeriesSiblingsForCandidate(c.env, result.primary);
+
+      return ok<EventCandidateDetailResponse>(c, {
+        candidate: result.primary,
+        ...(seriesSiblings.length > 0 ? { seriesSiblings } : {})
+      });
+    } catch (error) {
+      return handleReviewError(c, error, "Candidates could not be linked as a series.");
+    }
+  })
+  .post("/candidates/:id/series-unlink", async (c) => {
+    const body = await readJsonBody(c.req.raw);
+    const unlinkCandidateId =
+      typeof body.candidateId === "string" ? body.candidateId.trim() : "";
+
+    if (!unlinkCandidateId) {
+      return fail(c, "invalid_body", "candidateId is required.", 400);
+    }
+
+    try {
+      await unlinkCandidateFromSeries(c.env, unlinkCandidateId);
+      const primary = await getCandidate(c.env, c.req.param("id"));
+      if (!primary) {
+        return fail(c, "candidate_not_found", "That event candidate could not be found.", 404);
+      }
+
+      const seriesSiblings = await resolveSeriesSiblingsForCandidate(c.env, primary);
+
+      return ok<EventCandidateDetailResponse>(c, {
+        candidate: primary,
+        ...(seriesSiblings.length > 0 ? { seriesSiblings } : {})
+      });
+    } catch (error) {
+      return handleReviewError(c, error, "Series link could not be removed.");
     }
   })
   .post("/candidates/:id/reject", async (c) => {

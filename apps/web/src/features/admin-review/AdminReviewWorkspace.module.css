@@ -53,25 +53,35 @@
 }
 
 .listCol {
-  max-height: calc(100dvh - 13rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  min-width: 0;
 }
 
 .detailCol {
   position: sticky;
   top: 14px;
+  align-self: start;
+  height: calc(100dvh - 28px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .detailPane {
   background: var(--surface-card);
   border: var(--border-card);
   box-shadow: var(--shadow-lg);
-  padding: 20px;
-  min-height: calc(100dvh - 13rem);
+  padding: 24px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
+  color: var(--text-primary);
+  /* Paper card sits on a dark page — keep form controls readable */
+  color-scheme: light;
 }
 
 .detailPanePlaceholder {
@@ -81,7 +91,7 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  min-height: calc(100dvh - 13rem - 40px);
+  min-height: 100%;
   text-align: center;
   font-size: 14px;
   color: color-mix(in srgb, var(--text-on-page) 60%, transparent);
@@ -91,19 +101,38 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.tabRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.tabDivider {
+  color: color-mix(in srgb, var(--text-on-page) 35%, transparent);
+  font-size: 13px;
+  user-select: none;
 }
 
 .bulkBar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 12px 16px;
   margin-bottom: 16px;
   background: var(--surface-inset);
   border: 1.5px solid var(--border-on-page);
   box-shadow: var(--shadow-xs);
+}
+
+.bulkBarLabel {
+  font-size: 14px;
+  color: var(--text-on-page);
 }
 
 .message {
@@ -120,13 +149,14 @@
     grid-template-columns: 1fr;
   }
 
-  .listCol {
-    max-height: none;
-    overflow: visible;
-  }
-
   .detailCol {
     position: static;
+    height: auto;
+  }
+
+  .detailPane {
+    height: auto;
+    min-height: min(24rem, 60dvh);
   }
 }
 
@@ -137,21 +167,192 @@
   border: var(--border-card);
   box-shadow: var(--shadow-lg);
   padding: 28px;
+  color-scheme: light;
+  color: var(--text-primary);
 }
 
-.input {
+.tokenSubmit {
   width: 100%;
+  min-height: 44px;
+}
+
+.detailHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detailMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-label-on-card);
+}
+
+.detailMetaTag {
+  border-radius: 999px;
   border: var(--border-card);
-  background: var(--surface-card);
-  padding: 10px 12px;
-  font-size: 14px;
-  font-family: var(--font-body);
+  padding: 2px 8px;
   box-shadow: var(--shadow-xs);
 }
 
-.input:focus {
-  outline: 2px solid var(--mustard);
-  outline-offset: 1px;
+.detailTitle {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.detailSubtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary-on-card);
+}
+
+.detailActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  margin-bottom: 4px;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.detailActionsPrimary,
+.detailActionsSecondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.detailActionsSecondary {
+  margin-left: auto;
+}
+
+.detailForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+  min-height: 100%;
+}
+
+.detailSeriesFooter {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detailFormGrid {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .detailFormGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .detailFormGridNotes {
+    grid-template-columns: minmax(0, 1fr) 220px;
+  }
+}
+
+.updateNotice {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1.5px solid color-mix(in srgb, var(--mustard) 55%, var(--ink));
+  background: color-mix(in srgb, var(--mustard) 18%, var(--surface-card));
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.diffPanel {
+  overflow: hidden;
+  border: var(--border-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-xs);
+}
+
+.diffPanelHeader {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 14px;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-label-on-card);
+}
+
+.diffPanelList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diffPanelRow {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  .diffPanelRow {
+    grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.diffPanelLabel {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.diffPanelBefore {
+  color: var(--text-secondary-on-card);
+  text-decoration: line-through;
+}
+
+.diffPanelAfter {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.rawJson {
+  border: var(--border-card);
+  background: var(--surface-muted);
+  padding: 12px 14px;
+  font-size: 12px;
+  box-shadow: var(--shadow-xs);
+}
+
+.rawJson summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.rawJson pre {
+  margin: 10px 0 0;
+  max-height: 18rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-primary);
 }
 
 /* Postcard overrides for legacy tailwind markup inside workspace */

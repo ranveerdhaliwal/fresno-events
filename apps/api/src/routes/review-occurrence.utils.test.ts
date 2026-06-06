@@ -22,6 +22,7 @@ const primary: EventCandidate = {
   rawPayload: {},
   dedupeHash: "a",
   confidenceScore: 0.7,
+  detailStatus: "pending",
   status: "pending_review",
   occurrenceId: "occ-1",
   createdAt: "2026-01-01T00:00:00.000Z",

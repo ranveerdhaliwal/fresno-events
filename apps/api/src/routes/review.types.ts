@@ -1,11 +1,13 @@
-import type { EventCandidate, EventCandidateStatus } from "@fresno-events/shared";
+import type { EventCandidate, EventCandidateStatus, NormalizedEvent } from "@fresno-events/shared";
 
 export interface CandidatePatch {
-  status: EventCandidateStatus;
+  status?: EventCandidateStatus;
   review_notes?: string | null;
   reviewed_at?: string;
   reviewed_by?: string;
-  matched_event_id?: string;
+  matched_event_id?: string | null;
+  normalized_event?: NormalizedEvent;
+  updated_at?: string;
 }
 
 export interface SupabaseCandidateRow {
@@ -18,6 +20,8 @@ export interface SupabaseCandidateRow {
   start_ts: string;
   source_url: string | null;
   ticket_url: string | null;
+  detail_status: string;
+  detail_page_url: string | null;
   normalized_event: unknown;
   raw_payload: unknown;
   dedupe_hash: string;

@@ -1,9 +1,11 @@
 import { Loader2, ShieldAlert } from "lucide-react";
-import type { ReactNode } from "react";
 
+import { FormField } from "@/components/FormField/FormField";
 import { AdminApiError, type CandidateStatusFilter } from "../admin/admin-api";
 
 import styles from "./AdminReviewWorkspace.module.css";
+
+export { FormField as Field };
 
 export function EmptyDetail({ statusFilter }: { statusFilter: CandidateStatusFilter }) {
   const label =
@@ -48,14 +50,5 @@ export function ErrorBanner({ error }: { error: unknown }) {
       </div>
       <p className="mt-1">{message}</p>
     </div>
-  );
-}
-
-export function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="block space-y-1.5 text-xs uppercase tracking-[0.18em] text-neutral-400">
-      <span>{label}</span>
-      <div className="normal-case tracking-normal text-neutral-100">{children}</div>
-    </label>
   );
 }

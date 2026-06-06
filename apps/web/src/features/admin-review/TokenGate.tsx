@@ -1,10 +1,11 @@
 import { KeyRound, Loader2, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 
-import { cn } from "@/lib/cn";
+import { Button } from "@/components/Button/Button";
+import { TextInput } from "@/components/TextInput/TextInput";
 import { AdminApiError, isAdminAuthError, verifyAdminToken } from "../admin/admin-api";
 
-import { AUTH_FAILURE_MESSAGE, btnClickable, type TokenGateProps } from "./AdminReviewWorkspace.types";
+import { AUTH_FAILURE_MESSAGE, type TokenGateProps } from "./AdminReviewWorkspace.types";
 import styles from "./AdminReviewWorkspace.module.css";
 
 export function TokenGate({ authError, onAuthenticate }: TokenGateProps) {
@@ -66,7 +67,7 @@ export function TokenGate({ authError, onAuthenticate }: TokenGateProps) {
         }}
         className="space-y-3"
       >
-        <input
+        <TextInput
           autoFocus
           type="password"
           value={value}
@@ -78,20 +79,16 @@ export function TokenGate({ authError, onAuthenticate }: TokenGateProps) {
           }}
           placeholder="paste token"
           disabled={isVerifying}
-          className="h-11 w-full rounded-xl border border-neutral-700 bg-neutral-900 px-4 text-sm focus:border-amber-300 focus:outline-none disabled:opacity-60"
         />
-        <button
+        <Button
           type="submit"
+          variant="approve"
           disabled={isVerifying || !value.trim()}
-          className={cn(
-            "inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-300 text-sm font-semibold text-neutral-900 transition hover:bg-amber-200",
-            btnClickable,
-            "disabled:opacity-60"
-          )}
+          {...(styles.tokenSubmit ? { className: styles.tokenSubmit } : {})}
         >
-          {isVerifying ? <Loader2 className="size-4 animate-spin" /> : null}
+          {isVerifying ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           {isVerifying ? "Checking token…" : "Connect to review API"}
-        </button>
+        </Button>
       </form>
     </div>
   );
