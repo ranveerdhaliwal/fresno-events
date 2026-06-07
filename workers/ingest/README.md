@@ -13,5 +13,5 @@ pnpm ingest:promote-all
 | Registry key | Role |
 |--------------|------|
 | `venue-ingest` | All repo venues (direct + browser lanes) — [docs/VENUE_INGEST.md](../../docs/VENUE_INGEST.md) |
-| `ticketmaster`, etc. | Third-party APIs |
+| `ticketmaster`, `venunite`, etc. | Third-party APIs — [docs/TICKETING_SOURCES.md](../../docs/TICKETING_SOURCES.md) |
 | `ai-discovery` | Manual civic URL discovery |

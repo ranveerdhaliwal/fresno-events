@@ -3,13 +3,21 @@ import { z } from "zod";
 
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 
+const SaveMartMediaSchema = z.object({
+  mediaurl: z.string().optional()
+});
+
 const SaveMartDocSchema = z.object({
   recid: z.union([z.string(), z.number()]).optional(),
   title: z.string().optional(),
   url: z.string().optional(),
+  linkUrl: z.string().optional(),
   date: z.union([z.string(), z.record(z.unknown())]).optional(),
   startTime: z.union([z.string(), z.number()]).optional(),
-  location: z.string().optional()
+  location: z.string().optional(),
+  hostname: z.string().optional(),
+  media_raw: z.array(SaveMartMediaSchema).optional(),
+  _media: z.array(SaveMartMediaSchema).optional()
 });
 
 const SaveMartNestedDocsSchema = z.object({
@@ -78,18 +86,39 @@ export function buildSaveMartApiQuery(opts: { start: Date; end: Date; skip: numb
       fields: {
         _id: 1,
         location: 1,
+        hostname: 1,
         date: 1,
         startTime: 1,
         startDate: 1,
         endDate: 1,
         recid: 1,
         title: 1,
-        url: 1
+        url: 1,
+        linkUrl: 1,
+        media_raw: 1
       },
       hooks: [],
       sort: { date: 1, startTime: 1, rank: 1, title_sort: 1 }
     }
   };
+}
+
+function resolveSaveMartImageUrl(doc: z.infer<typeof SaveMartDocSchema>): string | undefined {
+  const fromMedia = doc.media_raw?.find((m) => m.mediaurl?.startsWith("http"))?.mediaurl;
+  if (fromMedia) {
+    return fromMedia;
+  }
+  return doc._media?.find((m) => m.mediaurl?.startsWith("http"))?.mediaurl;
+}
+
+function resolveSaveMartExternalUrl(doc: z.infer<typeof SaveMartDocSchema>): string {
+  if (doc.url?.startsWith("http")) {
+    return doc.url;
+  }
+  if (doc.url) {
+    return `https://www.savemartcenter.com${doc.url.startsWith("/") ? "" : "/"}${doc.url}`;
+  }
+  return "https://www.savemartcenter.com/events-tickets/";
 }
 
 export function buildSaveMartApiUrl(query: Record<string, unknown>, token: string): string {
@@ -121,21 +150,21 @@ export function saveMartDocsToEvents(docs: unknown[]): NormalizedEvent[] {
     }
 
     const recid = doc.recid !== undefined ? String(doc.recid) : title.toLowerCase().replace(/\s+/g, "-");
-    const externalUrl = doc.url?.startsWith("http")
-      ? doc.url
-      : doc.url
-        ? `https://www.savemartcenter.com${doc.url.startsWith("/") ? "" : "/"}${doc.url}`
-        : "https://www.savemartcenter.com/events-tickets/";
+    const externalUrl = resolveSaveMartExternalUrl(doc);
+    const imageUrl = resolveSaveMartImageUrl(doc);
+    const ticketUrl = doc.linkUrl?.startsWith("http") ? doc.linkUrl.trim() : undefined;
 
     events.push({
       source: "scrape:www.savemartcenter.com",
       sourceEventId: `venue:save-mart:${recid}`,
       title,
-      venueName: doc.location?.trim() || "Save Mart Center",
+      venueName: doc.location?.trim() || doc.hostname?.trim() || "Save Mart Center",
       venueCity: "Fresno",
       startTs,
       category: "community",
-      externalUrl
+      externalUrl,
+      ...(imageUrl ? { imageUrl } : {}),
+      ...(ticketUrl ? { ticketUrl } : {})
     });
   }
 

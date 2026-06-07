@@ -260,7 +260,7 @@ export function CandidateDetail({
         hint={
           candidate.suggestedPriority !== undefined ? (
             <>
-              AI suggested P{candidate.suggestedPriority}
+              Suggested P{candidate.suggestedPriority}
               {candidate.suggestedPriority !== draft.priority ? " · you overrode" : ""}
             </>
           ) : undefined

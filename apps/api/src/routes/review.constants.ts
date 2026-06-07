@@ -32,6 +32,7 @@ export const candidateSelect = [
   "reviewed_by",
   "matched_event_id",
   "occurrence_id",
+  "occurrence_key",
   "canonical_candidate_id",
   "created_at",
   "updated_at"

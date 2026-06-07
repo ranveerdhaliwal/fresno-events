@@ -1,13 +1,29 @@
+import type { CSSProperties } from "react";
+
 import { gradientForPalette } from "@/lib/image-palette";
 import { cn } from "@/lib/cn";
 
 import type { PlaceholderImageProps } from "./PlaceholderImage.types";
 import styles from "./PlaceholderImage.module.css";
 
-export function PlaceholderImage({ paletteKey, label, className, imageUrl }: PlaceholderImageProps) {
+export function PlaceholderImage({
+  paletteKey,
+  label,
+  className,
+  imageUrl,
+  imageFit = "cover",
+  imagePadding
+}: PlaceholderImageProps) {
   if (imageUrl) {
     return (
-      <div className={cn(styles.root, className)}>
+      <div
+        className={cn(styles.root, styles.photo, imageFit === "contain" && styles.contain, className)}
+        style={
+          imageFit === "contain" && imagePadding !== undefined
+            ? ({ "--logo-inset": `${imagePadding}px` } as CSSProperties)
+            : undefined
+        }
+      >
         <img src={imageUrl} alt="" className={styles.img} />
       </div>
     );
@@ -15,7 +31,7 @@ export function PlaceholderImage({ paletteKey, label, className, imageUrl }: Pla
 
   return (
     <div
-      className={cn(styles.root, className)}
+      className={cn(styles.root, styles.placeholder, className)}
       style={{ background: gradientForPalette(paletteKey) }}
       data-testid="placeholder-image"
     >

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { VenueConfig } from "@/venues/venue.types";
 
-import { parseChaffeeListingHtml } from "./chaffee-listing.utils";
+import { CHAFFEE_ZOO_DEFAULT_IMAGE_URL, parseChaffeeListingHtml } from "./chaffee-listing.utils";
 import configJson from "./venue.config.json";
 
 const config = configJson as VenueConfig;
@@ -22,5 +22,8 @@ describe("parseChaffeeListingHtml", () => {
     expect(events[0]?.title).toBe("Breakfast With The Animals");
     expect(events[0]?.source).toBe("scrape:fcz.org");
     expect(events[1]?.title).toContain("Rainbow Family Day");
+    expect(events.every((e) => e.imageUrl === CHAFFEE_ZOO_DEFAULT_IMAGE_URL)).toBe(true);
+    expect(events.every((e) => e.showVenueLogoInList === true)).toBe(true);
+    expect(events.every((e) => e.listVenueLogoPadding === 2)).toBe(true);
   });
 });

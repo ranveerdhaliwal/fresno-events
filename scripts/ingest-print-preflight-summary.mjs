@@ -115,7 +115,8 @@ if (
 }
 
 /** @typedef {{ title?: string, url?: string, start_ts?: string }} EventLink */
-/** @typedef {{ url?: string, label?: string, events_found?: number, venue_key?: string, event_source?: string, detail_urls_planned?: number, dry_run_plan?: boolean, listing_urls?: string[], detail_urls?: string[], event_links?: EventLink[], strategy?: string, ingest_lane?: string, detail_mode?: string, fetch_urls?: string[] }} SeedMetric */
+/** @typedef {{ processed?: number, updated?: number, skipped_sufficient_data?: number, skipped_pending_detail?: number, errors?: number, auto_rejected?: number }} EnrichmentMetric */
+/** @typedef {{ url?: string, label?: string, events_found?: number, venue_key?: string, event_source?: string, detail_urls_planned?: number, detail_urls_visited?: number, dry_run_plan?: boolean, listing_urls?: string[], detail_urls?: string[], event_links?: EventLink[], strategy?: string, ingest_lane?: string, detail_mode?: string, enrichment?: EnrichmentMetric, fetch_urls?: string[] }} SeedMetric */
 /** @typedef {{ url?: string, message?: string }} ScrapeError */
 /** @typedef {{ code?: string, message?: string }} ValidationIssue */
 /** @typedef {{ title?: string, start_ts?: string, venue_name?: string, source?: string, source_event_id?: string, kept_source_event_id?: string, kept_title?: string, match?: string, external_url?: string, kept_external_url?: string }} BatchDuplicateItem */
@@ -551,6 +552,75 @@ function errorsForUrl(errors, url) {
   return errors.filter((error) => error.url && domainStem(error.url) === stem);
 }
 
+/** @param {EnrichmentMetric | undefined} enrichment */
+function formatEnrichedCount(enrichment) {
+  if (!enrichment) {
+    return "  —";
+  }
+  const llm = typeof enrichment.updated === "number" ? enrichment.updated : 0;
+  const skipped =
+    (enrichment.skipped_sufficient_data ?? 0) + (enrichment.skipped_pending_detail ?? 0);
+  if (skipped > 0 && llm === 0) {
+    return String(skipped);
+  }
+  if (skipped > 0) {
+    return `${llm}+${skipped}skip`;
+  }
+  return String(llm);
+}
+
+/** @param {SeedMetric | undefined} metric */
+function formatDetailPages(metric) {
+  if (!metric) {
+    return "  —";
+  }
+  if (metric.detail_mode === "none") {
+    return "none";
+  }
+  const visited = typeof metric.detail_urls_visited === "number" ? metric.detail_urls_visited : 0;
+  const planned = typeof metric.detail_urls_planned === "number" ? metric.detail_urls_planned : null;
+  if (planned !== null && visited === 0) {
+    return `0/${planned}`;
+  }
+  return String(visited);
+}
+
+/** @param {Record<string, unknown>} summary @param {SeedMetric | undefined} metric */
+function printPromoteResultLine(summary, metric) {
+  const source =
+    typeof metric?.venue_key === "string"
+      ? metric.venue_key
+      : typeof summary.source === "string"
+        ? summary.source
+        : "unknown";
+  const eventsFound =
+    typeof metric?.events_found === "number"
+      ? metric.events_found
+      : typeof summary.events_found === "number"
+        ? summary.events_found
+        : 0;
+  const errorCount = typeof summary.errors === "number" ? summary.errors : 0;
+  const ok = summary.ok === true;
+  const persisted =
+    isRecord(summary.persistence) && summary.persistence.persisted === true;
+  const candidates =
+    isRecord(summary.persistence) && typeof summary.persistence.candidates === "number"
+      ? summary.persistence.candidates
+      : eventsFound;
+  const enrichment = metric?.enrichment ?? (isRecord(summary.enrichment) ? summary.enrichment : undefined);
+  const status = ok && persisted ? "OK  " : "FAIL";
+
+  console.log(
+    `${status} ${source.padEnd(22)} scraped ${String(eventsFound).padStart(3)}  persisted ${persisted ? String(candidates).padStart(3) : " no "}  enriched ${formatEnrichedCount(enrichment).padStart(6)}  detail ${formatDetailPages(metric).padStart(5)}  errors ${errorCount}`
+  );
+
+  if (!ok && typeof summary.message === "string" && summary.message) {
+    console.log(`     ${summary.message}`);
+  } else if (!persisted && isRecord(summary.persistence) && typeof summary.persistence.reason === "string") {
+    console.log(`     ${summary.persistence.reason}`);
+  }
+}
+
 /** @param {ScrapeError[]} errors */
 function formatErrors(errors) {
   const first = errors[0];
@@ -679,24 +749,13 @@ if (isPromote) {
     if (!isRecord(summary) || summary.dry_run === true) {
       continue;
     }
-    const source = typeof summary.source === "string" ? summary.source : "unknown";
-    const eventsFound = typeof summary.events_found === "number" ? summary.events_found : 0;
-    const errorCount = typeof summary.errors === "number" ? summary.errors : 0;
-    const ok = summary.ok === true;
-    const persisted =
-      isRecord(summary.persistence) && summary.persistence.persisted === true;
-    const candidates =
-      isRecord(summary.persistence) && typeof summary.persistence.candidates === "number"
-        ? summary.persistence.candidates
-        : eventsFound;
-    const status = ok && persisted ? "OK  " : "FAIL";
-    console.log(
-      `${status} ${source.padEnd(22)} scraped ${String(eventsFound).padStart(3)}  persisted ${persisted ? String(candidates).padStart(3) : " no "}  errors ${errorCount}`
-    );
-    if (!ok && typeof summary.message === "string" && summary.message) {
-      console.log(`     ${summary.message}`);
-    } else if (!persisted && isRecord(summary.persistence) && typeof summary.persistence.reason === "string") {
-      console.log(`     ${summary.persistence.reason}`);
+    const seedMetrics = Array.isArray(summary.seed_metrics) ? summary.seed_metrics : [];
+    if (seedMetrics.length > 0) {
+      for (const metric of seedMetrics) {
+        printPromoteResultLine(summary, /** @type {SeedMetric} */ (metric));
+      }
+    } else {
+      printPromoteResultLine(summary, undefined);
     }
     if (isRecord(summary.validation) && Array.isArray(summary.validation.soft) && summary.validation.soft.length > 0) {
       for (const issue of summary.validation.soft) {

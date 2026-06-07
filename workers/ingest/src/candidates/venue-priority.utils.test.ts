@@ -39,4 +39,25 @@ describe("venue-priority.utils", () => {
     expect(result.suggested_priority).toBe(3);
     expect(result.review_notes).toContain("[venue] Grizzlies / MiLB → P3");
   });
+
+  it("prioritizes bulldogs football above other bulldogs sports", () => {
+    expect(
+      resolveVenueSuggestedPriority({
+        source: "api:gobulldogs",
+        sourceEventId: "gobulldogs:game:1",
+        title: "Women's Volleyball vs UCSB",
+        venueName: "Save Mart Center",
+        startTs: "2026-08-15T00:00:00.000Z"
+      })
+    ).toBe(4);
+    expect(
+      resolveVenueSuggestedPriority({
+        source: "api:gobulldogs",
+        sourceEventId: "gobulldogs:game:2",
+        title: "Football vs USC",
+        venueName: "Valley Children's Stadium",
+        startTs: "2026-09-05T01:00:00.000Z"
+      })
+    ).toBe(3);
+  });
 });

@@ -33,8 +33,17 @@ export function writePriorityOverrides(overrides: Record<string, number>) {
 }
 
 export function clearPriorityOverride(id: string, overrides: Record<string, number>): Record<string, number> {
+  return clearPriorityOverridesForIds(overrides, [id]);
+}
+
+export function clearPriorityOverridesForIds(
+  overrides: Record<string, number>,
+  ids: Iterable<string>
+): Record<string, number> {
   const next = { ...overrides };
-  delete next[id];
+  for (const id of ids) {
+    delete next[id];
+  }
   writePriorityOverrides(next);
   return next;
 }

@@ -74,7 +74,8 @@ Check raw rows: Supabase Studio http://127.0.0.1:54423 → `event_candidates`, `
 
 | Key | How it fetches | Needs in `.dev.vars` | Cron schedule | Cadence (typical) |
 | --- | --- | --- | --- | --- |
-| `ticketmaster` | Official API | `TICKETMASTER_API_KEY` | cron | 6h |
+| `ticketmaster` | Ticketmaster Discovery API (paginated) | `TICKETMASTER_API_KEY` | cron | 24h — [TICKETING_SOURCES.md](TICKETING_SOURCES.md) |
+| `venunite` | VenuNite REST aggregator (Fresno, skipModules) | — | cron | 14d |
 | `visit-fresno-api` | CMS REST (`get_simple_token` + `rest_v2`) | optional `VISIT_FRESNO_API_TOKEN` fallback | cron | 6h |
 | `milb-api` | statsapi | — | cron | 12h |
 | `downtown-fresno-api` | CityLight BBQ HTML + BR detail `/do/*` | `CLOUDFLARE_*` + LLM for details (BBQ key in code) | cron | 7d |

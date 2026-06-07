@@ -9,6 +9,8 @@ export interface EventRowProps {
   showImage?: boolean;
   /** Shown under price (e.g. admin confidence hint). Replaces default RSVP sublabel. */
   priceSubLabel?: string;
+  /** Shown above price/confidence (e.g. admin display priority). */
+  priorityLabel?: string;
   /** Keep row visible below 600px (admin list). */
   forceVisible?: boolean;
 }

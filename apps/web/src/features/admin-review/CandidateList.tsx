@@ -7,6 +7,7 @@ import { listDisplayPriority, type PriorityGroup } from "../admin/admin-priority
 import type { CandidateStatusFilter } from "../admin/admin-api";
 
 import { toCandidateEventRowViewModel } from "./admin-candidate.utils";
+import { isPageFullySelected } from "./admin-review-selection.utils";
 import styles from "./CandidateList.module.css";
 
 export interface CandidateListProps {
@@ -19,7 +20,9 @@ export interface CandidateListProps {
   priorityOverrides: Record<string, number>;
   seriesDisplayPriorities: Map<string, number>;
   onToggleSelected: (id: string) => void;
-  onSelectAll: () => void;
+  onSelectAll: (pageIds: string[]) => void;
+  searchMode?: boolean;
+  searchQuery?: string;
 }
 
 export function CandidateList({
@@ -32,7 +35,9 @@ export function CandidateList({
   priorityOverrides,
   seriesDisplayPriorities,
   onToggleSelected,
-  onSelectAll
+  onSelectAll,
+  searchMode = false,
+  searchQuery = ""
 }: CandidateListProps) {
   const items = groups.flatMap((group) => group.items);
 
@@ -47,18 +52,30 @@ export function CandidateList({
   if (items.length === 0) {
     return (
       <div className={styles.empty}>
-        No candidates with status <strong>{statusFilter.replace(/_/g, " ")}</strong>.
+        {searchMode ? (
+          <>
+            No candidates match <strong>{searchQuery.trim()}</strong>.
+          </>
+        ) : (
+          <>
+            No candidates with status <strong>{statusFilter.replace(/_/g, " ")}</strong>.
+          </>
+        )}
       </div>
     );
   }
 
-  const allSelected = items.length > 0 && selectedIds.size === items.length;
+  const allSelected = isPageFullySelected(selectedIds, items.map((item) => item.id));
 
   return (
     <div className={styles.list} data-admin-list>
       <div className={styles.toolbar}>
         <label className={styles.selectAll}>
-          <input type="checkbox" checked={allSelected} onChange={onSelectAll} />
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={() => onSelectAll(items.map((item) => item.id))}
+          />
           Select all on page
         </label>
         <span className={styles.count}>{items.length} rows</span>
@@ -67,16 +84,17 @@ export function CandidateList({
       {groups.map((group, groupIndex) => (
         <section key={`${group.priority}-${groupIndex}`} className={styles.group}>
           <SecHead
-            title={`PRIORITY ${group.priority}`}
+            title={searchMode ? `SEARCH · PRIORITY ${group.priority}` : `PRIORITY ${group.priority}`}
             script={getEventDisplayPriorityLabel(group.priority).toLowerCase()}
             count={group.items.length}
           />
           <ul className={styles.rows}>
             {group.items.map((candidate) => {
               const priority = listDisplayPriority(candidate, seriesDisplayPriorities, priorityOverrides);
-              const aiSuggested =
-                candidate.suggestedPriority !== undefined && priorityOverrides[candidate.id] === undefined;
-              const row = toCandidateEventRowViewModel(candidate, priority, { aiSuggested });
+              const row = toCandidateEventRowViewModel(candidate, priority, {
+                showStatusInLabel: searchMode
+              });
+              const showImage = priority < 5 || row.showVenueLogoInList === true;
 
               return (
                 <li key={candidate.id} className={styles.item}>
@@ -92,7 +110,8 @@ export function CandidateList({
                     event={row}
                     isSelected={candidate.id === activeId}
                     onSelect={() => onSelect(candidate.id)}
-                    showImage={priority < 5}
+                    showImage={showImage}
+                    priorityLabel={`P${priority} · ${getEventDisplayPriorityLabel(priority)}`}
                     priceSubLabel="confidence"
                     forceVisible
                   />

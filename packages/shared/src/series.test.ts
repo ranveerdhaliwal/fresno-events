@@ -88,6 +88,19 @@ describe("computeCanonicalSeriesId", () => {
     expect(a.seriesId).toMatch(/^series:visitfresnocounty:[a-f0-9]{64}$/);
   });
 
+  it("groups multi-performance runs by shared title at venue", async () => {
+    const base = {
+      source: "scrape:www.savemartcenter.com",
+      title: "Ringling Bros. and Barnum & Bailey presents The Greatest Show On Earth",
+      venueName: "Save Mart Center",
+      groupByTitleRun: true
+    };
+    const a = await computeCanonicalSeriesId(base);
+    const b = await computeCanonicalSeriesId({ ...base, title: base.title });
+    expect(a.seriesId).toBe(b.seriesId);
+    expect(a.seriesId).toMatch(/^series:savemartcenter\.com:[a-f0-9]{64}$/);
+  });
+
   it("different CMS slugs same loose title → same seriesId", async () => {
     const base = {
       source: "api:visitfresnocounty",

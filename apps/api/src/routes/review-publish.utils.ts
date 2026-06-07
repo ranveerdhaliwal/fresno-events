@@ -111,7 +111,12 @@ export async function approveCandidateCore(
   const priority =
     options.priority !== undefined ? options.priority : resolveBulkApprovePriority(candidate);
 
-  const siblings = await fetchCandidatesByOccurrenceId(env, candidate.occurrenceId, candidate.id);
+  const siblings = await fetchCandidatesByOccurrenceId(
+    env,
+    candidate.occurrenceId,
+    candidate.id,
+    candidate.occurrenceKey
+  );
 
   const { event } = await publishCandidateToEvent(env, candidate, {
     eventOverride: options.eventOverride,

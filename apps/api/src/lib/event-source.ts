@@ -1,6 +1,6 @@
 import type { EventSource } from "@fresno-events/shared";
 
-const FIXED_SOURCES = ["ticketmaster", "eventbrite", "bandsintown", "seatgeek", "manual", "recurring"] as const;
+const FIXED_SOURCES = ["ticketmaster", "venunite", "eventbrite", "bandsintown", "seatgeek", "manual", "recurring"] as const;
 
 export function toEventSource(value: string): EventSource {
   if ((FIXED_SOURCES as readonly string[]).includes(value)) {

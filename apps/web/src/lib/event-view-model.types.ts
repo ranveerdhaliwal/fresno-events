@@ -14,6 +14,7 @@ export interface EventRowViewModel {
   dateLabel: string;
   dayShort: string;
   dayNum: string;
+  monthShort: string;
   categoryLabel: string;
   priceLabel: string;
   flagLabel: string | null;
@@ -21,6 +22,10 @@ export interface EventRowViewModel {
   paletteKey: ImagePaletteKey;
   paletteGradient: string;
   imageUrl: string | null;
+  /** When set, show logo thumbnail even at community priority in list rows. */
+  showVenueLogoInList?: boolean;
+  /** Inset (px) around venue logos in list thumbnails. */
+  listVenueLogoPadding?: number;
   isFree: boolean;
   isLive: boolean;
   featuredBadge: FeaturedBadge;

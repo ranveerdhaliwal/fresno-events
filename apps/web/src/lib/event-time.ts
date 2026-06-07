@@ -27,6 +27,13 @@ export function formatEventDate(value: string | Date): string {
   }).format(typeof value === "string" ? new Date(value) : value);
 }
 
+export function formatMonthLong(value: string | Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    timeZone: TIME_ZONE
+  }).format(typeof value === "string" ? new Date(value) : value);
+}
+
 export function formatDayOfMonth(value: string | Date): string {
   return new Intl.DateTimeFormat("en-US", {
     day: "numeric",

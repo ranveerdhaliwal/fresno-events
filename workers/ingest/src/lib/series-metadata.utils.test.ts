@@ -48,6 +48,22 @@ describe("applySeriesMetadata", () => {
     expect(results[0]?.seriesId).toBe(results[1]?.seriesId);
   });
 
+  it("assigns seriesId when multiple performances share the same title at a venue", async () => {
+    const base = {
+      source: "scrape:www.savemartcenter.com" as const,
+      title: "Monster Jam",
+      venueName: "Save Mart Center"
+    };
+    const results = await applySeriesMetadata([
+      { ...base, sourceEventId: "a", startTs: "2026-08-22T03:00:00.000Z" },
+      { ...base, sourceEventId: "b", startTs: "2026-08-23T03:00:00.000Z" },
+      { ...base, sourceEventId: "c", startTs: "2026-08-24T03:00:00.000Z" }
+    ]);
+    expect(results.every((r) => r.seriesId)).toBe(true);
+    expect(results[0]?.seriesId).toBe(results[1]?.seriesId);
+    expect(results[1]?.seriesId).toBe(results[2]?.seriesId);
+  });
+
   it("leaves one-offs without seriesId", async () => {
     const [result] = await applySeriesMetadata([
       {

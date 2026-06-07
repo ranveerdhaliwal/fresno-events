@@ -16,6 +16,7 @@ import {
 } from "@/candidates/persist-audit.utils";
 import { buildPublishedEventPatchBody } from "@/candidates/sync-published-event.utils";
 import type { IngestEnv } from "@/env";
+import { compactPersistAuditForLog } from "@/log-compact.utils";
 import { getSupabaseConfig, type SupabaseConfig } from "@/sources";
 
 export type PersistenceResult =
@@ -262,11 +263,7 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       event: "ingest_persist_summary",
       run_id: result.runId,
       source: result.source,
-      new: auditSummary.new,
-      changed: auditSummary.changed,
-      unchanged: auditSummary.unchanged,
-      new_items: auditSummary.new_items,
-      changed_items: auditSummary.changed_items
+      ...compactPersistAuditForLog(auditSummary)
     })
   );
   console.log(
@@ -398,7 +395,10 @@ async function fetchExistingCandidatesForSource(
 
 function isCrossSourceDedupeEnabled(env: IngestEnv) {
   const value = env.INGEST_CROSS_SOURCE_DEDUPE?.trim().toLowerCase();
-  return value === "true" || value === "1";
+  if (value === "false" || value === "0" || value === "off") {
+    return false;
+  }
+  return true;
 }
 
 async function syncPublishedEvent(

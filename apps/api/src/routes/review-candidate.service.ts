@@ -1,5 +1,7 @@
 import type {
   CandidateBulkDeleteResponse,
+  CandidateBulkPriorityResponse,
+  CandidateBulkRejectResponse,
   CandidateDetailStatus,
   EventCandidate,
   EventCandidateStatus,
@@ -8,6 +10,7 @@ import type {
 
 import type { Env } from "@/env";
 import { toEventSource } from "@/lib/event-source";
+import { clampEventPriority } from "@fresno-events/shared";
 import { partitionCandidatesForDelete } from "@/routes/review-delete.utils";
 import { candidateSelect } from "@/routes/review.constants";
 import { toCandidateStatus, toRecord } from "@/routes/review-mappers.utils";
@@ -44,6 +47,7 @@ export function mapCandidateRow(row: SupabaseCandidateRow): EventCandidate {
     ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
     ...(row.matched_event_id ? { matchedEventId: row.matched_event_id } : {}),
     occurrenceId: row.occurrence_id,
+    ...(row.occurrence_key ? { occurrenceKey: row.occurrence_key } : {}),
     ...(row.canonical_candidate_id ? { canonicalCandidateId: row.canonical_candidate_id } : {})
   };
 }
@@ -78,7 +82,8 @@ export async function updateCandidate(env: Env, id: string, patch: CandidatePatc
 export async function fetchCandidatesByOccurrenceId(
   env: Env,
   occurrenceId: string,
-  excludeId?: string
+  excludeId?: string,
+  occurrenceKey?: string | null
 ): Promise<EventCandidate[]> {
   const params = new URLSearchParams({
     select: candidateSelect,
@@ -86,6 +91,9 @@ export async function fetchCandidatesByOccurrenceId(
     order: "source.asc",
     limit: "50"
   });
+  if (occurrenceKey) {
+    params.set("occurrence_key", `eq.${occurrenceKey}`);
+  }
 
   const rows = await supabaseReviewRequest<SupabaseCandidateRow[]>(
     env,
@@ -230,4 +238,69 @@ export async function deleteCandidates(
   }
 
   return { deleted: toDelete.length, skipped };
+}
+
+export async function bulkUpdateSuggestedPriority(
+  env: Env,
+  ids: string[],
+  priority: number
+): Promise<CandidateBulkPriorityResponse> {
+  const clamped = clampEventPriority(priority);
+  const uniqueIds = [...new Set(ids)];
+  const failed: Array<{ id: string; message: string }> = [];
+  let updated = 0;
+
+  for (const id of uniqueIds) {
+    try {
+      const row = await updateCandidate(env, id, { suggested_priority: clamped });
+      if (row) {
+        updated += 1;
+      } else {
+        failed.push({ id, message: "not_found" });
+      }
+    } catch (error) {
+      failed.push({
+        id,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  return { priority: clamped, updated, failed };
+}
+
+export async function bulkRejectCandidates(
+  env: Env,
+  ids: string[],
+  options: { notes?: string; reviewedBy?: string } = {}
+): Promise<CandidateBulkRejectResponse> {
+  const uniqueIds = [...new Set(ids)];
+  const failed: Array<{ id: string; message: string }> = [];
+  let rejected = 0;
+  const reviewedAt = new Date().toISOString();
+  const reviewedBy = options.reviewedBy ?? "admin";
+  const reviewNotes = options.notes ?? null;
+
+  for (const id of uniqueIds) {
+    try {
+      const row = await updateCandidate(env, id, {
+        status: "rejected",
+        review_notes: reviewNotes,
+        reviewed_by: reviewedBy,
+        reviewed_at: reviewedAt
+      });
+      if (row) {
+        rejected += 1;
+      } else {
+        failed.push({ id, message: "not_found" });
+      }
+    } catch (error) {
+      failed.push({
+        id,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  return { rejected, failed };
 }

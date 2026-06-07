@@ -23,6 +23,18 @@ export const SOURCE_VALIDATION_PROFILES: SourceValidationProfile[] = [
     multiSource: true,
     minEventsWarn: 5,
     maxErrors: 40
+  },
+  {
+    scraperKey: "venunite",
+    eventSource: "venunite",
+    minEventsWarn: 80,
+    maxErrors: 5
+  },
+  {
+    scraperKey: "ticketmaster",
+    eventSource: "ticketmaster",
+    minEventsWarn: 15,
+    maxErrors: 5
   }
 ];
 

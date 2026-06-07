@@ -8,7 +8,7 @@
   justify-content: center;
 }
 
-.root::after {
+.placeholder::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -23,6 +23,20 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.photo .img {
+  object-fit: cover;
+}
+
+.contain {
+  background: var(--surface-card);
+}
+
+.contain .img {
+  object-fit: contain;
+  padding: var(--logo-inset, 6px);
+  box-sizing: border-box;
 }
 
 .label {

@@ -1,5 +1,7 @@
 import type { EventSource, NormalizedEvent } from "@fresno-events/shared";
 
+import { resolveGobulldogsPriority } from "@/scrapers/gobulldogs-priority.utils";
+
 /** Predefined editorial priority for matching ingest candidates (overrides AI). */
 export interface VenuePriorityRule {
   /** When set, candidate must match this ingest source. */
@@ -24,6 +26,10 @@ const VENUE_PRIORITY_RULES: readonly VenuePriorityRule[] = [
 ];
 
 export function resolveVenueSuggestedPriority(event: NormalizedEvent): number | null {
+  const gobulldogs = resolveGobulldogsPriority(event);
+  if (gobulldogs) {
+    return gobulldogs.priority;
+  }
   const match = findVenuePriorityRule(event);
   return match?.priority ?? null;
 }
@@ -49,6 +55,16 @@ export function applyVenuePriorityOverride(
   aiPriority: number,
   reviewNotes: string
 ): { suggested_priority: number; review_notes: string } {
+  const gobulldogs = resolveGobulldogsPriority(event);
+  if (gobulldogs) {
+    const venueNote = `[venue] ${gobulldogs.label} → P${gobulldogs.priority}`;
+    const notes = reviewNotes.includes("[venue]") ? reviewNotes : `${reviewNotes} · ${venueNote}`;
+    return {
+      suggested_priority: gobulldogs.priority,
+      review_notes: notes
+    };
+  }
+
   const rule = findVenuePriorityRule(event);
   if (!rule) {
     return { suggested_priority: aiPriority, review_notes: reviewNotes };

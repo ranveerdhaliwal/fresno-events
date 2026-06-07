@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  BULLDOGS_DEFAULT_IMAGE_URL,
   buildGobulldogsCalendarApiUrl,
   buildGobulldogsGameTitle,
   gobulldogsCalendarDaysToEvents,
@@ -34,6 +35,9 @@ describe("parseGobulldogsCalendarDays", () => {
     expect(events[0]?.source).toBe("api:gobulldogs");
     expect(events[0]?.timezone).toBe("America/Los_Angeles");
     expect(events[0]?.sourceEventId.startsWith("gobulldogs:game:")).toBe(true);
+    expect(events.every((e) => e.imageUrl === BULLDOGS_DEFAULT_IMAGE_URL)).toBe(true);
+    const football = events.find((e) => e.title.startsWith("Football"));
+    expect(football?.tags).toContain("sport:football");
   });
 });
 

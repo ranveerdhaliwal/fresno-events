@@ -5,4 +5,8 @@ export interface PlaceholderImageProps {
   label?: string;
   className?: string;
   imageUrl?: string | null;
+  /** Thumbnails for logos/posters in rows; posters on cards use cover. */
+  imageFit?: "cover" | "contain";
+  /** Inset (px) when imageFit is contain; lower = larger logo. */
+  imagePadding?: number;
 }

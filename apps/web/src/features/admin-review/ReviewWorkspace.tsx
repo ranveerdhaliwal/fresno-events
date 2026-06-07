@@ -1,14 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Loader2, LogOut, RefreshCcw, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, Loader2, LogOut, RefreshCcw, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import type { EventCandidate } from "@fresno-events/shared";
+import { EVENT_DISPLAY_PRIORITY } from "@fresno-events/shared";
 
 import { Button } from "@/components/Button/Button";
+import { SelectInput } from "@/components/SelectInput/SelectInput";
 import {
   AdminApiError,
   bulkApproveAllPending,
   bulkApproveCandidates,
   bulkApproveChanges,
   bulkApproveChangesAll,
+  bulkSetCandidatePriority,
+  bulkRejectCandidates,
   deleteCandidates,
   getCandidate,
   isAdminAuthError,
@@ -18,6 +24,7 @@ import {
 import {
   buildSeriesDisplayPriorities,
   clearPriorityOverride,
+  clearPriorityOverridesForIds,
   effectivePriority,
   groupCandidatesByPriority,
   readPriorityOverrides,
@@ -33,9 +40,15 @@ import {
   type ReviewWorkspaceProps
 } from "./AdminReviewWorkspace.types";
 import styles from "./AdminReviewWorkspace.module.css";
+import { AdminSearchInput } from "./AdminSearchInput";
 import { CandidateChangeDetail } from "./CandidateChangeDetail";
 import { CandidateDetail } from "./CandidateDetail";
 import { CandidateList } from "./CandidateList";
+import {
+  ADMIN_SEARCH_STATUSES,
+  filterCandidatesForSearch
+} from "./admin-review-search.utils";
+import { togglePageSelection } from "./admin-review-selection.utils";
 
 export function ReviewWorkspace({
   token,
@@ -54,6 +67,46 @@ export function ReviewWorkspace({
   const [priorityOverrides, setPriorityOverrides] = useState<Record<string, number>>(() =>
     readPriorityOverrides()
   );
+  const [bulkPriority, setBulkPriority] = useState("5");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
+
+  const searchActive = searchQuery.trim().length >= 2;
+
+  const crossStatusQueries = useQueries({
+    queries: ADMIN_SEARCH_STATUSES.map((status) => ({
+      queryKey: ["admin", "candidates", "search", status, token],
+      queryFn: () => listCandidates(token, status),
+      staleTime: 5 * 60_000,
+      gcTime: 10 * 60_000,
+      enabled: searchActive
+    }))
+  });
+
+  const crossStatusRevision = crossStatusQueries.reduce(
+    (total, query) => total + (query.dataUpdatedAt ?? 0),
+    0
+  );
+
+  const crossStatusItems = useMemo(() => {
+    const byId = new Map<string, EventCandidate>();
+    for (const result of crossStatusQueries) {
+      for (const row of result.data?.items ?? []) {
+        byId.set(row.id, row);
+      }
+    }
+    return [...byId.values()];
+  }, [crossStatusQueries, crossStatusRevision]);
+
+  const searchResults = useMemo(() => {
+    if (!searchActive) {
+      return [];
+    }
+    return filterCandidatesForSearch(crossStatusItems, searchQuery);
+  }, [crossStatusItems, searchActive, searchQuery]);
 
   const candidatesQuery = useQuery({
     queryKey: ["admin", "candidates", activeTab, token],
@@ -81,6 +134,36 @@ export function ReviewWorkspace({
     () => groupCandidatesByPriority(sortedItems, priorityOverrides, seriesDisplayPriorities),
     [sortedItems, priorityOverrides, seriesDisplayPriorities]
   );
+  const listGroups = useMemo(() => {
+    if (!searchActive) {
+      return priorityGroups;
+    }
+    if (searchResults.length === 0) {
+      return [];
+    }
+    const searchSeriesPriorities = buildSeriesDisplayPriorities(searchResults, priorityOverrides);
+    return groupCandidatesByPriority(
+      sortCandidatesForReview(searchResults, priorityOverrides),
+      priorityOverrides,
+      searchSeriesPriorities
+    );
+  }, [priorityGroups, searchActive, searchResults, priorityOverrides]);
+
+  const visibleListItems = useMemo(() => listGroups.flatMap((group) => group.items), [listGroups]);
+
+  const listSeriesDisplayPriorities = useMemo(
+    () =>
+      searchActive
+        ? buildSeriesDisplayPriorities(visibleListItems, priorityOverrides)
+        : seriesDisplayPriorities,
+    [searchActive, visibleListItems, priorityOverrides, seriesDisplayPriorities]
+  );
+
+  const handleSelectAllPage = useCallback((pageIds: string[]) => {
+    setSelectedIds((prev) => togglePageSelection(prev, pageIds));
+  }, []);
+  const listLoading =
+    candidatesQuery.isLoading || (searchActive && crossStatusQueries.some((query) => query.isLoading));
   const activeId = selectedId ?? sortedItems[0]?.id ?? null;
 
   useEffect(() => {
@@ -225,12 +308,46 @@ export function ReviewWorkspace({
     }
   });
 
+  const bulkPriorityMutation = useMutation({
+    mutationFn: ({ ids, priority }: { ids: string[]; priority: number }) =>
+      bulkSetCandidatePriority(token, ids, priority),
+    onSuccess: (result, variables) => {
+      setPriorityOverrides((prev) => clearPriorityOverridesForIds(prev, variables.ids));
+      setSelectedIds(new Set());
+      const failedPart =
+        result.failed.length > 0 ? ` ${result.failed.length} failed.` : "";
+      setApproveMessage(`Set priority P${result.priority} on ${result.updated} row(s).${failedPart}`);
+      handleAfterDecision();
+    },
+    onError: (error: unknown) => {
+      setApproveMessage(error instanceof AdminApiError ? error.message : "Bulk priority update failed.");
+    }
+  });
+
+  const rejectSelectedMutation = useMutation({
+    mutationFn: (ids: string[]) => bulkRejectCandidates(token, ids, { reviewedBy: "admin-bulk-ui" }),
+    onSuccess: (result) => {
+      const parts = [`Rejected ${result.rejected}.`];
+      if (result.failed.length > 0) {
+        parts.push(`${result.failed.length} failed.`);
+      }
+      setApproveMessage(parts.join(" "));
+      setSelectedIds(new Set());
+      handleAfterDecision();
+    },
+    onError: (error: unknown) => {
+      setApproveMessage(error instanceof AdminApiError ? error.message : "Bulk reject failed.");
+    }
+  });
+
   const bulkActionPending =
     deleteMutation.isPending ||
+    rejectSelectedMutation.isPending ||
     approveSelectedMutation.isPending ||
     approveAllMutation.isPending ||
     approveSelectedUpdatesMutation.isPending ||
-    approveAllUpdatesMutation.isPending;
+    approveAllUpdatesMutation.isPending ||
+    bulkPriorityMutation.isPending;
 
   const candidateQuery = useQuery({
     queryKey: ["admin", "candidate", activeId, token],
@@ -245,6 +362,7 @@ export function ReviewWorkspace({
           <p className={styles.eyebrow}>Admin</p>
           <h1 className={styles.title}>{TAB_COPY[activeTab].title}</h1>
           <p className={styles.subtitle}>{TAB_COPY[activeTab].subtitle}</p>
+          <AdminSearchInput onDebouncedChange={handleSearchChange} />
           <div className={styles.tabRow}>
             {PRIMARY_TABS.map((tab) => (
               <Button
@@ -343,6 +461,41 @@ export function ReviewWorkspace({
       {selectedIds.size > 0 ? (
         <div className={styles.bulkBar}>
           <span className={styles.bulkBarLabel}>{selectedIds.size} selected</span>
+          <label className={styles.bulkPriorityField}>
+            <span className={styles.bulkPriorityLabel}>Priority</span>
+            <SelectInput
+              className={styles.bulkPrioritySelect}
+              value={bulkPriority}
+              onChange={(event) => setBulkPriority(event.target.value)}
+              aria-label="Bulk display priority"
+            >
+              {EVENT_DISPLAY_PRIORITY.map((tier) => (
+                <option key={tier.value} value={tier.value}>
+                  P{tier.value} — {tier.label}
+                </option>
+              ))}
+            </SelectInput>
+          </label>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={bulkActionPending}
+            onClick={() => {
+              const priority = Number(bulkPriority);
+              if (
+                window.confirm(
+                  `Set priority P${priority} on ${selectedIds.size} selected candidate(s)?`
+                )
+              ) {
+                bulkPriorityMutation.mutate({ ids: [...selectedIds], priority });
+              }
+            }}
+          >
+            {bulkPriorityMutation.isPending ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : null}
+            Set priority
+          </Button>
           {activeTab === "new" ? (
             <Button
               variant="approve"
@@ -390,6 +543,27 @@ export function ReviewWorkspace({
             size="sm"
             disabled={bulkActionPending}
             onClick={() => {
+              if (
+                window.confirm(
+                  `Reject ${selectedIds.size} selected candidate(s)? They will move to the Rejected tab.`
+                )
+              ) {
+                rejectSelectedMutation.mutate([...selectedIds]);
+              }
+            }}
+          >
+            {rejectSelectedMutation.isPending ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <X className="size-3.5" aria-hidden />
+            )}
+            Reject selected
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={bulkActionPending}
+            onClick={() => {
               if (window.confirm(`Delete ${selectedIds.size} candidate(s)? This cannot be undone.`)) {
                 deleteMutation.mutate({ ids: [...selectedIds], force: false });
               }
@@ -423,14 +597,16 @@ export function ReviewWorkspace({
       <div className={styles.split}>
         <div className={styles.listCol}>
           <CandidateList
-          groups={priorityGroups}
+          groups={listGroups}
           activeId={activeId}
-          isLoading={candidatesQuery.isLoading}
+          isLoading={listLoading}
           onSelect={onSelect}
           statusFilter={statusFilter}
           selectedIds={selectedIds}
           priorityOverrides={priorityOverrides}
-          seriesDisplayPriorities={seriesDisplayPriorities}
+          seriesDisplayPriorities={listSeriesDisplayPriorities}
+          searchMode={searchActive}
+          searchQuery={searchQuery}
           onToggleSelected={(id) => {
             setSelectedIds((prev) => {
               const next = new Set(prev);
@@ -442,14 +618,7 @@ export function ReviewWorkspace({
               return next;
             });
           }}
-          onSelectAll={() => {
-            setSelectedIds((prev) => {
-              if (prev.size === sortedItems.length) {
-                return new Set();
-              }
-              return new Set(sortedItems.map((item) => item.id));
-            });
-          }}
+          onSelectAll={handleSelectAllPage}
           />
         </div>
 

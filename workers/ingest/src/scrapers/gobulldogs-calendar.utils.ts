@@ -1,9 +1,13 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 
+import { withDefaultImageUrl } from "@/lib/default-image.utils";
 import { dateOnlyStartTs } from "@/lib/pacific-instant.utils";
+import { isGobulldogsFinalEvent } from "@/scrapers/gobulldogs-priority.utils";
 
 const BASE = "https://gobulldogs.com";
 const SOURCE = "api:gobulldogs";
+
+export const BULLDOGS_DEFAULT_IMAGE_URL = "https://gobulldogs.com/images/logos/site/site.png";
 
 export function buildGobulldogsCalendarApiUrl(now: Date, horizonDays = 90): string {
   const end = new Date(now.getTime() + horizonDays * 86_400_000);
@@ -23,6 +27,7 @@ type GobulldogsSport = {
 
 type GobulldogsOpponent = {
   title: string;
+  tournamentTitle: string | null;
 };
 
 type GobulldogsFacility = {
@@ -37,6 +42,9 @@ export type GobulldogsCalendarGame = {
   dateUtc: string | null;
   tbd: boolean;
   gameCalendarExclude: boolean;
+  gamePromotionText: string | null;
+  conferenceTitle: string | null;
+  gameImageUrl: string | null;
   sport: GobulldogsSport;
   opponent: GobulldogsOpponent;
   facility: GobulldogsFacility | null;
@@ -72,7 +80,11 @@ function parseOpponent(value: unknown): GobulldogsOpponent | null {
   if (!title) {
     return null;
   }
-  return { title };
+  const tournamentTitle =
+    typeof value.tournamentTitle === "string" && value.tournamentTitle.trim()
+      ? value.tournamentTitle.trim()
+      : null;
+  return { title, tournamentTitle };
 }
 
 function parseFacility(value: unknown): GobulldogsFacility | null {
@@ -81,6 +93,20 @@ function parseFacility(value: unknown): GobulldogsFacility | null {
   }
   const title = typeof value.title === "string" ? value.title.trim() : "";
   return title ? { title } : null;
+}
+
+function resolveSidearmImageUrl(raw: string | null | undefined): string | undefined {
+  const trimmed = raw?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (trimmed.startsWith("http")) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("//")) {
+    return `https:${trimmed}`;
+  }
+  return `${BASE}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
 }
 
 function parseGame(value: unknown): GobulldogsCalendarGame | null {
@@ -95,6 +121,15 @@ function parseGame(value: unknown): GobulldogsCalendarGame | null {
     return null;
   }
 
+  const gamePromotionText =
+    typeof value.gamePromotionText === "string" && value.gamePromotionText.trim()
+      ? value.gamePromotionText.trim()
+      : null;
+  const conferenceTitle =
+    typeof value.conferenceTitle === "string" && value.conferenceTitle.trim()
+      ? value.conferenceTitle.trim()
+      : null;
+
   return {
     id,
     time: typeof value.time === "string" ? value.time.trim() : "",
@@ -103,6 +138,11 @@ function parseGame(value: unknown): GobulldogsCalendarGame | null {
     dateUtc: typeof value.dateUtc === "string" ? value.dateUtc : null,
     tbd: value.tbd === true,
     gameCalendarExclude: value.gameCalendarExclude === true,
+    gamePromotionText,
+    conferenceTitle,
+    gameImageUrl: resolveSidearmImageUrl(
+      typeof value.gameImageUrl === "string" ? value.gameImageUrl : null
+    ) ?? null,
     sport,
     opponent,
     facility: parseFacility(value.facility)
@@ -176,6 +216,30 @@ function gameExternalUrl(game: GobulldogsCalendarGame): string {
   return `${BASE}/sports/${game.sport.globalSportShortname}/schedule#${game.id}`;
 }
 
+function buildGobulldogsTags(game: GobulldogsCalendarGame, title: string): string[] {
+  const tags: string[] = [];
+  if (/^football\b/i.test(game.sport.title)) {
+    tags.push("sport:football");
+  }
+
+  const priorityProbe: NormalizedEvent = {
+    source: SOURCE,
+    sourceEventId: `gobulldogs:game:${game.id}`,
+    title,
+    venueName: game.facility?.title || game.location || "Fresno State",
+    startTs: "2026-01-01T00:00:00.000Z",
+    tags,
+    descriptionText: [game.gamePromotionText, game.conferenceTitle, game.opponent.tournamentTitle]
+      .filter(Boolean)
+      .join(" · ")
+  };
+  if (isGobulldogsFinalEvent(priorityProbe)) {
+    tags.push("final");
+  }
+
+  return tags;
+}
+
 export function gobulldogsGameToNormalizedEvent(
   game: GobulldogsCalendarGame,
   dayDate: string
@@ -188,8 +252,12 @@ export function gobulldogsGameToNormalizedEvent(
 
   const venueName = game.facility?.title || game.location || "Fresno State";
   const venueCity = parseVenueCity(game.location || "Fresno, CA");
+  const tags = buildGobulldogsTags(game, title);
+  const contextBits = [game.gamePromotionText, game.conferenceTitle, game.opponent.tournamentTitle]
+    .filter(Boolean)
+    .join(" · ");
 
-  return {
+  const event: NormalizedEvent = {
     source: SOURCE,
     sourceEventId: `gobulldogs:game:${game.id}`,
     title,
@@ -199,8 +267,13 @@ export function gobulldogsGameToNormalizedEvent(
     timezone: "America/Los_Angeles",
     externalUrl: gameExternalUrl(game),
     category: "sports",
-    ...(game.tbd || /^tba$/i.test(game.time) ? { description: game.time || "TBA" } : {})
+    ...(game.tbd || /^tba$/i.test(game.time) ? { description: game.time || "TBA" } : {}),
+    ...(contextBits ? { descriptionText: contextBits } : {}),
+    ...(tags.length > 0 ? { tags } : {}),
+    ...(game.gameImageUrl ? { imageUrl: game.gameImageUrl } : {})
   };
+
+  return withDefaultImageUrl(event, BULLDOGS_DEFAULT_IMAGE_URL);
 }
 
 export function gobulldogsCalendarDaysToEvents(days: GobulldogsCalendarDay[]): NormalizedEvent[] {

@@ -17,6 +17,7 @@ describe("planner", () => {
     const keys = planned.map((p) => p.key);
 
     expect(keys).toContain("ticketmaster");
+    expect(keys).toContain("venunite");
     expect(keys).toContain("venue-ingest");
     expect(keys).not.toContain("seatgeek");
     expect(keys).not.toContain("ai-discovery");

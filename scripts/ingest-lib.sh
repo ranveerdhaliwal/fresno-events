@@ -100,6 +100,16 @@ ingest_print_preflight_summary() {
   printf '%s' "$resp" | node "$script"
 }
 
+ingest_print_relink_summary() {
+  local resp="$1"
+  local script="${REPO_ROOT:-}/scripts/ingest-print-relink-summary.mjs"
+  if [[ ! -f "$script" ]] || ! command -v node >/dev/null 2>&1; then
+    echo "Relink summary requires Node.js and $script" >&2
+    return 1
+  fi
+  printf '%s' "$resp" | node "$script"
+}
+
 # When --venue is set, Fresno venues always use venue-ingest (method is per venue.config.json).
 ingest_apply_venue_source_defaults() {
   if [[ -z "${VENUE:-}" ]]; then

@@ -3,10 +3,15 @@ import type { NormalizedEvent, ScrapeResult } from "@fresno-events/shared";
 import { persistScrapeResult, type PersistenceResult } from "@/candidates";
 import type { IngestEnv } from "@/env";
 import { runPostIngestEnrichment } from "@/runner";
+import type { EnrichmentSummary } from "@/enrichment";
+import { applySeriesMetadata } from "@/lib/series-metadata.utils";
 
 export interface PersistAndEnrichVenueResult {
   persistence: PersistenceResult;
   sourceFilter: string;
+  enrichment: EnrichmentSummary | null;
+  /** Events after series metadata (same array persisted). */
+  events: NormalizedEvent[];
 }
 
 /**
@@ -21,14 +26,18 @@ export async function persistAndEnrichVenueEvents(
   if (events.length === 0) {
     return {
       persistence: { persisted: false, reason: "No events to persist for venue." },
-      sourceFilter
+      sourceFilter,
+      enrichment: null,
+      events: []
     };
   }
+
+  const eventsWithSeries = await applySeriesMetadata(events);
 
   const scrapeResult: ScrapeResult = {
     source: "venue-ingest",
     runId,
-    events,
+    events: eventsWithSeries,
     errors: [],
     metrics: {
       pagesVisited: 0,
@@ -49,15 +58,23 @@ export async function persistAndEnrichVenueEvents(
   );
 
   const enrichLimit = Math.min(Math.max(events.length * 2, 25), 200);
-  await runPostIngestEnrichment(env, { sourceFilter, limit: enrichLimit, enrichAll: true });
+  const enrichment = await runPostIngestEnrichment(env, { sourceFilter, limit: enrichLimit, enrichAll: true });
 
   console.log(
     JSON.stringify({
       event: "venue_ingest_enrich_done",
       source_filter: sourceFilter,
-      events: events.length
+      events: events.length,
+      ...(enrichment
+        ? {
+            enriched: enrichment.updated,
+            skipped_sufficient: enrichment.skipped_sufficient_data,
+            skipped_pending_detail: enrichment.skipped_pending_detail,
+            errors: enrichment.errors
+          }
+        : {})
     })
   );
 
-  return { persistence, sourceFilter };
+  return { persistence, sourceFilter, enrichment, events: eventsWithSeries };
 }

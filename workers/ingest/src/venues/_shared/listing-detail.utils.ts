@@ -5,6 +5,7 @@ import { extractEventsFromMarkdown, type ExtractorVariant } from "@/ai/extractor
 import type { IngestEnv } from "@/env";
 import { renderUrlToMarkdown } from "@/browser-rendering/render-page";
 import type { VenueConfig } from "@/venues/venue.types";
+import { parseConventionDetailPage } from "@/venues/fresno-convention-center/convention-detail.utils";
 import { parsePlainHtmlDetailPage } from "@/venues/_shared/html-detail.utils";
 import { isDetailHostBlocked, resolveDetailMode } from "@/venues/venue-profile.utils";
 import { toNormalizedEventFromDiscovery } from "@/normalized-event";
@@ -36,6 +37,31 @@ export function resolveLlmCap(config: VenueConfig): number {
   return config.llmCallCap ?? 60;
 }
 
+function isVenueListingRoot(externalUrl: string): boolean {
+  try {
+    const path = new URL(externalUrl).pathname.replace(/\/+$/, "") || "/";
+    return path === "/";
+  } catch {
+    return false;
+  }
+}
+
+const PLACEHOLDER_DETAIL_TITLES = new Set(["even name", "event name", "untitled"]);
+
+function isPlaceholderDetailTitle(title: string | undefined): boolean {
+  const normalized = title?.trim().toLowerCase();
+  return !normalized || PLACEHOLDER_DETAIL_TITLES.has(normalized);
+}
+
+function resolveMergedExternalUrl(listing: NormalizedEvent, detail: AiDiscoveryItem): string | undefined {
+  const detailUrl = detail.externalUrl?.trim();
+  const listingUrl = listing.externalUrl?.trim();
+  if (detailUrl && (!listingUrl || isVenueListingRoot(listingUrl))) {
+    return detailUrl;
+  }
+  return listingUrl ?? detailUrl;
+}
+
 export function mergeListingWithDetail(
   listing: NormalizedEvent,
   detail: AiDiscoveryItem | null
@@ -54,9 +80,14 @@ export function mergeListingWithDetail(
       ? (detail.category as EventCategory)
       : (listing.category ?? "community");
 
+  const externalUrl = resolveMergedExternalUrl(listing, detail);
+  const imageUrl = detail.imageUrl?.trim() || listing.imageUrl?.trim();
+
+  const mergedTitle = isPlaceholderDetailTitle(detail.title) ? listing.title : detail.title.trim();
+
   return {
     ...listing,
-    title: detail.title.trim(),
+    title: mergedTitle,
     venueName: detail.venueName.trim(),
     startTs: start.toISOString(),
     category,
@@ -66,12 +97,18 @@ export function mergeListingWithDetail(
     ...(detail.venueAddress?.trim() ? { venueAddress: detail.venueAddress.trim() } : {}),
     ...(detail.venueCity?.trim() ? { venueCity: detail.venueCity.trim() } : {}),
     ...(detail.ticketUrl?.trim() ? { ticketUrl: detail.ticketUrl.trim() } : {}),
-    ...(detail.imageUrl?.trim() ? { imageUrl: detail.imageUrl.trim() } : {}),
+    ...(imageUrl ? { imageUrl } : {}),
     ...(typeof detail.priceMin === "number" ? { priceMin: detail.priceMin } : {}),
     ...(typeof detail.priceMax === "number" ? { priceMax: detail.priceMax } : {}),
-    ...(listing.externalUrl ? { externalUrl: listing.externalUrl } : {}),
-    ...(!listing.externalUrl && detail.externalUrl ? { externalUrl: detail.externalUrl } : {})
+    ...(externalUrl ? { externalUrl } : {})
   };
+}
+
+function parseDetailPage(html: string, pageUrl: string, config: VenueConfig): AiDiscoveryItem | null {
+  if (config.key === "fresno-convention-center") {
+    return parseConventionDetailPage(html, pageUrl);
+  }
+  return parsePlainHtmlDetailPage(html, pageUrl, config.label);
 }
 
 function seedUrlForConfig(config: VenueConfig): string {
@@ -135,8 +172,11 @@ export async function enrichListingsWithDetails(input: EnrichDetailsInput): Prom
     };
   }
 
+  const normalizeDetailUrl = (url: string) => url.replace(/\/+$/, "");
   const byUrl = new Map(
-    listings.filter((e) => e.externalUrl?.startsWith("http")).map((e) => [e.externalUrl!, e])
+    listings
+      .filter((e) => e.externalUrl?.startsWith("http"))
+      .map((e) => [normalizeDetailUrl(e.externalUrl!), e])
   );
   const bySourceEventId = new Map(listings.map((e) => [e.sourceEventId, e]));
   let detailUrlsVisited = 0;
@@ -157,7 +197,7 @@ export async function enrichListingsWithDetails(input: EnrichDetailsInput): Prom
       continue;
     }
 
-    const listing = byUrl.get(url);
+    const listing = byUrl.get(normalizeDetailUrl(url));
     if (!listing) {
       continue;
     }
@@ -167,7 +207,7 @@ export async function enrichListingsWithDetails(input: EnrichDetailsInput): Prom
       throwIfAborted(signal);
       try {
         const html = await fetchListingHtml(url, userAgent, signal);
-        const parsed = parsePlainHtmlDetailPage(html, url, config.label);
+        const parsed = parseDetailPage(html, url, config);
         bySourceEventId.set(listing.sourceEventId, mergeListingWithDetail(listing, parsed));
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {

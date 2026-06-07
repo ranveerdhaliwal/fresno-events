@@ -14,7 +14,7 @@
   border: var(--border-card-on-page);
   box-shadow: var(--shadow-card-on-page);
   display: grid;
-  grid-template-columns: 80px 64px 1fr auto;
+  grid-template-columns: 80px 88px 1fr auto;
   gap: 14px;
   padding: 12px 16px 12px 12px;
   cursor: pointer;
@@ -54,9 +54,14 @@
   background: var(--surface-card);
   border: var(--border-card);
   border-radius: 6px;
-  padding: 6px 4px;
+  min-width: 84px;
+  min-height: 78px;
+  padding: 8px 8px 10px;
   text-align: center;
   box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .day {
@@ -74,6 +79,18 @@
   line-height: 1;
   margin-top: 2px;
   display: block;
+}
+
+.month {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.25;
+  color: var(--text-secondary-on-card);
+  margin-top: 4px;
+  display: block;
+  white-space: nowrap;
 }
 
 .rowBody {
@@ -112,6 +129,18 @@
   color: var(--coral);
   text-align: right;
   line-height: 1.1;
+  min-width: 5.5rem;
+}
+
+.rowPriority {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary-on-card);
+  text-transform: uppercase;
+  margin-bottom: 4px;
 }
 
 .priceFree {
@@ -154,7 +183,7 @@
 }
 
 .p1 {
-  grid-template-columns: 130px 72px 1fr auto;
+  grid-template-columns: 130px 88px 1fr auto;
   padding: 14px 18px 14px 14px;
   box-shadow: 6px 6px 0 color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
   background: linear-gradient(to right, var(--tint-mustard-18) 0 6px, var(--surface-card) 6px);
@@ -174,7 +203,7 @@
 }
 
 .p2 {
-  grid-template-columns: 100px 64px 1fr auto;
+  grid-template-columns: 100px 88px 1fr auto;
 }
 
 .p2 .rowImg {
@@ -192,7 +221,7 @@
 }
 
 .p4 {
-  grid-template-columns: 56px 52px 1fr auto;
+  grid-template-columns: 56px 80px 1fr auto;
   padding: 10px 14px;
   box-shadow: var(--shadow-sm);
 }
@@ -207,7 +236,7 @@
 }
 
 .p5 {
-  grid-template-columns: 56px 1fr auto;
+  grid-template-columns: 88px 1fr auto;
   padding: 9px 14px 9px 10px;
   box-shadow: var(--shadow-xs);
   background: var(--surface-card);
@@ -215,6 +244,17 @@
 
 .p5 .rowImg {
   display: none;
+}
+
+.p5WithLogo {
+  grid-template-columns: 56px 88px 1fr auto;
+  padding: 10px 14px 10px 10px;
+}
+
+.p5WithLogo .rowImg {
+  display: block;
+  width: 56px;
+  height: 56px;
 }
 
 .p5 .rowBody h4 {
@@ -246,14 +286,19 @@
     display: none;
   }
 
+  .forceVisible.p5WithLogo .rowImg {
+    display: block;
+  }
+
   .row {
-    grid-template-columns: 56px 1fr auto;
+    grid-template-columns: 88px 1fr auto;
   }
 
   .p1,
   .p2,
-  .p4 {
-    grid-template-columns: 56px 1fr auto;
+  .p4,
+  .forceVisible.p5WithLogo {
+    grid-template-columns: 56px 88px 1fr auto;
   }
 }
 

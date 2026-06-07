@@ -11,7 +11,7 @@ import {
   type EnrichmentCandidateRow
 } from "@/candidates/enrichment-candidate.utils";
 import { harmonizeSeriesSuggestedPriority } from "@/candidates/series-enrichment.utils";
-import { applyVenuePriorityOverride } from "@/candidates/venue-priority.utils";
+import { applyVenuePriorityOverride, resolveVenueSuggestedPriority } from "@/candidates/venue-priority.utils";
 import type { IngestEnv } from "@/env";
 import type { SupabaseConfig } from "@/sources";
 
@@ -503,10 +503,18 @@ interface CandidatePatch {
 }
 
 async function markSufficientWithoutLlm(supabase: SupabaseConfig, row: EnrichmentCandidateRow) {
+  const venuePriority = resolveVenueSuggestedPriority(row.normalized_event);
+  const priority = venuePriority ?? 5;
+  const notes =
+    venuePriority !== null
+      ? `[ingest] skipped LLM — source already has title, time, category, and description · [venue] → P${priority}`
+      : "[ingest] skipped LLM — source already has title, time, category, and description";
+
   await patchCandidate(supabase, row.id, {
     ...(row.status === "awaiting_enrichment" ? { status: "pending_review" as const } : {}),
-    suggested_priority: 5,
-    review_notes: "[ingest] skipped LLM — source already has title, time, category, and description",
+    confidence_score: 0.95,
+    suggested_priority: priority,
+    review_notes: notes,
     updated_at: new Date().toISOString()
   });
 }

@@ -7,6 +7,7 @@ import type {
   OccurrenceMatchIndex,
   OccurrenceMatchStep
 } from "@/candidates/occurrence-match.types";
+import { urlKeyLinksWithOccurrenceLookup } from "@/candidates/occurrence-url-link.utils";
 
 const ACTIVE_PRIMARY_STATUSES = new Set([
   "awaiting_enrichment",
@@ -56,11 +57,11 @@ function rankPrimary(a: OccurrenceMatchCandidate, b: OccurrenceMatchCandidate): 
   if (a.status !== "approved" && b.status === "approved") {
     return 1;
   }
-  const created = a.created_at.localeCompare(b.created_at);
-  if (created !== 0) {
-    return created;
+  const sourceRank = sourcePriorityRank(a.source) - sourcePriorityRank(b.source);
+  if (sourceRank !== 0) {
+    return sourceRank;
   }
-  return sourcePriorityRank(a.source) - sourcePriorityRank(b.source);
+  return a.created_at.localeCompare(b.created_at);
 }
 
 export function pickPrimaryCandidate(candidates: OccurrenceMatchCandidate[]): OccurrenceMatchCandidate | null {
@@ -116,7 +117,9 @@ function collectCandidatesForMatch(
 
   if (urlKey) {
     for (const row of index.candidatesByUrlKey.get(urlKey) ?? []) {
-      seen.set(row.id, row);
+      if (urlKeyLinksWithOccurrenceLookup(fingerprints, row.occurrence_key)) {
+        seen.set(row.id, row);
+      }
     }
   }
 

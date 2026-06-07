@@ -1,6 +1,7 @@
 import type { ScrapeContext, ScrapeError, ScrapeResult } from "@fresno-events/shared";
 
 import { persistAndEnrichVenueEvents } from "@/candidates/persist-and-enrich-venue";
+import type { EnrichmentSummary } from "@/enrichment";
 import type { IngestEnv } from "@/env";
 import { ensureIngestRunStarted, finishIngestRunRecord } from "@/ingest-runs";
 import { finishVenueRun, startVenueRun, type VenueRunStatus } from "@/venue-ingest-state";
@@ -182,16 +183,19 @@ export function createVenueIngestRunner(env: IngestEnv) {
         });
 
         pagesVisited += venueResult.listingUrlsFound + venueResult.detailUrlsVisited;
-        allEvents.push(...venueResult.events);
         errors.push(...venueResult.errors);
 
+        let eventsForAggregate = venueResult.events;
+        let venueEnrichment: EnrichmentSummary | null = null;
         if (!dryRun && venueResult.events.length > 0) {
           const sourceFilter =
             config.eventSource ??
             venueResult.events.find((e) => e.source)?.source ??
             `venue-ingest:${config.key}`;
           try {
-            await persistAndEnrichVenueEvents(env, ctx.runId, venueResult.events, sourceFilter);
+            const persistResult = await persistAndEnrichVenueEvents(env, ctx.runId, venueResult.events, sourceFilter);
+            eventsForAggregate = persistResult.events;
+            venueEnrichment = persistResult.enrichment;
             venuePersistPerVenue = true;
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -202,6 +206,8 @@ export function createVenueIngestRunner(env: IngestEnv) {
             });
           }
         }
+
+        allEvents.push(...eventsForAggregate);
 
         const status: VenueRunStatus = dryRun
           ? "dry_run"
@@ -233,6 +239,19 @@ export function createVenueIngestRunner(env: IngestEnv) {
           strategy: config.strategy,
           ingestLane: venueIngestLane(config),
           detailMode: resolveDetailMode(config),
+          detailUrlsVisited: venueResult.detailUrlsVisited,
+          ...(venueEnrichment
+            ? {
+                enrichment: {
+                  processed: venueEnrichment.processed,
+                  updated: venueEnrichment.updated,
+                  skipped_sufficient_data: venueEnrichment.skipped_sufficient_data,
+                  skipped_pending_detail: venueEnrichment.skipped_pending_detail,
+                  errors: venueEnrichment.errors,
+                  auto_rejected: venueEnrichment.auto_rejected
+                }
+              }
+            : {}),
           ...(config.eventSource ? { eventSource: config.eventSource } : {}),
           ...(dryRun && detailUrlsPlanned > 0 ? { detailUrlsPlanned } : {}),
           ...(dryRunPlan ? { dryRunPlan: true } : {}),

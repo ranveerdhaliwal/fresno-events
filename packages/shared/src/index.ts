@@ -27,6 +27,7 @@ export type EventStatus =
 
 export type EventSource =
   | "ticketmaster"
+  | "venunite"
   | "eventbrite"
   | "bandsintown"
   | "seatgeek"
@@ -47,7 +48,11 @@ export {
   computeUrlKey,
   normalizeTitle,
   normalizeVenue,
+  canonicalOccurrenceTitle,
+  normalizeListingUrl,
+  pacificTimeBucketKey,
   sourcePriorityRank,
+  sha256Hex,
   type OccurrenceFingerprints
 } from "./occurrence.js";
 export {
@@ -300,6 +305,10 @@ export interface NormalizedEvent {
   ticketUrl?: string;
   externalUrl?: string;
   imageUrl?: string;
+  /** Show venue logo thumbnail in list rows even at community priority (5). */
+  showVenueLogoInList?: boolean;
+  /** Inset (px) around venue logos in list thumbnails; lower = larger logo. */
+  listVenueLogoPadding?: number;
   seriesId?: string;
   seriesName?: string;
   seriesListingRecId?: string;
@@ -323,6 +332,16 @@ export interface ScrapeContext {
   config: Record<string, unknown>;
   /** ai-crawl coordinator mode (defaults to real when omitted). */
   coordinatorMode?: CoordinatorMode;
+}
+
+/** AI enrichment counts from a promote run (per venue or whole source). */
+export interface ScrapeEnrichmentMetric {
+  processed: number;
+  updated: number;
+  skipped_sufficient_data: number;
+  skipped_pending_detail: number;
+  errors: number;
+  auto_rejected: number;
 }
 
 export interface ScrapeSeedMetric {
@@ -349,6 +368,10 @@ export interface ScrapeSeedMetric {
   ingestLane?: "direct" | "browser";
   /** How detail pages are fetched (api_embedded, plain_html, br_llm, none). */
   detailMode?: string;
+  /** Detail pages fetched on promote (0 when detailMode is none). */
+  detailUrlsVisited?: number;
+  /** Post-persist LLM enrichment for this venue's source filter. */
+  enrichment?: ScrapeEnrichmentMetric;
   /** HTTP URLs this run actually requests (API endpoints, listing pages, …). */
   fetchUrls?: string[];
 }
@@ -432,6 +455,8 @@ export interface EventCandidate {
   reviewedBy?: string;
   matchedEventId?: string;
   occurrenceId: string;
+  /** Same-show fingerprint; filters false-positive occurrence_id siblings in admin. */
+  occurrenceKey?: string;
   canonicalCandidateId?: string;
   createdAt: string;
   updatedAt: string;
@@ -486,6 +511,17 @@ export type CandidateDeleteSkipReason = "approved" | "not_found";
 export interface CandidateBulkDeleteResponse {
   deleted: number;
   skipped: Array<{ id: string; reason: CandidateDeleteSkipReason }>;
+}
+
+export interface CandidateBulkPriorityResponse {
+  priority: number;
+  updated: number;
+  failed: Array<{ id: string; message: string }>;
+}
+
+export interface CandidateBulkRejectResponse {
+  rejected: number;
+  failed: Array<{ id: string; message: string }>;
 }
 
 export type CandidateApproveSkipReason = "not_found" | "not_pending" | "already_approved";

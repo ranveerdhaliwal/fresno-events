@@ -1,6 +1,8 @@
 import type { IngestEnv } from "@/env";
 import { getJsonPromptBackend } from "@/llm/registry";
 import { runDetailBackfill } from "@/detail-backfill";
+import { runOccurrenceRelink } from "@/occurrence-relink";
+import { compactRunSummaryForLog } from "@/log-compact.utils";
 import { runIngest, runPostIngestEnrichment } from "@/runner";
 import { listRunnableSources } from "@/planner";
 import { INGEST_VALIDATION_POLICY } from "@/validation";
@@ -11,7 +13,7 @@ export default {
       (async () => {
         const summaries = await runIngest(env);
         for (const summary of summaries) {
-          console.log(JSON.stringify({ event: "ingest_run", trigger: "scheduled", ...summary }));
+          console.log(JSON.stringify({ event: "ingest_run", trigger: "scheduled", ...compactRunSummaryForLog(summary) }));
         }
       })()
     );
@@ -77,7 +79,7 @@ export default {
         ...(venueFilter?.length ? { venueFilter } : {})
       });
       for (const summary of summaries) {
-        console.log(JSON.stringify({ event: "ingest_run", trigger: "manual", ...summary }));
+        console.log(JSON.stringify({ event: "ingest_run", trigger: "manual", ...compactRunSummaryForLog(summary) }));
       }
 
       // `--venue` implies venue-scoped persist + enrichment inside venue-ingest.
@@ -102,6 +104,27 @@ export default {
       const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.trunc(parsedLimit) : undefined;
 
       const summary = await runDetailBackfill(env, {
+        dryRun,
+        ...(sourceFilter ? { sourceFilter } : {}),
+        ...(limit !== undefined ? { limit } : {})
+      });
+
+      return jsonResponse({ ok: true, data: { summary, dry_run: dryRun, limit } });
+    }
+
+    if (url.pathname === "/occurrence-relink/trigger") {
+      const auth = await checkAdminAuth(req, env);
+      if (auth) {
+        return jsonResponse({ ok: false, error: auth }, auth.status);
+      }
+
+      const dryRun = url.searchParams.get("dry_run") === "true";
+      const sourceFilter = url.searchParams.get("source") ?? undefined;
+      const limitParam = url.searchParams.get("limit");
+      const parsedLimit = limitParam ? Number(limitParam) : NaN;
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.trunc(parsedLimit) : undefined;
+
+      const summary = await runOccurrenceRelink(env, {
         dryRun,
         ...(sourceFilter ? { sourceFilter } : {}),
         ...(limit !== undefined ? { limit } : {})

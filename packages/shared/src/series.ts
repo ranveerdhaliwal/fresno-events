@@ -38,6 +38,8 @@ export interface SeriesResolveInput {
   seriesListingRecId?: string;
   /** Assign series from CMS listing id when multiple nights share recid. */
   groupByListingRecId?: boolean;
+  /** Assign series when multiple performances share title at the same venue (e.g. Monster Jam). */
+  groupByTitleRun?: boolean;
   ticketUrl?: string;
   externalUrl?: string;
 }
@@ -55,6 +57,13 @@ export async function computeCanonicalSeriesId(input: SeriesResolveInput): Promi
 
   if (input.groupByListingRecId && input.seriesListingRecId?.trim()) {
     const payload = `series|${scope}|listing|${input.seriesListingRecId.trim()}`;
+    const hash = await sha256Hex(payload);
+    return { seriesId: `series:${scope}:${hash}` };
+  }
+
+  if (input.groupByTitleRun) {
+    const anchor = titleAnchor(input.title, input.venueName);
+    const payload = `series|${scope}|${anchor}`;
     const hash = await sha256Hex(payload);
     return { seriesId: `series:${scope}:${hash}` };
   }

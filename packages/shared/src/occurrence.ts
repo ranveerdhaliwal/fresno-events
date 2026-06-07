@@ -18,9 +18,32 @@ const VENUE_ALIASES: Record<string, string> = {
   "chukchansi-park": "save-mart-center",
   "chukchansi-park-at-tipping-point": "save-mart-center",
   "save-mart-center-at-chukchansi-park": "save-mart-center",
+  "save-mart-center-at-fresno-state": "save-mart-center",
+  "save-mart-center-at-fresno-state-smg": "save-mart-center",
   "fresno-convention-entertainment-center": "fresno-convention-center",
-  "fcc": "fresno-convention-center"
+  "fcc": "fresno-convention-center",
+  "strummers": "strummers-club",
+  "strummer-s": "strummers-club",
+  "strummers-club-fresno": "strummers-club",
+  "warnors-center": "warnors-theatre",
+  "warnors-center-for-the-performing-arts": "warnors-theatre",
+  "warnors-theatre-fresno": "warnors-theatre",
+  "saroyan-theatre": "saroyan-theatre",
+  "william-saroyan-theatre": "saroyan-theatre",
+  "william-saroyan-theatre-fresno-convention-entertainment-center": "saroyan-theatre",
+  "historic-crest-theatre": "crest-theatre",
+  "the-crest-theatre-fresno": "crest-theatre",
+  "tower-theatre-for-the-performing-arts": "tower-theatre",
+  "tower-theatre-lounge": "tower-theatre-lounge"
 };
+
+/** Strip trailing promo/venue noise after normalizeTitle (occurrence matching only). */
+const OCCURRENCE_TITLE_SUFFIXES = [
+  /\s+live in concert$/,
+  /\s+in concert$/,
+  /\s+-\s+fresno$/,
+  /\s+fresno$/
+];
 
 export interface OccurrenceFingerprints {
   occurrenceKey: string;
@@ -43,6 +66,44 @@ export function normalizeTitle(title: string): string {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Collapse promo-night / vendor suffixes so cross-source titles align for occurrence_key. */
+export function canonicalOccurrenceTitle(normalizedTitle: string): string {
+  let value = normalizedTitle.trim();
+  if (!value) {
+    return value;
+  }
+
+  const grizzliesIdx = value.indexOf("fresno grizzlies vs");
+  if (grizzliesIdx > 0) {
+    value = value.slice(grizzliesIdx);
+  }
+
+  value = value.replace(/^fresno grizzlies vs\.?\s+/, "fresno grizzlies vs ");
+
+  for (const pattern of OCCURRENCE_TITLE_SUFFIXES) {
+    value = value.replace(pattern, "");
+  }
+
+  value = value.replace(/\s+/g, " ").trim();
+
+  const missCalifornia = canonicalMissCaliforniaTitle(value);
+  if (missCalifornia) {
+    return missCalifornia;
+  }
+
+  return value;
+}
+
+/** Collapse pageant week / year suffix drift across Visit, FCC scrape, and Ticketmaster. */
+function canonicalMissCaliforniaTitle(normalizedTitle: string): string | null {
+  if (!/\bmiss california\b/.test(normalizedTitle)) {
+    return null;
+  }
+
+  const isTeen = /\bteen\b/.test(normalizedTitle);
+  return isTeen ? "miss california teen" : "miss california";
 }
 
 export function slugifyVenue(value: string): string {
@@ -100,6 +161,24 @@ export function adjacentPacificBucketKeys(bucketKey: string): string[] {
   return [...keys];
 }
 
+function unwrapAffiliateListingTarget(parsed: URL): string | null {
+  for (const param of ["u", "url"]) {
+    const raw = parsed.searchParams.get(param);
+    if (!raw?.trim()) {
+      continue;
+    }
+    try {
+      const decoded = decodeURIComponent(raw.trim());
+      if (/^https?:\/\//i.test(decoded)) {
+        return decoded;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 export function normalizeListingUrl(url: string | undefined | null): string | null {
   if (!url?.trim()) {
     return null;
@@ -107,8 +186,31 @@ export function normalizeListingUrl(url: string | undefined | null): string | nu
 
   try {
     const parsed = new URL(url.trim());
+    const affiliateTarget = unwrapAffiliateListingTarget(parsed);
+    if (affiliateTarget) {
+      const nested = normalizeListingUrl(affiliateTarget);
+      if (nested) {
+        return nested;
+      }
+    }
+
     const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
-    const path = parsed.pathname.replace(/\/+$/, "") || "/";
+    let path = parsed.pathname.replace(/\/+$/, "") || "/";
+
+    const ticketmasterEventId = host.includes("ticketmaster.com")
+      ? /\/event\/([^/]+)/i.exec(path)?.[1]?.toLowerCase()
+      : undefined;
+    if (ticketmasterEventId) {
+      return `ticketmaster.com/event/${ticketmasterEventId}`;
+    }
+
+    const eventbriteEventId = host.includes("eventbrite.com")
+      ? /\/e\/[^/]*-(\d+)/i.exec(path)?.[1]
+      : undefined;
+    if (eventbriteEventId) {
+      return `eventbrite.com/e/${eventbriteEventId}`;
+    }
+
     const params = parsed.searchParams;
     const kept = new URLSearchParams();
     for (const key of ["eid", "eventId", "event_id"]) {
@@ -139,7 +241,7 @@ export async function computeOccurrenceKey(
     return null;
   }
 
-  const normalizedTitle = normalizeTitle(title);
+  const normalizedTitle = canonicalOccurrenceTitle(normalizeTitle(title));
   const normalizedVenue = normalizeVenue(venueName);
   if (!normalizedTitle || !normalizedVenue) {
     return null;
@@ -159,7 +261,7 @@ export async function computeLooseOccurrenceKey(
     return null;
   }
 
-  const looseTitle = normalizeTitle(title).replace(/\s+/g, "");
+  const looseTitle = canonicalOccurrenceTitle(normalizeTitle(title)).replace(/\s+/g, "");
   const normalizedVenue = normalizeVenue(venueName);
   if (!looseTitle || !normalizedVenue) {
     return null;
@@ -173,7 +275,7 @@ export async function computeOccurrenceKeyForBucket(
   bucketKey: string,
   venueName: string
 ): Promise<string | null> {
-  const normalizedTitle = normalizeTitle(title);
+  const normalizedTitle = canonicalOccurrenceTitle(normalizeTitle(title));
   const normalizedVenue = normalizeVenue(venueName);
   if (!normalizedTitle || !normalizedVenue) {
     return null;
@@ -219,19 +321,25 @@ export async function computeOccurrenceFingerprints(
   };
 }
 
-/** Lower rank = preferred primary source. */
+/** Lower rank = preferred primary source (Ticketmaster first — most stable official listings). */
 export function sourcePriorityRank(source: string): number {
-  if (source.startsWith("scrape:")) {
+  if (source === "ticketmaster") {
     return 0;
   }
-  if (source === "api:milb") {
+  if (source === "venunite") {
     return 1;
   }
-  if (source === "api:visitfresnocounty") {
+  if (source === "api:milb") {
     return 2;
   }
-  if (source === "api:downtownfresno") {
+  if (source === "api:visitfresnocounty") {
     return 3;
+  }
+  if (source === "api:downtownfresno") {
+    return 4;
+  }
+  if (source.startsWith("scrape:")) {
+    return 5;
   }
   return 10;
 }

@@ -50,6 +50,19 @@
   color: color-mix(in srgb, var(--text-on-page) 60%, transparent);
 }
 
+.searchHeading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-label);
+}
+
+.countInline {
+  color: var(--coral);
+}
+
 .group {
   display: flex;
   flex-direction: column;

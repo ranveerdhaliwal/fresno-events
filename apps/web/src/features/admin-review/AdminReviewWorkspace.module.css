@@ -33,6 +33,26 @@
   color: color-mix(in srgb, var(--text-on-page) 82%, transparent);
 }
 
+.searchRow {
+  position: relative;
+  margin-top: 14px;
+  max-width: 28rem;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-label);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding-left: 40px;
+}
+
 .select {
   height: 36px;
   border: var(--border-card);
@@ -133,6 +153,21 @@
 .bulkBarLabel {
   font-size: 14px;
   color: var(--text-on-page);
+}
+
+.bulkPriorityField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulkPriorityLabel {
+  font-size: 13px;
+  color: var(--text-on-page);
+}
+
+.bulkPrioritySelect {
+  min-width: 10rem;
 }
 
 .message {

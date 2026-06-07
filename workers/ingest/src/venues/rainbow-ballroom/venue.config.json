@@ -4,7 +4,16 @@
   "enabled": true,
   "strategy": "html_parse",
   "listingUrl": "https://www.rainbowballroom.com/blog-grid",
-  "allowedExternalHosts": ["eventmania.com", "www.eventmania.com"],
+  "allowedExternalHosts": [
+    "eventmania.com",
+    "www.eventmania.com",
+    "tixr.com",
+    "www.tixr.com",
+    "eventbrite.com",
+    "www.eventbrite.com",
+    "ticketon.com",
+    "www.ticketon.com"
+  ],
   "sourceHostname": "www.rainbowballroom.com",
   "ingestLane": "direct",
   "detailMode": "none"

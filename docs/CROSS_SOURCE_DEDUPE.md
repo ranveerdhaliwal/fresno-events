@@ -7,7 +7,7 @@ Same real-world events from Visit Fresno, Downtown Fresno, venue scrapers, and M
 | Column | Role |
 |--------|------|
 | `occurrence_id` | Link column — all sources for one show |
-| `occurrence_key` | Finder: normalized title + Pacific 30m bucket (±1) + venue |
+| `occurrence_key` | Finder: canonical title + Pacific 30m bucket (±1) + venue (see matching rules below) |
 | `url_key` | Finder: normalized ticket/external URL |
 | `canonical_candidate_id` | Non-primary → primary in the New queue |
 
@@ -15,10 +15,34 @@ Same real-world events from Visit Fresno, Downtown Fresno, venue scrapers, and M
 
 1. Always compute `occurrence_id` + finder keys on persist.
 2. Match step A (`occurrence_key`), then B (`url_key`), else new group.
-3. With **`INGEST_CROSS_SOURCE_DEDUPE=true`** (or `1`):
+3. **Default: linking enabled.** Set `INGEST_CROSS_SOURCE_DEDUPE=false` to shadow mode (keys assigned; logs `ingest_occurrence_would_link` without status changes).
+4. When enabled:
    - Secondaries: `status=duplicate`, `canonical_candidate_id` → primary.
    - If a **scheduled** `events` row exists: `matched_event_id` auto-link (no second approval).
-4. With flag off: keys still assigned; logs `ingest_occurrence_would_link` without status changes.
+
+### Matching rules (`packages/shared/src/occurrence.ts`)
+
+- **Venue aliases** — e.g. Strummer's → Strummers scrape slug, Warnors Center → Warnors Theatre, Saroyan name variants, Save Mart sub-names.
+- **Title canonicalization (occurrence only)** — Promo-night Grizzlies titles collapse to `fresno grizzlies vs {opponent}`; strips trailing `- Fresno` / `Live In Concert` before hashing. Miss California week listings (`Competition Week`, `2026`, etc.) collapse to `miss california` or `miss california teen`. Display titles are unchanged.
+- **URL keys** — Ticketmaster `/event/{id}` and Eventbrite numeric event IDs normalize to stable `url_key` (helps Venunite `eb:` rows and TM overlap).
+- **Primary source order** — When linking duplicates, **Ticketmaster** is preferred over scrapers and Visit/Downtown APIs (approved / already-published rows still win when they carry `matched_event_id`).
+- **Series URLs** — Shared listing URLs (multi-night runs) only link when **occurrence buckets overlap** (same show time). A week-long Visit page URL will not merge Jun 16 and Jun 17 into one occurrence.
+- **Occurrence IDs on relink** — `pnpm ingest:relink` assigns a stable UUID per `occurrence_key` (one per show night). Published Visit rows beat Ticketmaster when both have `matched_event_id`.
+
+After changing matching rules, re-promote affected sources so existing rows recompute keys, then run a full relink:
+
+```bash
+pnpm ingest:promote --source=ticketmaster
+pnpm ingest:relink
+```
+
+**Re-promote alone is not enough** — rows that already have an `occurrence_id` skip cross-source lookup on re-ingest. `pnpm ingest:relink` recomputes keys and duplicate links for all candidates (or `--source=` scoped).
+
+```bash
+pnpm ingest:relink --dry-run    # preview counts, no writes
+pnpm ingest:relink              # apply (requires pnpm ingest:dev)
+pnpm ingest:relink --source=ticketmaster
+```
 
 ## Admin
 
@@ -26,11 +50,11 @@ Same real-world events from Visit Fresno, Downtown Fresno, venue scrapers, and M
 - Detail: **Also listed on** lists siblings with the same `occurrence_id`.
 - Approve the primary; siblings get `matched_event_id`. `source_refs.alternates` updated on approve.
 
-## Enable linking
+## Disable linking (shadow mode)
 
 ```bash
-# In .dev.vars / wrangler secret
-INGEST_CROSS_SOURCE_DEDUPE=true
+# In .dev.vars / wrangler secret — only when debugging matcher false positives
+INGEST_CROSS_SOURCE_DEDUPE=false
 ```
 
 ## Backfill / collisions

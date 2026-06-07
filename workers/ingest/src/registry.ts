@@ -8,6 +8,7 @@ import { run as runBandsintown } from "@/scrapers/bandsintown";
 import { run as runEventbrite } from "@/scrapers/eventbrite";
 import { run as runSeatGeek } from "@/scrapers/seatgeek";
 import { run as runTicketmaster } from "@/scrapers/ticketmaster";
+import { run as runVenunite } from "@/scrapers/venunite";
 
 export interface RegisteredScraper {
   /** Stable source key (stored on candidates and ingest_runs). */
@@ -31,10 +32,18 @@ export const scrapers: RegisteredScraper[] = [
   {
     key: "ticketmaster",
     label: "Ticketmaster Discovery API",
-    defaultCadenceMinutes: 360,
+    defaultCadenceMinutes: 1440,
     schedule: "cron",
     requiredSecrets: ["TICKETMASTER_API_KEY"],
     run: runTicketmaster
+  },
+  {
+    key: "venunite",
+    label: "VenuNite aggregator API",
+    defaultCadenceMinutes: 20160,
+    schedule: "cron",
+    requiredSecrets: [],
+    run: runVenunite
   },
   {
     key: "seatgeek",

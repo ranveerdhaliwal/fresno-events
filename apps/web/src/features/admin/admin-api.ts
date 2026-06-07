@@ -8,6 +8,8 @@ import type {
   CandidateBulkApproveChangesResponse,
   CandidateBulkApproveResponse,
   CandidateBulkDeleteResponse,
+  CandidateBulkPriorityResponse,
+  CandidateBulkRejectResponse,
   EventCandidateDetailResponse,
   EventCandidateListResponse,
   HomepageSlotsPutBody,
@@ -187,6 +189,26 @@ export async function bulkApproveChangesAll(token: string, body: Omit<BulkApprov
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
+  });
+}
+
+export async function bulkSetCandidatePriority(token: string, ids: string[], priority: number) {
+  return adminFetch<CandidateBulkPriorityResponse>(token, "/review/candidates/bulk-priority", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids, priority })
+  });
+}
+
+export async function bulkRejectCandidates(
+  token: string,
+  ids: string[],
+  body: Omit<RejectBody, "notes"> & { notes?: string } = {}
+) {
+  return adminFetch<CandidateBulkRejectResponse>(token, "/review/candidates/bulk-reject", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, ids })
   });
 }
 

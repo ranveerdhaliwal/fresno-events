@@ -42,10 +42,12 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
   const monthRanges = buildSaveMartApiMonthRanges(horizonMonths, ctx.now);
   const allDocs: unknown[] = [];
   const seenRecids = new Set<string>();
+  const errors: ScrapeError[] = [];
 
   for (const range of monthRanges) {
     let skip = 0;
     let pages = 0;
+    let monthFailed = false;
 
     while (pages < 20) {
       const query = buildSaveMartApiQuery({
@@ -67,14 +69,20 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
       });
 
       if (!response.ok) {
-        return finish(ctx, started, [], [
-          {
-            source: "save-mart-api",
-            url,
-            message: `HTTP ${response.status} (${range.startYmd}..${range.endYmd})`,
-            recoverable: response.status >= 500 || response.status === 429
-          }
-        ], fetchUrls);
+        const recoverable = response.status >= 500 || response.status === 429;
+        const scrapeError: ScrapeError = {
+          source: "save-mart-api",
+          url,
+          message: `HTTP ${response.status} (${range.startYmd}..${range.endYmd})`,
+          recoverable
+        };
+        if (recoverable) {
+          errors.push(scrapeError);
+          log({ step: "month_window_error", status: response.status, range: range.startYmd });
+          monthFailed = true;
+          break;
+        }
+        return finish(ctx, started, saveMartDocsToEvents(allDocs), [scrapeError, ...errors], fetchUrls);
       }
 
       const json: unknown = await response.json();
@@ -97,12 +105,22 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
       }
       skip += PAGE_LIMIT;
     }
+
+    if (monthFailed) {
+      continue;
+    }
   }
 
   const events = saveMartDocsToEvents(allDocs);
-  log({ step: "run_end", eventsFound: events.length, docs: allDocs.length, monthWindows: monthRanges.length });
+  log({
+    step: "run_end",
+    eventsFound: events.length,
+    docs: allDocs.length,
+    monthWindows: monthRanges.length,
+    recoverableErrors: errors.length
+  });
 
-  return finish(ctx, started, events, [], fetchUrls);
+  return finish(ctx, started, events, errors, fetchUrls);
 }
 
 async function resolveToken(ctx: ScrapeContext, fetchUrls: string[]): Promise<string | null> {

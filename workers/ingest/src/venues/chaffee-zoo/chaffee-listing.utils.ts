@@ -1,8 +1,12 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 import { load } from "cheerio";
 
+import { withDefaultImageUrl } from "@/lib/default-image.utils";
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 import type { VenueConfig } from "@/venues/venue.types";
+
+export const CHAFFEE_ZOO_DEFAULT_IMAGE_URL =
+  "https://fcz.org/wp-content/uploads/2025/01/FCZ_Logo_CMYK-1.png";
 
 const SKIP_HEADING = /party like an animal|explore our venues|host a wild birthday|birthday party|get the latest|follow us/i;
 
@@ -153,19 +157,26 @@ export function parseChaffeeListingHtml(html: string, config: VenueConfig, now: 
         .attr("href")
         ?.trim() ?? config.listingUrl;
 
-    events.push({
-      source: `scrape:${host}`,
-      sourceEventId: `venue:${config.key}:${slug}`,
-      title,
-      descriptionText: body || undefined,
-      venueName: config.label,
-      venueCity: "Fresno",
-      startTs: when.startTs,
-      ...(when.endTs ? { endTs: when.endTs } : {}),
-      category: "family",
-      externalUrl: config.listingUrl,
-      ...(ticketHref.startsWith("http") ? { ticketUrl: ticketHref } : {})
-    });
+    events.push(
+      withDefaultImageUrl(
+        {
+          source: `scrape:${host}`,
+          sourceEventId: `venue:${config.key}:${slug}`,
+          title,
+          // Short listing blurbs should not skip post-ingest LLM (see hasSufficientReviewData).
+          ...(body.length >= 120 ? { descriptionText: body } : {}),
+          venueName: config.label,
+          venueCity: "Fresno",
+          startTs: when.startTs,
+          ...(when.endTs ? { endTs: when.endTs } : {}),
+          category: "family",
+          externalUrl: config.listingUrl,
+          ...(ticketHref.startsWith("http") ? { ticketUrl: ticketHref } : {})
+        },
+        CHAFFEE_ZOO_DEFAULT_IMAGE_URL,
+        { showInCommunityList: true, listVenueLogoPadding: 2 }
+      )
+    );
   });
 
   return events;

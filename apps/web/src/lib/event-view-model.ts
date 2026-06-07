@@ -1,7 +1,7 @@
 import type { Event, EventListItem } from "@fresno-events/shared";
 import { clampEventPriority } from "@fresno-events/shared";
 
-import { formatEventDate, formatShortTime, isTonight, isWeekend, toIsoDateLocal } from "@/lib/event-time";
+import { formatEventDate, formatMonthLong, formatShortTime, isTonight, isWeekend, toIsoDateLocal } from "@/lib/event-time";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
 
@@ -108,6 +108,7 @@ export function toEventRowViewModel(item: EventListItem, now = new Date()): Even
       .toUpperCase()
       .slice(0, 3),
     dayNum: new Intl.DateTimeFormat("en-US", { day: "numeric", timeZone: "America/Los_Angeles" }).format(start),
+    monthShort: formatMonthLong(event.startTs),
     categoryLabel: CATEGORY_LABELS[event.category] ?? "Event",
     priceLabel: formatPrice(event),
     flagLabel: deriveFlagLabel(event, now),

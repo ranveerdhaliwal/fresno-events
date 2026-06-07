@@ -26,6 +26,7 @@ const baseCandidate = {
   confidenceScore: 0.87,
   suggestedPriority: 1,
   status: "pending_review",
+  detailStatus: "complete",
   occurrenceId: "occ-1",
   createdAt: "2026-04-25T08:00:00.000Z",
   updatedAt: "2026-04-25T08:00:00.000Z"
@@ -33,10 +34,10 @@ const baseCandidate = {
 
 describe("toCandidateEventRowViewModel", () => {
   it("maps priority and confidence to row props", () => {
-    const row = toCandidateEventRowViewModel(baseCandidate, 1, { aiSuggested: true });
+    const row = toCandidateEventRowViewModel(baseCandidate, 1);
     expect(row.priority).toBe(1);
     expect(row.priceLabel).toBe("87%");
     expect(row.flagLabel).toBe("HUGE");
-    expect(row.categoryLabel).toContain("AI");
+    expect(row.categoryLabel).toBe("visitfresnocounty");
   });
 });

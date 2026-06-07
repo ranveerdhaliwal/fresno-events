@@ -7,6 +7,7 @@ export interface CandidatePatch {
   reviewed_by?: string;
   matched_event_id?: string | null;
   normalized_event?: NormalizedEvent;
+  suggested_priority?: number | null;
   updated_at?: string;
 }
 
@@ -33,6 +34,7 @@ export interface SupabaseCandidateRow {
   reviewed_by: string | null;
   matched_event_id: string | null;
   occurrence_id: string;
+  occurrence_key: string | null;
   canonical_candidate_id: string | null;
   created_at: string;
   updated_at: string;

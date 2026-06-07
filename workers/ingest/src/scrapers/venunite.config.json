@@ -1,0 +1,12 @@
+{
+  "state": "ca",
+  "cities": "Fresno",
+  "sort": "date-asc",
+  "pageDelayMs": 400,
+  "skipModules": [
+    "ticketmaster_ca",
+    "ticketmaster",
+    "fresno_grizzlies",
+    "strummer_s_bar_grill_fresno"
+  ]
+}

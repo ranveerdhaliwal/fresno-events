@@ -7,6 +7,8 @@ import {
   type CandidateBulkApproveResponse,
   type CandidateBulkApproveChangesResponse,
   type CandidateBulkDeleteResponse,
+  type CandidateBulkPriorityResponse,
+  type CandidateBulkRejectResponse,
   type ReviewDecisionResponse
 } from "@fresno-events/shared";
 
@@ -22,6 +24,8 @@ import {
 import { requireReviewAuth } from "@/routes/review-auth.utils";
 import {
   deleteCandidates,
+  bulkRejectCandidates,
+  bulkUpdateSuggestedPriority,
   fetchCandidatesByOccurrenceId,
   getCandidate,
   listAllCandidatesByStatus,
@@ -30,6 +34,10 @@ import {
 } from "@/routes/review-candidate.service";
 import { candidateSelect } from "@/routes/review.constants";
 import { handleReviewError } from "@/routes/review.errors";
+import {
+  parseBulkRejectIds,
+  validateBulkRejectIdCount
+} from "@/routes/review-bulk-reject.utils";
 import { buildContentDiff } from "@/routes/review-diff.utils";
 import {
   parseApprovePriority,
@@ -128,7 +136,12 @@ reviewRoute
         }
       }
 
-      const siblings = await fetchCandidatesByOccurrenceId(c.env, candidate.occurrenceId, candidate.id);
+      const siblings = await fetchCandidatesByOccurrenceId(
+        c.env,
+        candidate.occurrenceId,
+        candidate.id,
+        candidate.occurrenceKey
+      );
       const linkedCandidates = siblings.map(toLinkedCandidate);
 
       const seriesSiblings = await resolveSeriesSiblingsForCandidate(c.env, candidate);
@@ -412,5 +425,54 @@ reviewRoute
       return ok<CandidateBulkDeleteResponse>(c, result);
     } catch (error) {
       return handleReviewError(c, error, "Candidates could not be deleted.");
+    }
+  })
+  .post("/candidates/bulk-priority", async (c) => {
+    const body = await readJsonBody(c.req.raw);
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [];
+    const priority = parseOptionalApprovePriority(body.priority);
+
+    if (ids.length === 0) {
+      return fail(c, "invalid_request", "ids must be a non-empty array.", 400);
+    }
+
+    if (ids.length > 100) {
+      return fail(c, "invalid_request", "At most 100 ids per bulk-priority request.", 400);
+    }
+
+    if (priority === undefined) {
+      return fail(c, "invalid_request", "priority (0–5) is required.", 400);
+    }
+
+    try {
+      const result = await bulkUpdateSuggestedPriority(c.env, ids, priority);
+      return ok<CandidateBulkPriorityResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Candidate priorities could not be updated.");
+    }
+  })
+  .post("/candidates/bulk-reject", async (c) => {
+    const body = await readJsonBody(c.req.raw);
+    const ids = parseBulkRejectIds(body.ids);
+
+    if (!ids) {
+      return fail(c, "invalid_request", "ids must be a non-empty array.", 400);
+    }
+
+    const countError = validateBulkRejectIdCount(ids);
+    if (countError) {
+      return fail(c, "invalid_request", countError, 400);
+    }
+
+    try {
+      const result = await bulkRejectCandidates(c.env, ids, {
+        notes: typeof body.notes === "string" ? body.notes : undefined,
+        reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin-bulk-ui"
+      });
+      return ok<CandidateBulkRejectResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Candidates could not be rejected.");
     }
   });

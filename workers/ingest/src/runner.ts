@@ -1,4 +1,4 @@
-import type { CoordinatorMode, ScrapeContext, ScrapeResult } from "@fresno-events/shared";
+import type { CoordinatorMode, ScrapeContext, ScrapeEnrichmentMetric, ScrapeResult } from "@fresno-events/shared";
 
 import { runEnrichmentPipeline, type EnrichRecentCandidatesOptions, type EnrichmentSummary } from "@/enrichment";
 import { persistScrapeResult, previewPersistScrapeResult, type PersistenceResult } from "@/candidates";
@@ -6,6 +6,7 @@ import { dedupeScrapeBatch } from "@/lib/scrape-batch-dedupe.utils";
 import { applySeriesMetadata } from "@/lib/series-metadata.utils";
 import type { PersistAuditItemBatchDuplicate, PersistAuditSummary } from "@/candidates/persist-audit.utils";
 import { mergePersistAuditSummaries } from "@/candidates/persist-analysis.utils";
+import { compactPersistAuditForLog } from "@/log-compact.utils";
 import type { IngestEnv } from "@/env";
 import { listRunnableSources, planIngestRuns, sortPlanByStalest, type PlanItem } from "@/planner";
 import { resolveScraperRun, findScraper } from "@/registry";
@@ -50,9 +51,12 @@ export interface RunSummary {
     strategy?: string;
     ingest_lane?: "direct" | "browser";
     detail_mode?: string;
+    detail_urls_visited?: number;
+    enrichment?: ScrapeEnrichmentMetric;
     fetch_urls?: string[];
   }>;
   validation?: ScrapeValidationResult;
+  enrichment?: ScrapeEnrichmentMetric;
   persist_preview?: PersistAuditSummary;
   /** Scrape count before within-batch dedupe (when dedupe runs). */
   raw_events_found?: number;
@@ -181,23 +185,7 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
             : {})
         })),
         total_events_found: summaries.reduce((n, s) => n + s.events_found, 0),
-        ...(mergedPreview
-          ? {
-              persist_preview: {
-                new: mergedPreview.new,
-                changed: mergedPreview.changed,
-                unchanged: mergedPreview.unchanged,
-                new_items: mergedPreview.new_items,
-                changed_items: mergedPreview.changed_items,
-                ...(mergedPreview.batch_duplicates
-                  ? {
-                      batch_duplicates: mergedPreview.batch_duplicates,
-                      batch_duplicate_items: mergedPreview.batch_duplicate_items
-                    }
-                  : {})
-              }
-            }
-          : {}),
+        ...(mergedPreview ? { persist_preview: compactPersistAuditForLog(mergedPreview) } : {}),
         batch_duplicates_removed: summaries.reduce(
           (n, s) => n + (s.batch_duplicates_removed ?? 0),
           0
@@ -208,24 +196,6 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
 
     if (mergedPreview) {
       const batchRemoved = summaries.reduce((n, s) => n + (s.batch_duplicates_removed ?? 0), 0);
-      console.log(
-        JSON.stringify({
-          event: "ingest_preflight_summary",
-          dry_run: true,
-          new: mergedPreview.new,
-          changed: mergedPreview.changed,
-          unchanged: mergedPreview.unchanged,
-          new_items: mergedPreview.new_items,
-          changed_items: mergedPreview.changed_items,
-          ...(mergedPreview.batch_duplicates
-            ? {
-                batch_duplicates: mergedPreview.batch_duplicates,
-                batch_duplicate_items: mergedPreview.batch_duplicate_items
-              }
-            : {}),
-          ...(batchRemoved > 0 ? { batch_duplicates_removed: batchRemoved } : {})
-        })
-      );
       const batchNote =
         batchRemoved > 0 ? `, −${batchRemoved} batch duplicate(s) removed` : "";
       console.log(
@@ -265,7 +235,15 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
 
   const enrichmentPerVenue = summaries.some((s) => s.enrichmentPerVenue);
   if (!options.skipEnrichment && !enrichmentPerVenue) {
-    await runPostIngestEnrichment(env);
+    const enrichment = await runPostIngestEnrichment(env);
+    if (enrichment) {
+      const metric = toEnrichmentMetric(enrichment);
+      for (const summary of summaries) {
+        if (summary.persistence.persisted === true) {
+          summary.enrichment = metric;
+        }
+      }
+    }
   } else if (enrichmentPerVenue) {
     console.log("[ingest] Skipping global enrichment (already ran per venue in venue-ingest).");
   } else {
@@ -456,11 +434,7 @@ async function runOne(
           source: plan.key,
           runId,
           dry_run: true,
-          new: persistPreview.new,
-          changed: persistPreview.changed,
-          unchanged: persistPreview.unchanged,
-          new_items: persistPreview.new_items,
-          changed_items: persistPreview.changed_items
+          ...compactPersistAuditForLog(persistPreview)
         })
       );
       console.log(
@@ -584,8 +558,21 @@ function mapSeedMetrics(result: ScrapeResult): NonNullable<RunSummary["seed_metr
     ...(metric.strategy ? { strategy: metric.strategy } : {}),
     ...(metric.ingestLane ? { ingest_lane: metric.ingestLane } : {}),
     ...(metric.detailMode ? { detail_mode: metric.detailMode } : {}),
+    ...(typeof metric.detailUrlsVisited === "number" ? { detail_urls_visited: metric.detailUrlsVisited } : {}),
+    ...(metric.enrichment ? { enrichment: metric.enrichment } : {}),
     ...(metric.fetchUrls?.length ? { fetch_urls: metric.fetchUrls } : {})
   }));
+}
+
+function toEnrichmentMetric(summary: EnrichmentSummary): ScrapeEnrichmentMetric {
+  return {
+    processed: summary.processed,
+    updated: summary.updated,
+    skipped_sufficient_data: summary.skipped_sufficient_data,
+    skipped_pending_detail: summary.skipped_pending_detail,
+    errors: summary.errors,
+    auto_rejected: summary.auto_rejected
+  };
 }
 
 function runScrapeValidation(

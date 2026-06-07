@@ -2,13 +2,13 @@ import type { EventCandidate } from "@fresno-events/shared";
 import { clampEventPriority } from "@fresno-events/shared";
 
 import type { EventRowViewModel, RowPriority } from "@/lib/event-view-model";
-import { formatEventDate, formatShortTime } from "@/lib/event-time";
+import { formatEventDate, formatMonthLong, formatShortTime } from "@/lib/event-time";
 import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
 
 export function toCandidateEventRowViewModel(
   candidate: EventCandidate,
   displayPriority: number,
-  options: { aiSuggested?: boolean } = {}
+  options: { showStatusInLabel?: boolean } = {}
 ): EventRowViewModel {
   const priority = clampEventPriority(displayPriority) as RowPriority;
   const normalized = candidate.normalizedEvent;
@@ -31,7 +31,10 @@ export function toCandidateEventRowViewModel(
   }).format(start);
 
   const sourceLabel = candidate.source.replace(/^api:/, "").replace(/_/g, " ");
-
+  const statusLabel = candidate.status.replace(/_/g, " ");
+  const categoryLabel = options.showStatusInLabel
+    ? `${statusLabel} · ${sourceLabel}`
+    : sourceLabel;
   return {
     id: candidate.id,
     slug: candidate.id,
@@ -43,13 +46,18 @@ export function toCandidateEventRowViewModel(
     dateLabel: formatEventDate(candidate.startTs),
     dayShort,
     dayNum,
-    categoryLabel: options.aiSuggested ? `${sourceLabel} · AI` : sourceLabel,
+    monthShort: formatMonthLong(candidate.startTs),
+    categoryLabel,
     priceLabel: `${scorePct}%`,
-    flagLabel: deriveCandidateFlag(priority, candidate.status, options.aiSuggested),
+    flagLabel: deriveCandidateFlag(priority, candidate.status),
     priority,
     paletteKey,
     paletteGradient: gradientForPalette(paletteKey),
     imageUrl: normalized.imageUrl ?? null,
+    ...(normalized.showVenueLogoInList ? { showVenueLogoInList: true } : {}),
+    ...(normalized.listVenueLogoPadding !== undefined
+      ? { listVenueLogoPadding: normalized.listVenueLogoPadding }
+      : {}),
     isFree: false,
     isLive: false,
     featuredBadge: "default"
@@ -58,12 +66,10 @@ export function toCandidateEventRowViewModel(
 
 function deriveCandidateFlag(
   priority: RowPriority,
-  status: EventCandidate["status"],
-  aiSuggested?: boolean
+  status: EventCandidate["status"]
 ): string | null {
   if (priority === 0) return "PROMOTED";
   if (priority === 1) return "HUGE";
-  if (aiSuggested) return "AI";
   if (status === "pending_review") return "REVIEW";
   if (status === "needs_changes") return "UPDATE";
   return status.replace(/_/g, " ").toUpperCase();
