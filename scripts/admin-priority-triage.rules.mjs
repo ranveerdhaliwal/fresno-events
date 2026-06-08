@@ -66,6 +66,21 @@ export const EDITORIAL_PRIORITY_RULES = [
     match: (row) => /\bmonster jam\b/i.test(row.title) && /save mart|chukchansi/i.test(row.venue_name)
   },
   {
+    id: "fresno-flea-market",
+    label: "Fresno Flea Market (fairgrounds recurring)",
+    priority: 5,
+    match: (row) => /\bfresno flea market\b/i.test(row.title)
+  },
+  {
+    id: "big-fresno-fair-routine",
+    label: "Big Fresno Fair routine / grounds listing",
+    priority: 5,
+    match: (row) => {
+      const text = titleVenueBlob(row);
+      return /big fresno fair/i.test(row.venue_name) && /museum|flea market|farmers market/.test(text);
+    }
+  },
+  {
     id: "away-minor-league",
     label: "Away / non-Grizzlies minor-league baseball",
     priority: 5,

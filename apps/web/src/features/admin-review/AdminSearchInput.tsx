@@ -8,10 +8,17 @@ import styles from "./AdminReviewWorkspace.module.css";
 export interface AdminSearchInputProps {
   onDebouncedChange: (query: string) => void;
   debounceMs?: number;
+  placeholder?: string;
+  ariaLabel?: string;
 }
 
 /** Local input state so typing does not re-render the full review workspace. */
-export function AdminSearchInput({ onDebouncedChange, debounceMs = 250 }: AdminSearchInputProps) {
+export function AdminSearchInput({
+  onDebouncedChange,
+  debounceMs = 250,
+  placeholder = "Search all candidates by title, venue, or source…",
+  ariaLabel = "Search all candidates"
+}: AdminSearchInputProps) {
   const [value, setValue] = useState("");
 
   useEffect(() => {
@@ -26,8 +33,8 @@ export function AdminSearchInput({ onDebouncedChange, debounceMs = 250 }: AdminS
         type="search"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder="Search all candidates by title, venue, or source…"
-        aria-label="Search all candidates"
+        placeholder={placeholder}
+        aria-label={ariaLabel}
         className={styles.searchInput}
       />
     </div>

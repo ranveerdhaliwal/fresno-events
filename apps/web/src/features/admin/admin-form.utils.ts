@@ -1,4 +1,4 @@
-import type { NormalizedEvent } from "@fresno-events/shared";
+import { isValidCoordinate, type NormalizedEvent } from "@fresno-events/shared";
 
 import type { AdminEventFormState } from "./admin-form.types";
 import {
@@ -28,6 +28,8 @@ export function normalizedEventToFormState(
     venueName: event.venueName,
     venueCity: event.venueCity ?? "",
     venueAddress: event.venueAddress ?? "",
+    venueLat: formatCoord(event.venueLat),
+    venueLng: formatCoord(event.venueLng),
     imageUrl: event.imageUrl ?? "",
     ticketUrl: event.ticketUrl ?? "",
     externalUrl: event.externalUrl ?? "",
@@ -77,6 +79,8 @@ export function formStateToEventPatch(
   assignOptional(patch, "descriptionText", draft.descriptionText, original.descriptionText);
   assignOptional(patch, "venueCity", draft.venueCity, original.venueCity);
   assignOptional(patch, "venueAddress", draft.venueAddress, original.venueAddress);
+  assignCoordOptional(patch, "venueLat", draft.venueLat, original.venueLat);
+  assignCoordOptional(patch, "venueLng", draft.venueLng, original.venueLng);
   assignOptional(patch, "imageUrl", draft.imageUrl, original.imageUrl);
   assignOptional(patch, "ticketUrl", draft.ticketUrl, original.ticketUrl);
   assignOptional(patch, "externalUrl", draft.externalUrl, original.externalUrl);
@@ -150,6 +154,40 @@ function assignOptional<K extends keyof NormalizedEvent>(
   }
   if (trimmed !== (original ?? "")) {
     patch[key] = trimmed as NormalizedEvent[K];
+  }
+}
+
+function formatCoord(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value)) {
+    return "";
+  }
+  return value.toFixed(5);
+}
+
+function parseCoord(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const parsed = Number(trimmed);
+  if (!isValidCoordinate(parsed)) {
+    return undefined;
+  }
+  return parsed;
+}
+
+function assignCoordOptional(
+  patch: Partial<NormalizedEvent>,
+  key: "venueLat" | "venueLng",
+  value: string,
+  original: number | undefined
+) {
+  const parsed = parseCoord(value);
+  if (parsed === undefined) {
+    return;
+  }
+  if (parsed !== original) {
+    patch[key] = parsed;
   }
 }
 

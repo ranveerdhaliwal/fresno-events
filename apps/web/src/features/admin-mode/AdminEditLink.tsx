@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 
-import { useAdminModeOptional } from "./AdminModeProvider";
+import { useCanAdminEdit } from "./useCanAdminEdit";
 
 export interface AdminEditLinkProps {
   eventId: string;
@@ -13,9 +13,9 @@ export interface AdminEditLinkProps {
 }
 
 export function AdminEditLink({ eventId, className, children }: AdminEditLinkProps) {
-  const adminMode = useAdminModeOptional();
+  const canAdminEdit = useCanAdminEdit();
 
-  if (!adminMode?.adminModeEnabled) {
+  if (!canAdminEdit) {
     return null;
   }
 

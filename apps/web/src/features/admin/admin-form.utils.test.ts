@@ -43,4 +43,19 @@ describe("formStateToEventPatch", () => {
     expect(patch.startTs).toBeDefined();
     expect(patch.timezone).toBe("America/Los_Angeles");
   });
+
+  it("round-trips venue coordinates in patch", () => {
+    const withCoords = { ...baseEvent, venueLat: 36.7378, venueLng: -119.7871 };
+    const form = normalizedEventToFormState(withCoords, 5);
+    expect(form.venueLat).toBe("36.73780");
+    expect(form.venueLng).toBe("-119.78710");
+
+    const patch = formStateToEventPatch(withCoords, {
+      ...form,
+      venueLat: "36.80000",
+      venueLng: "-119.90000"
+    });
+    expect(patch.venueLat).toBe(36.8);
+    expect(patch.venueLng).toBe(-119.9);
+  });
 });

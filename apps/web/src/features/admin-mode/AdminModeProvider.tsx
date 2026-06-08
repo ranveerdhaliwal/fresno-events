@@ -49,6 +49,7 @@ export function AdminModeProvider({ children }: { children: ReactNode }) {
 
       if (message.type === "event-updated") {
         void queryClient.invalidateQueries({ queryKey: adminKeys.publishedEvent(message.eventId) });
+        void queryClient.invalidateQueries({ queryKey: [...adminKeys.all, "published-events"] });
         void queryClient.invalidateQueries({ queryKey: eventsKeys.all });
       }
     });

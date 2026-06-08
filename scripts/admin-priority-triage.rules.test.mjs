@@ -70,6 +70,18 @@ describe("suggestEditorialPriority", () => {
     assert.equal(result?.priority, 5);
   });
 
+  it("Fresno Flea Market → P5", () => {
+    const result = suggestEditorialPriority(
+      row({
+        title: "Fresno Flea Market",
+        venue_name: "Big Fresno Fair",
+        source: "scrape:www.fresnofair.com",
+        suggested_priority: 1
+      })
+    );
+    assert.equal(result?.priority, 5);
+  });
+
   it("defaults missing suggested_priority to 5", () => {
     assert.equal(currentSuggestedPriority(row({ suggested_priority: null })), 5);
   });

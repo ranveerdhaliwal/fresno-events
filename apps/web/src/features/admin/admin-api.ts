@@ -1,4 +1,5 @@
 import type {
+  AdminEventListResponse,
   AdminEventPatchBody,
   AdminEventSearchResponse,
   AdminPublishedEventResponse,
@@ -10,11 +11,16 @@ import type {
   CandidateBulkDeleteResponse,
   CandidateBulkPriorityResponse,
   CandidateBulkRejectResponse,
-  EventCandidateDetailResponse,
+  EventBulkPriorityResponse,
   EventCandidateListResponse,
   HomepageSlotsPutBody,
   HomepageSlotsResponse,
-  ReviewDecisionResponse
+  ReviewDecisionResponse,
+  ReviewOccurrenceRelinkOpsResponse,
+  ReviewPriorityTriageOpsResponse,
+  ReviewQueueAuditResponse,
+  ReviewVenueAddressBackfillOpsResponse,
+  ReviewVenueGeocodeOpsResponse
 } from "@fresno-events/shared";
 
 import type {
@@ -62,6 +68,82 @@ export function reviewTabToStatus(tab: ReviewQueueTab): CandidateStatusFilter {
     case "rejected":
       return "rejected";
   }
+}
+
+export async function fetchPreApproveAudit(token: string) {
+  return adminFetch<ReviewQueueAuditResponse>(token, "/review/candidates/pre-approve-audit");
+}
+
+export async function runOccurrenceRelinkOps(token: string, dryRun: boolean) {
+  const params = new URLSearchParams();
+  if (dryRun) {
+    params.set("dry_run", "true");
+  }
+  const query = params.toString();
+  return adminFetch<ReviewOccurrenceRelinkOpsResponse>(
+    token,
+    `/review/ops/occurrence-relink${query ? `?${query}` : ""}`,
+    { method: "POST" }
+  );
+}
+
+export async function runVenueAddressBackfillOps(token: string, dryRun: boolean, source?: string) {
+  const params = new URLSearchParams();
+  if (dryRun) {
+    params.set("dry_run", "true");
+  }
+  if (source?.trim()) {
+    params.set("source", source.trim());
+  }
+  const query = params.toString();
+  return adminFetch<ReviewVenueAddressBackfillOpsResponse>(
+    token,
+    `/review/ops/venue-address-backfill${query ? `?${query}` : ""}`,
+    { method: "POST" }
+  );
+}
+
+export async function geocodeVenueAddress(
+  token: string,
+  input: { address: string; city?: string }
+): Promise<{ lat: number; lng: number }> {
+  const params = new URLSearchParams();
+  if (input.address.trim()) {
+    params.set("address", input.address.trim());
+  }
+  if (input.city?.trim()) {
+    params.set("city", input.city.trim());
+  }
+  return adminFetch<{ lat: number; lng: number }>(token, `/review/geocode?${params}`);
+}
+
+export async function runVenueGeocodeOps(token: string, dryRun: boolean) {
+  const params = new URLSearchParams();
+  if (dryRun) {
+    params.set("dry_run", "true");
+  }
+  const query = params.toString();
+  return adminFetch<ReviewVenueGeocodeOpsResponse>(
+    token,
+    `/review/ops/venue-geocode${query ? `?${query}` : ""}`,
+    { method: "POST" }
+  );
+}
+
+export async function runPriorityTriageOps(token: string, dryRun: boolean, source?: string) {
+  const params = new URLSearchParams();
+  if (dryRun) {
+    params.set("dry_run", "true");
+  }
+  if (source?.trim()) {
+    params.set("source", source.trim());
+  }
+  const query = params.toString();
+  return adminFetch<ReviewPriorityTriageOpsResponse>(
+    token,
+    `/review/ops/priority-triage${query ? `?${query}` : ""}`,
+    { method: "POST" }
+  );
 }
 
 export async function listCandidates(
@@ -224,6 +306,32 @@ export async function saveHomepageSlots(token: string, body: HomepageSlotsPutBod
   });
 }
 
+export async function listPublishedEvents(
+  token: string,
+  opts?: {
+    limit?: number;
+    offset?: number;
+    scope?: "future" | "past" | "all";
+    q?: string;
+  }
+) {
+  const params = new URLSearchParams();
+  if (opts?.limit !== undefined) {
+    params.set("limit", String(opts.limit));
+  }
+  if (opts?.offset !== undefined) {
+    params.set("offset", String(opts.offset));
+  }
+  if (opts?.scope) {
+    params.set("scope", opts.scope);
+  }
+  if (opts?.q?.trim()) {
+    params.set("q", opts.q.trim());
+  }
+  const query = params.toString();
+  return adminFetch<AdminEventListResponse>(token, `/review/events${query ? `?${query}` : ""}`);
+}
+
 export async function searchPublishedEvents(
   token: string,
   q: string,
@@ -241,6 +349,14 @@ export async function searchPublishedEvents(
 
 export async function getPublishedEvent(token: string, eventId: string) {
   return adminFetch<AdminPublishedEventResponse>(token, `/review/events/${encodeURIComponent(eventId)}`);
+}
+
+export async function bulkSetPublishedEventPriority(token: string, ids: string[], priority: number) {
+  return adminFetch<EventBulkPriorityResponse>(token, "/review/events/bulk-priority", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids, priority })
+  });
 }
 
 export async function patchPublishedEvent(token: string, eventId: string, body: AdminEventPatchBody) {

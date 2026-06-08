@@ -47,4 +47,15 @@ describe("filterCandidatesForSearch", () => {
     expect(filterCandidatesForSearch(rows, "visalia")).toHaveLength(1);
     expect(filterCandidatesForSearch(rows, "valley strong")).toHaveLength(1);
   });
+
+  it("does not surface approved rows when caller passes only pending_review items", () => {
+    const rows = [
+      candidate({ id: "pending", title: "Visalia Rawhide vs. San Jose Giants", status: "pending_review" }),
+      candidate({ id: "approved", title: "Visalia Rawhide vs. San Jose Giants", status: "approved" })
+    ];
+
+    const pendingOnly = rows.filter((row) => row.status === "pending_review");
+    expect(filterCandidatesForSearch(pendingOnly, "visalia")).toHaveLength(1);
+    expect(filterCandidatesForSearch(pendingOnly, "visalia")[0]?.id).toBe("pending");
+  });
 });

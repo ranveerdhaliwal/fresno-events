@@ -6,6 +6,7 @@ import styles from "./AdminShell.module.css";
 
 const TABS = [
   { to: "/admin" as const, label: "Review", exact: true },
+  { to: "/admin/events" as const, label: "Live events", exact: false },
   { to: "/admin/homepage" as const, label: "Homepage", exact: false }
 ];
 

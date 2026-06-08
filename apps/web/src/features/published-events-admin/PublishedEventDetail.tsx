@@ -1,7 +1,6 @@
-import { useMutation } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, Loader2, X } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
 import { Button } from "@/components/Button/Button";
 import { DateInput } from "@/components/DateInput/DateInput";
 import { FormField } from "@/components/FormField/FormField";
@@ -9,46 +8,47 @@ import { SelectInput } from "@/components/SelectInput/SelectInput";
 import { TextArea } from "@/components/TextArea/TextArea";
 import { TextInput } from "@/components/TextInput/TextInput";
 import { TimeInput } from "@/components/TimeInput/TimeInput";
-import { cn } from "@/lib/cn";
-import { approveCandidate, rejectCandidate } from "../admin/admin-api";
 import {
   ADMIN_EVENT_CATEGORIES,
   type AdminEventFormState
-} from "../admin/admin-form.types";
-import { formStateToEventPatch, normalizedEventToFormState } from "../admin/admin-form.utils";
-import { ORGANIC_CANDIDATE_DISPLAY_PRIORITY, type EventCategory } from "@fresno-events/shared";
+} from "@/features/admin/admin-form.types";
+import { formStateToEventPatch, normalizedEventToFormState } from "@/features/admin/admin-form.utils";
+import { adminKeys } from "@/features/admin/admin.queryKeys";
+import { patchPublishedEvent } from "@/features/admin/admin-api";
+import { ErrorBanner } from "@/features/admin-review/AdminReviewDetail.shared";
+import { broadcastAdminCache } from "@/features/admin-mode/admin-cache";
 import { formatPacificDateTimeLabel } from "@/lib/pacific-time";
+import {
+  EVENT_DISPLAY_PRIORITY,
+  type AdminPublishedEventResponse,
+  type EventCategory
+} from "@fresno-events/shared";
 
 import { AdminLocationPicker } from "@/features/admin-location/AdminLocationPicker";
 
-import { ErrorBanner } from "./AdminReviewDetail.shared";
-import { type CandidateDetailProps } from "./AdminReviewWorkspace.types";
-import styles from "./AdminReviewWorkspace.module.css";
-import { LinkedSourcesSection } from "./LinkedSourcesSection";
-import { SeriesLinkPanel } from "./SeriesLinkPanel";
+import { publishedEventToNormalized } from "./published-event-normalize.utils";
+import styles from "../admin-review/AdminReviewWorkspace.module.css";
 
-export function CandidateDetail({
-  token,
-  candidate,
-  linkedCandidates,
-  seriesSiblings,
-  displayPriority,
-  onPriorityChange,
-  onAfterDecision,
-  onSeriesUpdated,
-  onSelectCandidate
-}: CandidateDetailProps) {
+export interface PublishedEventDetailProps {
+  token: string;
+  detail: AdminPublishedEventResponse;
+  onSaved?: () => void;
+}
+
+export function PublishedEventDetail({ token, detail, onSaved }: PublishedEventDetailProps) {
+  const queryClient = useQueryClient();
+  const { event, venue } = detail;
+  const baseline = useMemo(() => publishedEventToNormalized(event, venue, detail.heroImage), [detail, event, venue]);
+
   const [draft, setDraft] = useState<AdminEventFormState>(() =>
-    normalizedEventToFormState(candidate.normalizedEvent, displayPriority)
+    normalizedEventToFormState(baseline, event.priority)
   );
-  const [reviewerName, setReviewerName] = useState<string>(() => sessionStorage.getItem("wuf:admin_name") ?? "");
-  const [notes, setNotes] = useState<string>("");
-  const [showRaw, setShowRaw] = useState<boolean>(false);
+  const [reviewerName, setReviewerName] = useState(() => sessionStorage.getItem("wuf:admin_name") ?? "");
+  const [showRaw, setShowRaw] = useState(false);
 
   useEffect(() => {
-    setDraft(normalizedEventToFormState(candidate.normalizedEvent, displayPriority));
-    setNotes("");
-  }, [candidate.id, candidate.normalizedEvent, displayPriority]);
+    setDraft(normalizedEventToFormState(baseline, event.priority));
+  }, [baseline, event.id, event.priority]);
 
   useEffect(() => {
     if (reviewerName) {
@@ -56,76 +56,61 @@ export function CandidateDetail({
     }
   }, [reviewerName]);
 
-  const eventDiff = useMemo(
-    () => formStateToEventPatch(candidate.normalizedEvent, draft),
-    [candidate.normalizedEvent, draft]
-  );
+  const eventDiff = useMemo(() => formStateToEventPatch(baseline, draft), [baseline, draft]);
 
-  const approveMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: () =>
-      approveCandidate(token, candidate.id, {
+      patchPublishedEvent(token, event.id, {
         ...(Object.keys(eventDiff).length > 0 ? { event: eventDiff } : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-        ...(reviewerName.trim() ? { reviewedBy: reviewerName.trim() } : {}),
-        priority: draft.priority
-      }),
-    onSuccess: () => {
-      onAfterDecision(candidate.id);
-    }
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: () =>
-      rejectCandidate(token, candidate.id, {
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
+        priority: draft.priority,
         ...(reviewerName.trim() ? { reviewedBy: reviewerName.trim() } : {})
       }),
     onSuccess: () => {
-      onAfterDecision(candidate.id);
+      void queryClient.invalidateQueries({ queryKey: adminKeys.publishedEvent(event.id) });
+      void queryClient.invalidateQueries({ queryKey: [...adminKeys.all, "published-events"] });
+      broadcastAdminCache({ type: "event-updated", eventId: event.id });
+      onSaved?.();
     }
   });
 
-  const isBusy = approveMutation.isPending || rejectMutation.isPending;
-  const decisionError = approveMutation.error ?? rejectMutation.error;
   const externalUrl = draft.externalUrl.trim();
   const ticketUrl = draft.ticketUrl.trim();
+  const isBusy = saveMutation.isPending;
+
   return (
     <div className={styles.detailForm}>
       <header className={styles.detailHeader}>
         <div>
           <div className={styles.detailMeta}>
-            <span className={styles.detailMetaTag}>{candidate.source}</span>
-            <span>Status: {candidate.status}</span>
-            {candidate.detailStatus === "pending" ? <span>Detail pending</span> : null}
-            <span>Score {(candidate.confidenceScore * 100).toFixed(0)}%</span>
+            <span className={styles.detailMetaTag}>{event.source}</span>
+            <span>Status: {event.status.replace(/_/g, " ")}</span>
+            <span>P{event.priority}</span>
           </div>
-          <h2 className={styles.detailTitle}>{candidate.title}</h2>
+          <h2 className={styles.detailTitle}>{event.title}</h2>
           <p className={styles.detailSubtitle}>
-            {formatPacificDateTimeLabel(candidate.startTs)} · {candidate.venueName}
+            {formatPacificDateTimeLabel(event.startTs)} · {venue.name}
           </p>
         </div>
       </header>
 
       <div className={styles.detailActions}>
         <div className={styles.detailActionsPrimary}>
-          <Button variant="reject" disabled={isBusy} onClick={() => rejectMutation.mutate()}>
-            <X className="size-4" aria-hidden />
-            Reject
-          </Button>
-          <Button variant="approve" disabled={isBusy} onClick={() => approveMutation.mutate()}>
-            {isBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />}
-            {Object.keys(eventDiff).length > 0 ? "Approve with edits" : "Approve"}
+          <Button variant="approve" disabled={isBusy} onClick={() => saveMutation.mutate()}>
+            {isBusy ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <CheckCircle2 className="size-4" aria-hidden />
+            )}
+            {Object.keys(eventDiff).length > 0 ? "Save changes" : "Save priority"}
           </Button>
         </div>
         <div className={styles.detailActionsSecondary}>
-          {candidate.sourceUrl ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              href={candidate.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
+          <Button variant="secondary" size="sm" href={`/event/${event.slug}`} target="_blank">
+            <ExternalLink className="size-3.5" aria-hidden />
+            View live
+          </Button>
+          {event.externalUrl ? (
+            <Button variant="secondary" size="sm" href={event.externalUrl} target="_blank" rel="noreferrer">
               <ExternalLink className="size-3.5" aria-hidden />
               Source
             </Button>
@@ -136,9 +121,10 @@ export function CandidateDetail({
         </div>
       </div>
 
-      <LinkedSourcesSection linkedCandidates={linkedCandidates} />
-
-      {decisionError ? <ErrorBanner error={decisionError} /> : null}
+      {saveMutation.error ? <ErrorBanner error={saveMutation.error} /> : null}
+      {saveMutation.isSuccess ? (
+        <p className={styles.updateNotice}>Changes saved to the live event.</p>
+      ) : null}
 
       <div className={styles.detailFormGrid}>
         <FormField label="Title" fullWidth>
@@ -150,7 +136,9 @@ export function CandidateDetail({
         <FormField label="Category">
           <SelectInput
             value={draft.category}
-            onChange={(event) => setDraft((d) => ({ ...d, category: event.target.value as EventCategory }))}
+            onChange={(event) =>
+              setDraft((d) => ({ ...d, category: event.target.value as EventCategory }))
+            }
           >
             {ADMIN_EVENT_CATEGORIES.map((option) => (
               <option key={option} value={option}>
@@ -273,26 +261,15 @@ export function CandidateDetail({
         />
       </FormField>
 
-      <FormField
-        label="Display priority (published event)"
-        hint={
-          candidate.suggestedPriority !== undefined ? (
-            <>
-              Suggested P{candidate.suggestedPriority}
-              {candidate.suggestedPriority !== draft.priority ? " · you overrode" : ""}
-            </>
-          ) : undefined
-        }
-      >
+      <FormField label="Display priority (published event)">
         <SelectInput
           value={draft.priority}
           onChange={(event) => {
             const next = Number(event.target.value);
             setDraft((d) => ({ ...d, priority: next }));
-            onPriorityChange(candidate.id, next);
           }}
         >
-          {ORGANIC_CANDIDATE_DISPLAY_PRIORITY.map((tier) => (
+          {EVENT_DISPLAY_PRIORITY.map((tier) => (
             <option key={tier.value} value={tier.value}>
               {tier.value} — {tier.label} ({tier.description})
             </option>
@@ -300,40 +277,20 @@ export function CandidateDetail({
         </SelectInput>
       </FormField>
 
-      <div className={cn(styles.detailFormGrid, styles.detailFormGridNotes)}>
-        <FormField label="Notes for review log">
-          <TextArea
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            rows={3}
-            placeholder="What did you change or why are you rejecting?"
-          />
-        </FormField>
-        <FormField label="Reviewer">
-          <TextInput
-            value={reviewerName}
-            onChange={(event) => setReviewerName(event.target.value)}
-            placeholder="your name"
-          />
-        </FormField>
-      </div>
+      <FormField label="Reviewer">
+        <TextInput
+          value={reviewerName}
+          onChange={(event) => setReviewerName(event.target.value)}
+          placeholder="your name"
+        />
+      </FormField>
 
       {showRaw ? (
         <details open className={styles.rawJson}>
-          <summary>Normalized event JSON</summary>
-          <pre>{JSON.stringify(candidate.normalizedEvent, null, 2)}</pre>
+          <summary>Published event JSON</summary>
+          <pre>{JSON.stringify({ event, venue }, null, 2)}</pre>
         </details>
       ) : null}
-
-      <footer className={styles.detailSeriesFooter}>
-        <SeriesLinkPanel
-          token={token}
-          candidate={candidate}
-          seriesSiblings={seriesSiblings ?? []}
-          onSelectCandidate={onSelectCandidate}
-          onSeriesUpdated={onSeriesUpdated}
-        />
-      </footer>
     </div>
   );
 }

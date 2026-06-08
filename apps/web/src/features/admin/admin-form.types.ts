@@ -13,6 +13,8 @@ export interface AdminEventFormState {
   venueName: string;
   venueCity: string;
   venueAddress: string;
+  venueLat: string;
+  venueLng: string;
   imageUrl: string;
   ticketUrl: string;
   externalUrl: string;

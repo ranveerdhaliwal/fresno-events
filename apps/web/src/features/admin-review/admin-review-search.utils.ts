@@ -1,16 +1,6 @@
 import type { EventCandidate } from "@fresno-events/shared";
 
-import type { CandidateStatusFilter } from "../admin/admin-api.types";
-
-export const ADMIN_SEARCH_STATUSES: CandidateStatusFilter[] = [
-  "pending_review",
-  "needs_changes",
-  "approved",
-  "rejected",
-  "duplicate",
-  "awaiting_enrichment"
-];
-
+/** Filter candidates already scoped to the active review tab (e.g. pending_review on New). */
 export function filterCandidatesForSearch(items: EventCandidate[], query: string): EventCandidate[] {
   const needle = query.trim().toLowerCase();
   if (needle.length < 2) {

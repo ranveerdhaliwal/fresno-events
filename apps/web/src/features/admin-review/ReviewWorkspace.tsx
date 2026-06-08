@@ -1,12 +1,13 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Loader2, LogOut, RefreshCcw, Trash2, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, ClipboardList, Loader2, LogOut, RefreshCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { EventCandidate } from "@fresno-events/shared";
-import { EVENT_DISPLAY_PRIORITY } from "@fresno-events/shared";
+import type { ReviewQueueAuditResponse } from "@fresno-events/shared";
+import { ORGANIC_CANDIDATE_DISPLAY_PRIORITY } from "@fresno-events/shared";
 
 import { Button } from "@/components/Button/Button";
 import { SelectInput } from "@/components/SelectInput/SelectInput";
+import { Text } from "@/components/Text";
 import {
   AdminApiError,
   bulkApproveAllPending,
@@ -16,7 +17,12 @@ import {
   bulkSetCandidatePriority,
   bulkRejectCandidates,
   deleteCandidates,
+  fetchPreApproveAudit,
   getCandidate,
+  runOccurrenceRelinkOps,
+  runPriorityTriageOps,
+  runVenueAddressBackfillOps,
+  runVenueGeocodeOps,
   isAdminAuthError,
   listCandidates,
   reviewTabToStatus
@@ -44,11 +50,14 @@ import { AdminSearchInput } from "./AdminSearchInput";
 import { CandidateChangeDetail } from "./CandidateChangeDetail";
 import { CandidateDetail } from "./CandidateDetail";
 import { CandidateList } from "./CandidateList";
-import {
-  ADMIN_SEARCH_STATUSES,
-  filterCandidatesForSearch
-} from "./admin-review-search.utils";
+import { filterCandidatesForSearch } from "./admin-review-search.utils";
 import { togglePageSelection } from "./admin-review-selection.utils";
+import {
+  AdminMaintenancePanel,
+  type MaintenanceOpKind,
+  type MaintenanceOpResult
+} from "./AdminMaintenancePanel";
+import { ReviewQueueAuditPanel } from "./ReviewQueueAuditPanel";
 
 export function ReviewWorkspace({
   token,
@@ -67,46 +76,18 @@ export function ReviewWorkspace({
   const [priorityOverrides, setPriorityOverrides] = useState<Record<string, number>>(() =>
     readPriorityOverrides()
   );
-  const [bulkPriority, setBulkPriority] = useState("5");
+  const [bulkPriority, setBulkPriority] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [auditResult, setAuditResult] = useState<ReviewQueueAuditResponse | null>(null);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [maintenanceOp, setMaintenanceOp] = useState<MaintenanceOpKind | null>(null);
+  const [maintenanceResult, setMaintenanceResult] = useState<MaintenanceOpResult | null>(null);
 
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
   }, []);
 
   const searchActive = searchQuery.trim().length >= 2;
-
-  const crossStatusQueries = useQueries({
-    queries: ADMIN_SEARCH_STATUSES.map((status) => ({
-      queryKey: ["admin", "candidates", "search", status, token],
-      queryFn: () => listCandidates(token, status),
-      staleTime: 5 * 60_000,
-      gcTime: 10 * 60_000,
-      enabled: searchActive
-    }))
-  });
-
-  const crossStatusRevision = crossStatusQueries.reduce(
-    (total, query) => total + (query.dataUpdatedAt ?? 0),
-    0
-  );
-
-  const crossStatusItems = useMemo(() => {
-    const byId = new Map<string, EventCandidate>();
-    for (const result of crossStatusQueries) {
-      for (const row of result.data?.items ?? []) {
-        byId.set(row.id, row);
-      }
-    }
-    return [...byId.values()];
-  }, [crossStatusQueries, crossStatusRevision]);
-
-  const searchResults = useMemo(() => {
-    if (!searchActive) {
-      return [];
-    }
-    return filterCandidatesForSearch(crossStatusItems, searchQuery);
-  }, [crossStatusItems, searchActive, searchQuery]);
 
   const candidatesQuery = useQuery({
     queryKey: ["admin", "candidates", activeTab, token],
@@ -122,6 +103,14 @@ export function ReviewWorkspace({
   }, [candidatesQuery.error, onAuthFailure]);
 
   const items = candidatesQuery.data?.items ?? [];
+
+  const searchResults = useMemo(() => {
+    if (!searchActive) {
+      return [];
+    }
+    return filterCandidatesForSearch(items, searchQuery);
+  }, [items, searchActive, searchQuery]);
+
   const sortedItems = useMemo(
     () => sortCandidatesForReview(items, priorityOverrides),
     [items, priorityOverrides]
@@ -162,8 +151,7 @@ export function ReviewWorkspace({
   const handleSelectAllPage = useCallback((pageIds: string[]) => {
     setSelectedIds((prev) => togglePageSelection(prev, pageIds));
   }, []);
-  const listLoading =
-    candidatesQuery.isLoading || (searchActive && crossStatusQueries.some((query) => query.isLoading));
+  const listLoading = candidatesQuery.isLoading;
   const activeId = selectedId ?? sortedItems[0]?.id ?? null;
 
   useEffect(() => {
@@ -174,6 +162,7 @@ export function ReviewWorkspace({
 
   useEffect(() => {
     setSelectedIds(new Set());
+    setBulkPriority("");
     setDeleteMessage(null);
     setApproveMessage(null);
   }, [activeTab]);
@@ -324,6 +313,105 @@ export function ReviewWorkspace({
     }
   });
 
+  const preApproveAuditMutation = useMutation({
+    mutationFn: () => fetchPreApproveAudit(token),
+    onSuccess: (result) => {
+      setAuditResult(result);
+      setAuditError(null);
+    },
+    onError: (error: unknown) => {
+      setAuditResult(null);
+      setAuditError(error instanceof AdminApiError ? error.message : "Pre-approve check failed.");
+    }
+  });
+
+  const relinkOpsMutation = useMutation({
+    mutationFn: (dryRun: boolean) => runOccurrenceRelinkOps(token, dryRun),
+    onMutate: (dryRun) => {
+      setMaintenanceOp("relink");
+      setMaintenanceResult({ kind: "relink", dryRun });
+    },
+    onSuccess: (relink, dryRun) => {
+      setMaintenanceResult({ kind: "relink", dryRun, relink });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
+    },
+    onError: (error: unknown, dryRun) => {
+      setMaintenanceResult({
+        kind: "relink",
+        dryRun,
+        error: error instanceof AdminApiError ? error.message : "Occurrence relink failed."
+      });
+    },
+    onSettled: () => {
+      setMaintenanceOp(null);
+    }
+  });
+
+  const addressBackfillMutation = useMutation({
+    mutationFn: (dryRun: boolean) => runVenueAddressBackfillOps(token, dryRun),
+    onMutate: (dryRun) => {
+      setMaintenanceOp("addresses");
+      setMaintenanceResult({ kind: "addresses", dryRun });
+    },
+    onSuccess: (addresses, dryRun) => {
+      setMaintenanceResult({ kind: "addresses", dryRun, addresses });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
+    },
+    onError: (error: unknown, dryRun) => {
+      setMaintenanceResult({
+        kind: "addresses",
+        dryRun,
+        error: error instanceof AdminApiError ? error.message : "Venue address cleanup failed."
+      });
+    },
+    onSettled: () => {
+      setMaintenanceOp(null);
+    }
+  });
+
+  const priorityTriageMutation = useMutation({
+    mutationFn: (dryRun: boolean) => runPriorityTriageOps(token, dryRun),
+    onMutate: (dryRun) => {
+      setMaintenanceOp("priority");
+      setMaintenanceResult({ kind: "priority", dryRun });
+    },
+    onSuccess: (priority, dryRun) => {
+      setMaintenanceResult({ kind: "priority", dryRun, priority });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
+    },
+    onError: (error: unknown, dryRun) => {
+      setMaintenanceResult({
+        kind: "priority",
+        dryRun,
+        error: error instanceof AdminApiError ? error.message : "Priority triage failed."
+      });
+    },
+    onSettled: () => {
+      setMaintenanceOp(null);
+    }
+  });
+
+  const geocodeOpsMutation = useMutation({
+    mutationFn: (dryRun: boolean) => runVenueGeocodeOps(token, dryRun),
+    onMutate: (dryRun) => {
+      setMaintenanceOp("geocode");
+      setMaintenanceResult({ kind: "geocode", dryRun });
+    },
+    onSuccess: (geocode, dryRun) => {
+      setMaintenanceResult({ kind: "geocode", dryRun, geocode });
+    },
+    onError: (error: unknown, dryRun) => {
+      setMaintenanceResult({
+        kind: "geocode",
+        dryRun,
+        error: error instanceof AdminApiError ? error.message : "Venue geocode failed."
+      });
+    },
+    onSettled: () => {
+      setMaintenanceOp(null);
+    }
+  });
+
   const rejectSelectedMutation = useMutation({
     mutationFn: (ids: string[]) => bulkRejectCandidates(token, ids, { reviewedBy: "admin-bulk-ui" }),
     onSuccess: (result) => {
@@ -347,7 +435,80 @@ export function ReviewWorkspace({
     approveAllMutation.isPending ||
     approveSelectedUpdatesMutation.isPending ||
     approveAllUpdatesMutation.isPending ||
-    bulkPriorityMutation.isPending;
+    bulkPriorityMutation.isPending ||
+    preApproveAuditMutation.isPending ||
+    relinkOpsMutation.isPending ||
+    addressBackfillMutation.isPending ||
+    priorityTriageMutation.isPending ||
+    geocodeOpsMutation.isPending;
+
+  const maintenanceLoading =
+    relinkOpsMutation.isPending ||
+    addressBackfillMutation.isPending ||
+    priorityTriageMutation.isPending ||
+    geocodeOpsMutation.isPending;
+
+  const handleMaintenanceCheck = useCallback(
+    (kind: MaintenanceOpKind) => {
+      if (kind === "relink") {
+        relinkOpsMutation.mutate(true);
+        return;
+      }
+      if (kind === "addresses") {
+        addressBackfillMutation.mutate(true);
+        return;
+      }
+      if (kind === "geocode") {
+        geocodeOpsMutation.mutate(true);
+        return;
+      }
+      priorityTriageMutation.mutate(true);
+    },
+    [addressBackfillMutation, geocodeOpsMutation, priorityTriageMutation, relinkOpsMutation]
+  );
+
+  const handleMaintenanceApply = useCallback(
+    (kind: MaintenanceOpKind) => {
+      if (kind === "relink") {
+        if (
+          window.confirm(
+            "Run occurrence relink? This updates occurrence keys and cross-source duplicate links."
+          )
+        ) {
+          relinkOpsMutation.mutate(false);
+        }
+        return;
+      }
+      if (kind === "addresses") {
+        if (
+          window.confirm(
+            "Fix venue addresses? This normalizes mailing-line addresses on candidates and published venues."
+          )
+        ) {
+          addressBackfillMutation.mutate(false);
+        }
+        return;
+      }
+      if (kind === "geocode") {
+        if (
+          window.confirm(
+            "Geocode venues missing coordinates? Apply is rate-limited (~50 venues max per run)."
+          )
+        ) {
+          geocodeOpsMutation.mutate(false);
+        }
+        return;
+      }
+      if (
+        window.confirm(
+          "Apply priority triage? This patches suggested_priority on pending primaries when editorial rules match."
+        )
+      ) {
+        priorityTriageMutation.mutate(false);
+      }
+    },
+    [addressBackfillMutation, geocodeOpsMutation, priorityTriageMutation, relinkOpsMutation]
+  );
 
   const candidateQuery = useQuery({
     queryKey: ["admin", "candidate", activeId, token],
@@ -359,9 +520,13 @@ export function ReviewWorkspace({
     <div className={styles.workspace}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Admin</p>
-          <h1 className={styles.title}>{TAB_COPY[activeTab].title}</h1>
-          <p className={styles.subtitle}>{TAB_COPY[activeTab].subtitle}</p>
+          <Text variant="eyebrow">Admin</Text>
+          <Text variant="header1" className={styles.title}>
+            {TAB_COPY[activeTab].title}
+          </Text>
+          <Text variant="body1" tone="mutedOnPage" className={styles.subtitle}>
+            {TAB_COPY[activeTab].subtitle}
+          </Text>
           <AdminSearchInput onDebouncedChange={handleSearchChange} />
           <div className={styles.tabRow}>
             {PRIMARY_TABS.map((tab) => (
@@ -394,19 +559,25 @@ export function ReviewWorkspace({
         <div className={styles.headerActions}>
           {activeTab === "new" ? (
             <Button
+              variant="secondary"
+              size="sm"
+              disabled={bulkActionPending || candidatesQuery.isLoading}
+              onClick={() => preApproveAuditMutation.mutate()}
+            >
+              {preApproveAuditMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <ClipboardList className="size-3.5" aria-hidden />
+              )}
+              Pre-approve check
+            </Button>
+          ) : null}
+          {activeTab === "new" ? (
+            <Button
               variant="approve"
               size="sm"
               disabled={bulkActionPending || candidatesQuery.isLoading}
-              onClick={() => {
-                const count = items.length;
-                if (
-                  window.confirm(
-                    `Approve all pending candidates in the database? (Listed: ${count} on this page.) Uses suggested priority per row.`
-                  )
-                ) {
-                  approveAllMutation.mutate();
-                }
-              }}
+              onClick={() => approveAllMutation.mutate()}
             >
               {approveAllMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -421,11 +592,7 @@ export function ReviewWorkspace({
               variant="approve"
               size="sm"
               disabled={bulkActionPending || candidatesQuery.isLoading}
-              onClick={() => {
-                if (window.confirm(`Approve all ${items.length} listed update(s)?`)) {
-                  approveAllUpdatesMutation.mutate();
-                }
-              }}
+              onClick={() => approveAllUpdatesMutation.mutate()}
             >
               {approveAllUpdatesMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -454,9 +621,38 @@ export function ReviewWorkspace({
         <ErrorBanner error={candidatesQuery.error} />
       ) : null}
 
-      {approveMessage ? <p className={styles.message}>{approveMessage}</p> : null}
+      <AdminMaintenancePanel
+        activeOp={maintenanceOp}
+        isLoading={maintenanceLoading}
+        result={maintenanceResult}
+        onCheck={handleMaintenanceCheck}
+        onApply={handleMaintenanceApply}
+        onDismiss={() => setMaintenanceResult(null)}
+      />
 
-      {deleteMessage ? <p className={styles.message}>{deleteMessage}</p> : null}
+      {activeTab === "new" ? (
+        <ReviewQueueAuditPanel
+          audit={auditResult}
+          isLoading={preApproveAuditMutation.isPending}
+          error={auditError}
+          onDismiss={() => {
+            setAuditResult(null);
+            setAuditError(null);
+          }}
+        />
+      ) : null}
+
+      {approveMessage ? (
+        <Text variant="body1" tone="onCard" className={styles.message}>
+          {approveMessage}
+        </Text>
+      ) : null}
+
+      {deleteMessage ? (
+        <Text variant="body1" tone="onCard" className={styles.message}>
+          {deleteMessage}
+        </Text>
+      ) : null}
 
       {selectedIds.size > 0 ? (
         <div className={styles.bulkBar}>
@@ -469,7 +665,10 @@ export function ReviewWorkspace({
               onChange={(event) => setBulkPriority(event.target.value)}
               aria-label="Bulk display priority"
             >
-              {EVENT_DISPLAY_PRIORITY.map((tier) => (
+              <option value="" disabled>
+                Choose priority…
+              </option>
+              {ORGANIC_CANDIDATE_DISPLAY_PRIORITY.map((tier) => (
                 <option key={tier.value} value={tier.value}>
                   P{tier.value} — {tier.label}
                 </option>
@@ -479,7 +678,7 @@ export function ReviewWorkspace({
           <Button
             variant="secondary"
             size="sm"
-            disabled={bulkActionPending}
+            disabled={bulkActionPending || bulkPriority === ""}
             onClick={() => {
               const priority = Number(bulkPriority);
               if (
@@ -501,15 +700,7 @@ export function ReviewWorkspace({
               variant="approve"
               size="sm"
               disabled={bulkActionPending}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Approve ${selectedIds.size} selected candidate(s)? Uses each row's suggested priority.`
-                  )
-                ) {
-                  approveSelectedMutation.mutate([...selectedIds]);
-                }
-              }}
+              onClick={() => approveSelectedMutation.mutate([...selectedIds])}
             >
               {approveSelectedMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -524,11 +715,7 @@ export function ReviewWorkspace({
               variant="approve"
               size="sm"
               disabled={bulkActionPending}
-              onClick={() => {
-                if (window.confirm(`Approve ${selectedIds.size} selected update(s)?`)) {
-                  approveSelectedUpdatesMutation.mutate([...selectedIds]);
-                }
-              }}
+              onClick={() => approveSelectedUpdatesMutation.mutate([...selectedIds])}
             >
               {approveSelectedUpdatesMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -588,7 +775,14 @@ export function ReviewWorkspace({
           >
             Force delete
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSelectedIds(new Set());
+              setBulkPriority("");
+            }}
+          >
             Clear selection
           </Button>
         </div>
