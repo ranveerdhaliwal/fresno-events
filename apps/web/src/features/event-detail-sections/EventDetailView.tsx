@@ -10,7 +10,10 @@ import { FooterStamp } from "@/components/FooterStamp";
 import { StickyCtaBar } from "@/components/StickyCtaBar";
 import { ContextStrip } from "@/components/ContextStrip";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
+import { VenueMiniMap } from "@/components/VenueMiniMap";
 import { deriveTagline, formatPrice, toEventRowViewModel } from "@/lib/event-view-model";
+import { formatVenueAddressLine } from "@/lib/venue-display.utils";
+import { buildGoogleMapsSearchUrl } from "@fresno-events/shared";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { formatCountdownLabel, formatEventDate, formatShortTime, toIsoDateLocal } from "@/lib/event-time";
 import { paletteKeyForCategory, gradientForPalette } from "@/lib/image-palette";
@@ -29,6 +32,13 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
 
   const relatedRows = detail.relatedEvents.map((item) => toEventRowViewModel(item));
   const seriesRows = (detail.seriesEvents ?? []).map((item) => toEventRowViewModel(item));
+  const mapsUrl = buildGoogleMapsSearchUrl({
+    ...(venue.address ? { address: venue.address } : {}),
+    city: venue.city,
+    ...(venue.lat != null ? { lat: venue.lat } : {}),
+    ...(venue.lng != null ? { lng: venue.lng } : {})
+  });
+  const hasCoords = venue.lat != null && venue.lng != null;
 
   return (
     <article className={styles.article} data-testid="event-detail-view">
@@ -124,17 +134,15 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
 
           <section className={styles.sec}>
             <SecHead number="03" script="find it" title="LOCATION & PARKING" />
-            <div className={styles.map}>
-              <div className={styles.road} />
-              <div className={styles.road2} />
-              <div className={styles.pin}>
-                <div className={styles.pinBody} />
-              </div>
-              <span className={styles.mapLabel}>{venue.name}</span>
-            </div>
-            <p>
-              {[venue.address, venue.city].filter(Boolean).join(", ") || venue.city}
-            </p>
+            {hasCoords ? (
+              <VenueMiniMap lat={venue.lat!} lng={venue.lng!} category={event.category} />
+            ) : null}
+            <p className={styles.addressLine}>{formatVenueAddressLine(venue) || venue.name}</p>
+            {mapsUrl ? (
+              <a href={mapsUrl} target="_blank" rel="noreferrer" className={styles.mapLink}>
+                Open in Google Maps →
+              </a>
+            ) : null}
             {venue.website ? (
               <a href={venue.website} target="_blank" rel="noreferrer" className={styles.mapLink}>
                 Open venue website →

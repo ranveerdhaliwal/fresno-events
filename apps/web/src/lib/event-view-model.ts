@@ -24,6 +24,7 @@ import type {
 
 const CATEGORY_LABELS: Partial<Record<Event["category"], string>> = {
   music: "Live music",
+  comedy: "Comedy",
   food_drink: "Food & drink",
   art: "Arts",
   theater: "Theater",

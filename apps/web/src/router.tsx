@@ -1,7 +1,10 @@
 import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router";
 
+import { EventMapPage } from "@/features/event-map/EventMapPage";
+import { SearchPage } from "@/features/search/SearchPage";
 import { PlaceholderPage } from "@/components/PlaceholderPage";
 import { AdminLayoutPage } from "@/pages/AdminLayoutPage";
+import { AdminEventsPage } from "@/pages/AdminEventsPage";
 import { AdminHomepagePage } from "@/pages/AdminHomepagePage";
 import { AdminEventEditorPage } from "@/pages/AdminEventEditorPage";
 import { AdminReviewPage } from "@/pages/AdminReviewPage";
@@ -50,13 +53,7 @@ const exploreRoute = createRoute({
 const mapRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/map",
-  component: () => (
-    <PlaceholderPage
-      eyebrow="Map"
-      title="Clustered events across the Valley."
-      description="Mapbox will power custom-styled pins, top filter chips, and a springy bottom sheet of nearby events."
-    />
-  )
+  component: EventMapPage
 });
 
 const eventRoute = createRoute({
@@ -92,13 +89,10 @@ const artistRoute = createRoute({
 const searchRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/search",
-  component: () => (
-    <PlaceholderPage
-      eyebrow="Search"
-      title="Fast search for events, venues, and artists."
-      description="The search surface will include debounced keystrokes, recents, trending terms, and type filters."
-    />
-  )
+  validateSearch: (search: Record<string, unknown>) => ({
+    q: typeof search.q === "string" ? search.q : ""
+  }),
+  component: SearchPage
 });
 
 const savedRoute = createRoute({
@@ -143,6 +137,12 @@ const adminHomepageRoute = createRoute({
   component: AdminHomepagePage
 });
 
+const adminEventsListRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/events",
+  component: AdminEventsPage
+});
+
 const adminEventEditorRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/events/$eventId",
@@ -161,7 +161,7 @@ const routeTree = rootRoute.addChildren([
   searchRoute,
   savedRoute,
   settingsRoute,
-  adminLayoutRoute.addChildren([adminIndexRoute, adminHomepageRoute, adminEventEditorRoute])
+  adminLayoutRoute.addChildren([adminIndexRoute, adminEventsListRoute, adminHomepageRoute, adminEventEditorRoute])
 ]);
 
 export const router = createRouter({
