@@ -70,3 +70,7 @@ export function clampSuggestedPriorityForOrganicEvent(value: unknown, isJunk: bo
 export function formatEventDisplayPriorityRubric(): string {
   return EVENT_DISPLAY_PRIORITY.map((tier) => `${tier.value}=${tier.label}: ${tier.description}`).join("; ");
 }
+
+/** Ingest review queue — P0 is reserved for manually published sponsored placements only. */
+export const ORGANIC_CANDIDATE_DISPLAY_PRIORITY: readonly EventDisplayPriorityTier[] =
+  EVENT_DISPLAY_PRIORITY.filter((tier) => tier.value > 0);

@@ -34,13 +34,18 @@ const VENUE_ALIASES: Record<string, string> = {
   "historic-crest-theatre": "crest-theatre",
   "the-crest-theatre-fresno": "crest-theatre",
   "tower-theatre-for-the-performing-arts": "tower-theatre",
-  "tower-theatre-lounge": "tower-theatre-lounge"
+  "tower-theatre-lounge": "tower-theatre-lounge",
+  "paul-paul-theatre": "big-fresno-fair",
+  "paul-paul-theater": "big-fresno-fair",
+  "fresno-fairgrounds": "big-fresno-fair",
+  "big-fresno-fairgrounds": "big-fresno-fair"
 };
 
 /** Strip trailing promo/venue noise after normalizeTitle (occurrence matching only). */
 const OCCURRENCE_TITLE_SUFFIXES = [
   /\s+live in concert$/,
   /\s+in concert$/,
+  /\s+live$/,
   /\s+-\s+fresno$/,
   /\s+fresno$/
 ];
@@ -75,6 +80,8 @@ export function canonicalOccurrenceTitle(normalizedTitle: string): string {
     return value;
   }
 
+  value = value.replace(/["'][^"']*["']/g, " ");
+
   const grizzliesIdx = value.indexOf("fresno grizzlies vs");
   if (grizzliesIdx > 0) {
     value = value.slice(grizzliesIdx);
@@ -93,7 +100,21 @@ export function canonicalOccurrenceTitle(normalizedTitle: string): string {
     return missCalifornia;
   }
 
+  const iglesias = canonicalGabrielIglesiasTitle(value);
+  if (iglesias) {
+    return iglesias;
+  }
+
   return value;
+}
+
+/** Collapse stage-name drift between fair listings and Ticketmaster. */
+function canonicalGabrielIglesiasTitle(normalizedTitle: string): string | null {
+  if (!/^gabriel\s+\S+\s+iglesias$/.test(normalizedTitle)) {
+    return null;
+  }
+
+  return "gabriel iglesias";
 }
 
 /** Collapse pageant week / year suffix drift across Visit, FCC scrape, and Ticketmaster. */
@@ -224,6 +245,30 @@ export function normalizeListingUrl(url: string | undefined | null): string | nu
   } catch {
     return null;
   }
+}
+
+/** True when normalizeListingUrl encodes one performance (not a multi-night series landing page). */
+export function isUniquePerPerformanceListingUrl(normalizedUrl: string | null | undefined): boolean {
+  if (!normalizedUrl) {
+    return false;
+  }
+  return (
+    /^ticketmaster\.com\/event\/[^/?#]+/.test(normalizedUrl) ||
+    /^eventbrite\.com\/e\/\d+/.test(normalizedUrl)
+  );
+}
+
+export function normalizedListingUrlForEvent(event: ListingUrls): string | null {
+  return normalizeListingUrl(event.ticketUrl ?? event.externalUrl ?? null);
+}
+
+export function listingUrlsReferToSamePerformance(left: ListingUrls, right: ListingUrls): boolean {
+  const leftNorm = normalizedListingUrlForEvent(left);
+  const rightNorm = normalizedListingUrlForEvent(right);
+  if (!leftNorm || !rightNorm || leftNorm !== rightNorm) {
+    return false;
+  }
+  return isUniquePerPerformanceListingUrl(leftNorm);
 }
 
 export async function sha256Hex(value: string): Promise<string> {

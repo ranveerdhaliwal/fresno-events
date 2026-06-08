@@ -50,6 +50,9 @@ export {
   normalizeVenue,
   canonicalOccurrenceTitle,
   normalizeListingUrl,
+  isUniquePerPerformanceListingUrl,
+  normalizedListingUrlForEvent,
+  listingUrlsReferToSamePerformance,
   pacificTimeBucketKey,
   sourcePriorityRank,
   sha256Hex,
@@ -81,10 +84,23 @@ export {
   clampEventPriority,
   clampSuggestedPriorityForOrganicEvent,
   EVENT_DISPLAY_PRIORITY,
+  ORGANIC_CANDIDATE_DISPLAY_PRIORITY,
   formatEventDisplayPriorityRubric,
   getEventDisplayPriorityLabel,
   type EventDisplayPriorityTier
 } from "./priority.js";
+export {
+  buildGoogleMapsSearchUrl,
+  buildMapsSearchQuery,
+  isValidCoordinate,
+  normalizeVenueStreetAddress,
+  parseMailingAddress,
+  parseStreetFromFullAddress,
+  resolveVenueLocationFields,
+  type MapsLinkInput,
+  type ResolvedVenueLocation,
+  type VenueLocationParts
+} from "./venue-location.utils.js";
 
 export type CoordinatorMode = "real" | "dry-run" | "resume-jobs";
 
@@ -198,6 +214,32 @@ export interface EventListResponse {
   items: EventListItem[];
   nextCursor: string | null;
   generatedAt: string;
+  meta?: EventListMeta;
+}
+
+export interface EventListMeta {
+  omittedNoCoords?: number;
+}
+
+export interface SearchVenueHit {
+  id: string;
+  slug: string;
+  name: string;
+  city: string;
+}
+
+export interface SearchArtistHit {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+export interface SearchResponse {
+  query: string;
+  events: EventListItem[];
+  venues: SearchVenueHit[];
+  artists: SearchArtistHit[];
+  generatedAt: string;
 }
 
 export type HomepageSection = "featured" | "popular";
@@ -260,6 +302,19 @@ export interface AdminEventSearchResponse {
   items: AdminEventSearchHit[];
 }
 
+export interface AdminEventListHit extends AdminEventSearchHit {
+  priority: number;
+  source: string;
+  status: string;
+}
+
+export interface AdminEventListResponse {
+  items: AdminEventListHit[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface AdminEventPatchBody {
   event?: Partial<NormalizedEvent>;
   priority?: number;
@@ -290,6 +345,8 @@ export interface NormalizedEvent {
   venueName: string;
   venueAddress?: string;
   venueCity?: string;
+  venueLat?: number;
+  venueLng?: number;
   startTs: string;
   endTs?: string;
   timezone?: string;
@@ -519,6 +576,12 @@ export interface CandidateBulkPriorityResponse {
   failed: Array<{ id: string; message: string }>;
 }
 
+export interface EventBulkPriorityResponse {
+  priority: number;
+  updated: number;
+  failed: Array<{ id: string; message: string }>;
+}
+
 export interface CandidateBulkRejectResponse {
   rejected: number;
   failed: Array<{ id: string; message: string }>;
@@ -543,3 +606,44 @@ export interface CandidateBulkApproveChangesResponse {
   skipped: Array<{ id: string; reason: CandidateApproveChangesSkipReason }>;
   failed: Array<{ id: string; message: string }>;
 }
+
+export type ReviewQueueAuditSeverity = "error" | "warn";
+
+export type ReviewQueueAuditCode =
+  | "slug_conflict_published"
+  | "slug_conflict_pending_peer"
+  | "pending_linked_duplicate"
+  | "multi_primary_occurrence"
+  | "ticketmaster_needs_ai";
+
+export interface ReviewQueueAuditIssue {
+  code: ReviewQueueAuditCode;
+  severity: ReviewQueueAuditSeverity;
+  candidateId: string;
+  title: string;
+  message: string;
+  detail?: Record<string, string>;
+}
+
+export interface ReviewQueueAuditResponse {
+  generatedAt: string;
+  summary: {
+    pendingPrimaries: number;
+    scheduledEvents: number;
+    errors: number;
+    warnings: number;
+  };
+  issues: ReviewQueueAuditIssue[];
+}
+
+export type {
+  ReviewOccurrenceRelinkOpsResponse,
+  ReviewOccurrenceRelinkSummary,
+  ReviewPriorityTriageOpsResponse,
+  ReviewPriorityTriageRuleGroup,
+  ReviewPriorityTriageSummary,
+  ReviewVenueAddressBackfillOpsResponse,
+  ReviewVenueAddressBackfillSummary,
+  ReviewVenueGeocodeOpsResponse,
+  ReviewVenueGeocodeSummary
+} from "./review-ops.types.js";
