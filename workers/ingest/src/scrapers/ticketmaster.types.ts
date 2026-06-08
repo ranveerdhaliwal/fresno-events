@@ -10,6 +10,7 @@ export interface TicketmasterVenue {
   name?: string;
   address?: { line1?: string };
   city?: { name?: string };
+  location?: { latitude?: string | number; longitude?: string | number };
 }
 
 export interface TicketmasterImage {
@@ -79,4 +80,15 @@ export function isString(value: string | undefined): value is string {
 
 export function readNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+export function readCoordinate(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }

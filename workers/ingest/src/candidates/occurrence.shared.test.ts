@@ -20,6 +20,26 @@ describe("occurrence fingerprints", () => {
     expect(normalizeVenue("Warnors Center")).toBe("warnors-theatre");
     expect(normalizeVenue("William Saroyan Theatre")).toBe("saroyan-theatre");
     expect(normalizeVenue("Save Mart Center at Fresno State - SMG")).toBe("save-mart-center");
+    expect(normalizeVenue("Paul Paul Theatre")).toBe("big-fresno-fair");
+    expect(normalizeVenue("Big Fresno Fair")).toBe("big-fresno-fair");
+  });
+
+  it("canonicalOccurrenceTitle aligns Gabriel Iglesias fair vs Ticketmaster", () => {
+    const fair = normalizeTitle('Gabriel "Fluffy" Iglesias LIVE');
+    const tm = normalizeTitle("Gabriel Iglesias");
+    expect(canonicalOccurrenceTitle(fair)).toBe("gabriel iglesias");
+    expect(canonicalOccurrenceTitle(tm)).toBe("gabriel iglesias");
+  });
+
+  it("matches Gabriel Iglesias across fair API and Ticketmaster", async () => {
+    const ts = "2026-10-09T02:00:00.000Z";
+    const fair = await computeOccurrenceKey(
+      'Gabriel "Fluffy" Iglesias LIVE',
+      ts,
+      "Big Fresno Fair"
+    );
+    const tm = await computeOccurrenceKey("Gabriel Iglesias", ts, "Paul Paul Theatre");
+    expect(fair).toBe(tm);
   });
 
   it("canonicalOccurrenceTitle aligns promo-night Grizzlies titles", () => {

@@ -1,7 +1,12 @@
-import type { EventCategory, NormalizedEvent } from "@fresno-events/shared";
+import {
+  type EventCategory,
+  isValidCoordinate,
+  type NormalizedEvent,
+  parseStreetFromFullAddress
+} from "@fresno-events/shared";
 
 import configJson from "./venunite.config.json";
-import type { VenuniteConfig, VenuniteEvent, VenuniteResponse } from "./venunite.types";
+import type { VenuniteConfig, VenuniteEvent, VenuniteResponse, VenuniteVenueDetail } from "./venunite.types";
 import { VenuniteResponseSchema } from "./venunite.types";
 
 const VENUNITE_API = "https://venunite.com/api/events";
@@ -42,7 +47,34 @@ export function resolveSourceEventId(event: VenuniteEvent): string {
   return `vu:${event.id}`;
 }
 
-export function toNormalizedEvent(event: VenuniteEvent): NormalizedEvent | null {
+export function resolveVenuniteVenueLocation(
+  event: VenuniteEvent,
+  venueDetail?: VenuniteVenueDetail | null
+): Pick<NormalizedEvent, "venueAddress" | "venueCity" | "venueLat" | "venueLng"> {
+  const city = venueDetail?.city?.trim() ?? event.venue?.city?.trim() ?? "Fresno";
+  const state = venueDetail?.state?.trim() ?? event.venue?.state?.trim() ?? undefined;
+  const zip = venueDetail?.zip?.trim();
+
+  const lat = event.venue?.latitude ?? venueDetail?.latitude ?? undefined;
+  const lng = event.venue?.longitude ?? venueDetail?.longitude ?? undefined;
+
+  const fullAddress = venueDetail?.address?.trim();
+  const venueAddress = fullAddress
+    ? parseStreetFromFullAddress(fullAddress, { city, state, zip })
+    : undefined;
+
+  return {
+    venueCity: city,
+    ...(venueAddress ? { venueAddress } : {}),
+    ...(isValidCoordinate(lat) ? { venueLat: lat } : {}),
+    ...(isValidCoordinate(lng) ? { venueLng: lng } : {})
+  };
+}
+
+export function toNormalizedEvent(
+  event: VenuniteEvent,
+  venueDetails: ReadonlyMap<number, VenuniteVenueDetail> = new Map()
+): NormalizedEvent | null {
   const venueName = event.venue?.name?.trim();
   if (!venueName || !event.title.trim() || !event.startDate) {
     return null;
@@ -51,6 +83,7 @@ export function toNormalizedEvent(event: VenuniteEvent): NormalizedEvent | null 
   const listingUrl = event.website?.trim() || undefined;
   const minCents = event.priceWatch?.minPriceCents;
   const maxCents = event.priceWatch?.maxPriceCents;
+  const venueDetail = event.venueId != null ? venueDetails.get(event.venueId) : undefined;
 
   return {
     source: "venunite",
@@ -63,9 +96,9 @@ export function toNormalizedEvent(event: VenuniteEvent): NormalizedEvent | null 
     subcategories: event.categories ?? [],
     tags: ["venunite", "api", `upstream:${event.sourceModule}`],
     currency: event.priceWatch?.currency ?? "USD",
+    ...resolveVenuniteVenueLocation(event, venueDetail),
     ...(event.endDate ? { endTs: event.endDate } : {}),
     ...(event.cost ? { descriptionText: `Cost: ${event.cost}` } : {}),
-    ...(event.venue?.city ? { venueCity: event.venue.city } : { venueCity: "Fresno" }),
     ...(minCents != null && minCents > 0 ? { priceMin: minCents / 100 } : {}),
     ...(maxCents != null && maxCents > 0 ? { priceMax: maxCents / 100 } : {}),
     ...(listingUrl ? { externalUrl: listingUrl, ticketUrl: listingUrl } : {}),
@@ -95,14 +128,15 @@ export function mapVenuniteCategory(
 
 export function mapVenuniteEvents(
   events: VenuniteEvent[],
-  skipModules: readonly string[] = venuniteConfig.skipModules
+  skipModules: readonly string[] = venuniteConfig.skipModules,
+  venueDetails: ReadonlyMap<number, VenuniteVenueDetail> = new Map()
 ): NormalizedEvent[] {
   const out: NormalizedEvent[] = [];
   for (const event of events) {
     if (shouldSkipModule(event.sourceModule, skipModules)) {
       continue;
     }
-    const mapped = toNormalizedEvent(event);
+    const mapped = toNormalizedEvent(event, venueDetails);
     if (mapped) {
       out.push(mapped);
     }

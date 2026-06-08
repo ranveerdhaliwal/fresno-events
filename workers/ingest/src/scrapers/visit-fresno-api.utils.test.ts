@@ -170,6 +170,38 @@ describe("visit-fresno-api.utils", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it("stores street-only venueAddress from full mailing lines", () => {
+    const event = toNormalizedEvent({
+      _id: "addr-1",
+      recid: "1",
+      title: "Sample Event",
+      dates: { eventDate: "2026-06-03T06:59:59.000Z" },
+      location: "Downtown Fresno",
+      address1: "730 M Street, Fresno, CA 93721",
+      city: "Fresno",
+      state: "CA"
+    } as import("./visit-fresno-api.types").VisitFresnoDoc);
+
+    expect(event?.venueAddress).toBe("730 M Street");
+    expect(event?.venueCity).toBe("Fresno");
+  });
+
+  it("normalizes Clovis listings and keeps the correct city", () => {
+    const event = toNormalizedEvent({
+      _id: "addr-clovis",
+      recid: "2",
+      title: "High Fitness & Hops!",
+      dates: { eventDate: "2026-06-03T06:59:59.000Z" },
+      location: "Some Clovis venue",
+      address1: "526 Spruce Avenue, Clovis, CA 93611",
+      city: "Clovis",
+      state: "CA"
+    } as import("./visit-fresno-api.types").VisitFresnoDoc);
+
+    expect(event?.venueAddress).toBe("526 Spruce Avenue");
+    expect(event?.venueCity).toBe("Clovis");
+  });
+
   it("does not set seriesId in mapper; applySeriesMetadata assigns canonical id", async () => {
     const raw = {
       _id: "occ-123",

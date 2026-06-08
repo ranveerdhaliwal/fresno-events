@@ -3,6 +3,7 @@
   "cities": "Fresno",
   "sort": "date-asc",
   "pageDelayMs": 400,
+  "venueDetailDelayMs": 250,
   "skipModules": [
     "ticketmaster_ca",
     "ticketmaster",

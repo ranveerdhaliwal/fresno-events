@@ -8,7 +8,9 @@ import {
   hasAiEnrichmentNotes,
   hasSufficientReviewData,
   isBlockedByPendingDetail,
-  summarizeEnrichmentDelta
+  shouldPromoteSufficientWithoutLlm,
+  summarizeEnrichmentDelta,
+  ticketmasterRequiresAiEnrichment
 } from "./enrichment-candidate.utils";
 
 const base: NormalizedEvent = {
@@ -80,6 +82,31 @@ describe("enrichment-candidate.utils", () => {
     ).toBe(true);
   });
 
+  it("ticketmasterRequiresAiEnrichment even when payload is otherwise sufficient", () => {
+    const tmRow = {
+      id: "tm-1",
+      status: "pending_review" as const,
+      normalized_event: {
+        ...base,
+        source: "ticketmaster" as const,
+        descriptionText: "Full Ticketmaster write-up."
+      },
+      confidence_score: 0.95,
+      review_notes: null,
+      suggested_priority: 5
+    };
+
+    expect(ticketmasterRequiresAiEnrichment(tmRow)).toBe(true);
+    expect(candidateNeedsEnrichment(tmRow)).toBe(true);
+
+    expect(
+      candidateNeedsEnrichment({
+        ...tmRow,
+        review_notes: "[ai] headliner comedy tour"
+      })
+    ).toBe(false);
+  });
+
   it("candidateNeedsEnrichment skips already enriched or sufficient rows", () => {
     expect(
       candidateNeedsEnrichment({
@@ -113,6 +140,32 @@ describe("enrichment-candidate.utils", () => {
         suggested_priority: null
       })
     ).toBe(true);
+  });
+
+  it("shouldPromoteSufficientWithoutLlm only for awaiting_enrichment without ai notes", () => {
+    const awaiting = {
+      id: "1",
+      status: "awaiting_enrichment" as const,
+      normalized_event: base,
+      confidence_score: 0.7,
+      review_notes: null,
+      suggested_priority: null
+    };
+
+    expect(shouldPromoteSufficientWithoutLlm(awaiting)).toBe(true);
+    expect(
+      shouldPromoteSufficientWithoutLlm({
+        ...awaiting,
+        status: "pending_review",
+        review_notes: "[ingest] skipped LLM"
+      })
+    ).toBe(false);
+    expect(
+      shouldPromoteSufficientWithoutLlm({
+        ...awaiting,
+        review_notes: "[ai] done"
+      })
+    ).toBe(false);
   });
 
   it("summarizeEnrichmentDelta reports title and category changes", () => {

@@ -21,6 +21,7 @@
     "ingest:enrich": "bash scripts/ingest-enrich.sh",
     "ingest:detail-backfill": "bash scripts/ingest-detail-backfill.sh",
     "ingest:relink": "bash scripts/ingest-occurrence-relink.sh",
+    "db:backfill-addresses": "bash scripts/backfill-venue-addresses.sh",
     "ingest:preflight-direct": "bash scripts/ingest-preflight-direct.sh",
     "ingest:preflight-browser": "bash scripts/ingest-preflight-browser.sh",
     "ingest:preflight-all": "bash scripts/ingest-preflight-all.sh",

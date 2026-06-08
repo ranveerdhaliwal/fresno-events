@@ -1,4 +1,5 @@
 import type { OccurrenceFingerprints } from "@fresno-events/shared";
+import { isUniquePerPerformanceListingUrl, normalizedListingUrlForEvent } from "@fresno-events/shared";
 
 /** True when two rows could match on occurrence_key (same title/venue ±1 Pacific bucket). */
 export function occurrenceLookupKeysOverlap(
@@ -9,8 +10,21 @@ export function occurrenceLookupKeysOverlap(
   return right.occurrenceKeysForLookup.some((key) => leftKeys.has(key));
 }
 
+/** True when url_key lookup should link despite Pacific bucket drift (e.g. Save Mart date off by one day). */
+export function urlKeyLinksAcrossSources(
+  fingerprints: Pick<OccurrenceFingerprints, "occurrenceKeysForLookup">,
+  candidateOccurrenceKey: string | null,
+  listingUrls: { ticketUrl?: string; externalUrl?: string }
+): boolean {
+  if (isUniquePerPerformanceListingUrl(normalizedListingUrlForEvent(listingUrls))) {
+    return true;
+  }
+  return urlKeyLinksWithOccurrenceLookup(fingerprints, candidateOccurrenceKey);
+}
+
 /**
- * url_key may repeat on multi-night series pages — only link when occurrence buckets overlap.
+ * Legacy guard for series pages that share a url_key across nights.
+ * Prefer urlKeyLinksAcrossSources when listing URLs are available.
  */
 export function urlKeyLinksWithOccurrenceLookup(
   fingerprints: Pick<OccurrenceFingerprints, "occurrenceKeysForLookup">,

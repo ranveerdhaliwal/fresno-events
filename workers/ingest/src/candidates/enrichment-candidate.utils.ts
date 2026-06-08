@@ -11,9 +11,15 @@ export interface EnrichmentCandidateRow {
   suggested_priority: number | null;
   matched_event_id?: string | null;
   detail_status?: string | null;
+  occurrence_id?: string | null;
+  canonical_candidate_id?: string | null;
 }
 
 const AI_REVIEW_PREFIX = "[ai]";
+
+/** PostgREST status filter for enrichment batch fetches (includes pending_review backlog). */
+export const ENRICHMENT_QUEUE_STATUSES =
+  "in.(awaiting_enrichment,pending_review,needs_changes)" as const;
 
 /** Already ran through post-ingest LLM enrichment. */
 export function hasAiEnrichmentNotes(reviewNotes: string | null | undefined): boolean {
@@ -34,6 +40,11 @@ export function hasSufficientReviewData(event: NormalizedEvent): boolean {
   );
 }
 
+/** Ticketmaster payloads are often "sufficient" but still need an editorial AI priority pass. */
+export function ticketmasterRequiresAiEnrichment(row: EnrichmentCandidateRow): boolean {
+  return row.normalized_event.source === "ticketmaster" && !hasAiEnrichmentNotes(row.review_notes);
+}
+
 export function candidateNeedsEnrichment(row: EnrichmentCandidateRow): boolean {
   if (isBlockedByPendingDetail(row)) {
     return false;
@@ -44,10 +55,18 @@ export function candidateNeedsEnrichment(row: EnrichmentCandidateRow): boolean {
   if (hasAiEnrichmentNotes(row.review_notes)) {
     return false;
   }
+  if (ticketmasterRequiresAiEnrichment(row)) {
+    return true;
+  }
   if (hasSufficientReviewData(row.normalized_event)) {
     return false;
   }
   return true;
+}
+
+/** Only new rows get promoted to pending_review when skipping LLM for sufficient data. */
+export function shouldPromoteSufficientWithoutLlm(row: EnrichmentCandidateRow): boolean {
+  return row.status === "awaiting_enrichment" && !hasAiEnrichmentNotes(row.review_notes);
 }
 
 export function isBlockedByPendingDetail(row: EnrichmentCandidateRow): boolean {

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   extractSaveMartTokenFromHtml,
+  extractTicketmasterSlugDateYmd,
   parseSaveMartApiResponse,
   parseSaveMartSimpleToken,
-  saveMartDocsToEvents
+  saveMartDocsToEvents,
+  unwrapSaveMartTicketUrl
 } from "./save-mart-api.utils";
 
 describe("save-mart-api.utils", () => {
@@ -49,5 +51,53 @@ describe("save-mart-api.utils", () => {
     expect(events[0]?.imageUrl).toContain("ticketm.net");
     expect(events[0]?.ticketUrl).toContain("ticketmaster.com");
     expect(events[0]?.externalUrl).toBe("https://www.savemartcenter.com/event/zz-top/12345/");
+    // startTime 1200 = 12:00 HHMM on API date
+    expect(events[0]?.startTs).toBe("2026-08-07T19:00:00.000Z");
+  });
+
+  it("extracts performance date from ticketmaster affiliate slug over API date", () => {
+    const affiliate =
+      "https://ticketmaster.evyy.net/c/4241810/264167/4272?u=https%3A%2F%2Fwww.ticketmaster.com%2Fnate-bargatze-big-dumb-eyes-world-fresno-california-07-19-2026%2Fevent%2F1C00631A8DE414D4";
+    expect(extractTicketmasterSlugDateYmd(affiliate)).toBe("2026-07-19");
+    expect(unwrapSaveMartTicketUrl(affiliate)).toContain("nate-bargatze");
+
+    const events = saveMartDocsToEvents([
+      {
+        recid: "nate",
+        title: "Nate Bargatze: Big Dumb Eyes World Tour",
+        date: { $date: "2026-07-20T07:00:00.000Z" },
+        startTime: 1900,
+        hostname: "Save Mart Center",
+        linkUrl: affiliate
+      }
+    ]);
+
+    expect(events).toHaveLength(1);
+    // July 19 7pm Pacific — matches Ticketmaster, not Save Mart API date (July 20)
+    expect(events[0]?.startTs).toBe("2026-07-20T02:00:00.000Z");
+  });
+
+  it("parses startTime as HHMM and as minutes since midnight", () => {
+    const hhmm = saveMartDocsToEvents([
+      {
+        recid: "1",
+        title: "Evening HHMM",
+        date: { $date: "2026-08-01T07:00:00.000Z" },
+        startTime: 1930,
+        linkUrl: "https://www.ticketmaster.com/example-fresno-california-08-01-2026/event/abc"
+      }
+    ]);
+    expect(hhmm[0]?.startTs).toBe("2026-08-02T02:30:00.000Z");
+
+    const minutes = saveMartDocsToEvents([
+      {
+        recid: "2",
+        title: "Evening minutes",
+        date: { $date: "2026-08-01T07:00:00.000Z" },
+        startTime: 1170,
+        linkUrl: "https://www.ticketmaster.com/example-fresno-california-08-01-2026/event/def"
+      }
+    ]);
+    expect(minutes[0]?.startTs).toBe("2026-08-02T02:30:00.000Z");
   });
 });

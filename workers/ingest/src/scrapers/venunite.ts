@@ -1,5 +1,7 @@
 import type { NormalizedEvent, ScrapeContext, ScrapeError, ScrapeResult } from "@fresno-events/shared";
 
+import { collectVenuniteVenueIds, loadVenuniteVenueDetails } from "./venunite-venue.utils";
+import type { VenuniteVenueDetail } from "./venunite.types";
 import {
   buildVenunitePageUrl,
   mapVenuniteEvents,
@@ -12,6 +14,7 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
   const started = performance.now();
   const errors: ScrapeError[] = [];
   const allEvents: NormalizedEvent[] = [];
+  const venueCache = new Map<number, VenuniteVenueDetail>();
   let pagesVisited = 0;
   let totalPages = 1;
 
@@ -44,7 +47,15 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
 
       const payload = parseVenuniteResponse(await response.json());
       totalPages = payload.totalPages;
-      allEvents.push(...mapVenuniteEvents(payload.events));
+
+      const venueIds = collectVenuniteVenueIds(payload.events, venuniteConfig.skipModules);
+      await loadVenuniteVenueDetails(venueIds, venueCache, {
+        userAgent: ctx.userAgent,
+        ...(ctx.signal ? { signal: ctx.signal } : {}),
+        delayMs: venuniteConfig.venueDetailDelayMs
+      });
+
+      allEvents.push(...mapVenuniteEvents(payload.events, venuniteConfig.skipModules, venueCache));
 
       if (page < totalPages) {
         await sleep(venuniteConfig.pageDelayMs);

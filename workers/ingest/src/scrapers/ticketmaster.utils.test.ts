@@ -17,7 +17,14 @@ describe("ticketmaster.utils", () => {
       },
       classifications: [{ segment: { name: "Music" }, genre: { name: "Rock" } }],
       _embedded: {
-        venues: [{ name: "Warnors Theatre", address: { line1: "1400 Fulton St" }, city: { name: "Fresno" } }]
+        venues: [
+          {
+            name: "Warnors Theatre",
+            address: { line1: "1400 Fulton St" },
+            city: { name: "Fresno" },
+            location: { latitude: "36.7378", longitude: "-119.7871" }
+          }
+        ]
       }
     };
 
@@ -26,6 +33,8 @@ describe("ticketmaster.utils", () => {
     expect(event?.sourceEventId).toBe("abc123");
     expect(event?.category).toBe("music");
     expect(event?.venueCity).toBe("Fresno");
+    expect(event?.venueLat).toBe(36.7378);
+    expect(event?.venueLng).toBe(-119.7871);
   });
 
   it("builds local date time fallback", () => {

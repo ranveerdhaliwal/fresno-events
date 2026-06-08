@@ -1,4 +1,4 @@
-import type { NormalizedEvent } from "@fresno-events/shared";
+import { resolveVenueLocationFields, type NormalizedEvent } from "@fresno-events/shared";
 
 import {
   dateOnlyStartTs,
@@ -299,7 +299,13 @@ export function toNormalizedEvent(raw: VisitFresnoDoc): NormalizedEvent | null {
   const venueName = raw.location?.trim() || "Unknown venue";
   const imageUrl = raw.media_raw?.find((m) => m.mediaurl)?.mediaurl;
 
-  const venueAddress = raw.address1?.trim();
+  const { venueAddress: resolvedAddress, venueCity: resolvedCity } = resolveVenueLocationFields(
+    raw.address1,
+    raw.city,
+    raw.state
+  );
+  const venueCity = resolvedCity || "Fresno";
+  const venueAddress = resolvedAddress ?? undefined;
   const descriptionText = raw.description ? stripHtml(raw.description) : undefined;
   const externalUrl = raw.absoluteUrl ?? raw.linkUrl;
   const recurrence = raw.recurrence?.trim();
@@ -310,7 +316,7 @@ export function toNormalizedEvent(raw: VisitFresnoDoc): NormalizedEvent | null {
     sourceEventId: raw._id,
     title: raw.title,
     venueName,
-    venueCity: raw.city?.trim() || "Fresno",
+    venueCity,
     startTs: startIso,
     ...(raw.recid ? { seriesListingRecId: String(raw.recid) } : {}),
     ...(recurrence ? { seriesName: recurrence } : {}),

@@ -3,6 +3,7 @@ import type { NormalizedEvent } from "@fresno-events/shared";
 import {
   chooseImage,
   isString,
+  readCoordinate,
   toCategory,
   toLocalDateTime,
   type TicketmasterEvent,
@@ -47,6 +48,8 @@ export function toNormalizedEvent(event: TicketmasterEvent): NormalizedEvent[] {
   const priceRange = event.priceRanges?.[0];
   const image = chooseImage(event.images);
   const category = toCategory(event.classifications?.[0]);
+  const venueLat = readCoordinate(venue.location?.latitude);
+  const venueLng = readCoordinate(venue.location?.longitude);
 
   return [
     {
@@ -66,6 +69,8 @@ export function toNormalizedEvent(event: TicketmasterEvent): NormalizedEvent[] {
       ...(event.info ? { descriptionText: event.info } : {}),
       ...(venue.address?.line1 ? { venueAddress: venue.address.line1 } : {}),
       ...(venue.city?.name ? { venueCity: venue.city.name } : { venueCity: "Fresno" }),
+      ...(venueLat !== undefined ? { venueLat } : {}),
+      ...(venueLng !== undefined ? { venueLng } : {}),
       ...(priceRange?.min !== undefined ? { priceMin: priceRange.min } : {}),
       ...(priceRange?.max !== undefined ? { priceMax: priceRange.max } : {}),
       ...(event.url ? { externalUrl: event.url, ticketUrl: event.url } : {}),

@@ -3,14 +3,16 @@ import type { NormalizedEvent } from "@fresno-events/shared";
 import { enrichCandidate, getAiBackend } from "@/ai";
 import {
   candidateNeedsEnrichment,
+  ENRICHMENT_QUEUE_STATUSES,
   formatEnrichmentDoneLine,
-  hasAiEnrichmentNotes,
   isBlockedByPendingDetail,
   reasoningPreview,
+  shouldPromoteSufficientWithoutLlm,
   summarizeEnrichmentDelta,
   type EnrichmentCandidateRow
 } from "@/candidates/enrichment-candidate.utils";
 import { harmonizeSeriesSuggestedPriority } from "@/candidates/series-enrichment.utils";
+import { harmonizeLinkedOccurrencePriority } from "@/candidates/linked-priority-harmonize.utils";
 import { applyVenuePriorityOverride, resolveVenueSuggestedPriority } from "@/candidates/venue-priority.utils";
 import type { IngestEnv } from "@/env";
 import type { SupabaseConfig } from "@/sources";
@@ -72,7 +74,7 @@ export async function countPendingEnrichment(
 ): Promise<PendingEnrichmentCounts> {
   const params = new URLSearchParams({
     select: "id,status,review_notes,normalized_event,suggested_priority,confidence_score,matched_event_id,detail_status",
-    status: "in.(awaiting_enrichment,pending_review,needs_changes)",
+    status: ENRICHMENT_QUEUE_STATUSES,
     limit: "1000"
   });
 
@@ -128,59 +130,91 @@ export async function enrichRecentCandidates(
   };
 
   const limit = Math.min(Math.max(batchSize, 1), 100);
+  const scanPageSize = Math.min(Math.max(limit * 3, limit), 100);
 
-  const params = new URLSearchParams({
-    select: "id,status,normalized_event,confidence_score,review_notes,suggested_priority,matched_event_id,detail_status",
-    status: "in.(awaiting_enrichment,needs_changes)",
-    order: "created_at.asc",
-    limit: String(limit)
-  });
-
-  if (options.sourceFilter) {
-    params.set("source", `eq.${options.sourceFilter}`);
-  }
-
-  const rows = await supabaseFetch<EnrichmentCandidateRow[]>(supabase, `/rest/v1/event_candidates?${params}`);
   const toProcess: EnrichmentCandidateRow[] = [];
   const hasLlmBackend = Boolean(getAiBackend(env, "enrichment"));
   let batchTitleChanged = 0;
   let batchCategoryChanged = 0;
   let batchTagsAdded = 0;
   let batchNormalizedPatched = 0;
+  let scanned = 0;
+  let offset = 0;
 
-  for (const row of rows) {
-    if (isBlockedByPendingDetail(row)) {
-      summary.skipped_pending_detail += 1;
-      continue;
-    }
-    if (candidateNeedsEnrichment(row)) {
-      toProcess.push(row);
-      continue;
-    }
-    summary.skipped_sufficient_data += 1;
-    const shortTitle =
-      row.normalized_event.title.length > 48
-        ? `${row.normalized_event.title.slice(0, 47)}…`
-        : row.normalized_event.title;
-    console.log(`[ingest] sufficient (no LLM): "${shortTitle}"`);
-    logStruct(env, "ai_enrichment_item_sufficient", {
-      candidate_id: row.id,
-      title: row.normalized_event.title,
-      source: row.normalized_event.source,
-      venue: row.normalized_event.venueName,
-      action: options.dryRun ? "would_tag_without_llm" : "tagged_without_llm"
+  while (toProcess.length < limit) {
+    const params = new URLSearchParams({
+      select:
+        "id,status,normalized_event,confidence_score,review_notes,suggested_priority,matched_event_id,detail_status,occurrence_id,canonical_candidate_id",
+      status: ENRICHMENT_QUEUE_STATUSES,
+      order: "created_at.asc",
+      limit: String(scanPageSize),
+      offset: String(offset)
     });
-    if (!options.dryRun && !hasAiEnrichmentNotes(row.review_notes)) {
-      await markSufficientWithoutLlm(supabase, row);
-      summary.updated += 1;
+
+    if (options.sourceFilter) {
+      params.set("source", `eq.${options.sourceFilter}`);
+    }
+
+    const rows = await supabaseFetch<EnrichmentCandidateRow[]>(
+      supabase,
+      `/rest/v1/event_candidates?${params}`
+    );
+    if (rows.length === 0) {
+      break;
+    }
+
+    scanned += rows.length;
+
+    for (const row of rows) {
+      if (isBlockedByPendingDetail(row)) {
+        summary.skipped_pending_detail += 1;
+        continue;
+      }
+      if (candidateNeedsEnrichment(row)) {
+        toProcess.push(row);
+        if (toProcess.length >= limit) {
+          break;
+        }
+        continue;
+      }
+      if (row.status !== "awaiting_enrichment") {
+        continue;
+      }
+      summary.skipped_sufficient_data += 1;
+      const shortTitle =
+        row.normalized_event.title.length > 48
+          ? `${row.normalized_event.title.slice(0, 47)}…`
+          : row.normalized_event.title;
+      console.log(`[ingest] sufficient (no LLM): "${shortTitle}"`);
+      logStruct(env, "ai_enrichment_item_sufficient", {
+        candidate_id: row.id,
+        title: row.normalized_event.title,
+        source: row.normalized_event.source,
+        venue: row.normalized_event.venueName,
+        action: options.dryRun ? "would_tag_without_llm" : "tagged_without_llm"
+      });
+      if (!options.dryRun && shouldPromoteSufficientWithoutLlm(row)) {
+        await markSufficientWithoutLlm(supabase, row);
+        summary.updated += 1;
+
+        const linked = await harmonizeLinkedOccurrencePriority(supabase, row.occurrence_id);
+        if (linked.primaryUpdated) {
+          summary.updated += 1;
+        }
+      }
+    }
+
+    offset += rows.length;
+    if (rows.length < scanPageSize) {
+      break;
     }
   }
 
   console.log(
-    `[ingest] enrichment batch: ${toProcess.length} to process, ${summary.skipped_sufficient_data} sufficient (skipped LLM), ${summary.skipped_pending_detail} pending detail, limit ${limit}${options.sourceFilter ? `, source ${options.sourceFilter}` : ""}${options.dryRun ? ", dry-run" : ""}`
+    `[ingest] enrichment batch: ${toProcess.length} to process, ${summary.skipped_sufficient_data} sufficient (skipped LLM), ${summary.skipped_pending_detail} pending detail, scanned ${scanned}, limit ${limit}${options.sourceFilter ? `, source ${options.sourceFilter}` : ""}${options.dryRun ? ", dry-run" : ""}`
   );
   logStruct(env, "ai_enrichment_batch_start", {
-    fetched: rows.length,
+    scanned,
     will_process: toProcess.length,
     skipped_sufficient_data: summary.skipped_sufficient_data,
     batch_limit: limit,
@@ -309,11 +343,18 @@ export async function enrichRecentCandidates(
         }
         summary.updated += harmonized.siblingsUpdated;
 
+        const linked = await harmonizeLinkedOccurrencePriority(supabase, row.occurrence_id);
+        if (linked.primaryUpdated) {
+          summary.updated += 1;
+        }
+
         console.log(doneLine);
         logStruct(env, "ai_enrichment_item_done", {
           ...doneLog,
           series_priority_unified: harmonized.unified,
-          series_siblings_updated: harmonized.siblingsUpdated
+          series_siblings_updated: harmonized.siblingsUpdated,
+          linked_primary_priority: linked.unified,
+          linked_primary_updated: linked.primaryUpdated
         });
       }
     } catch (error) {

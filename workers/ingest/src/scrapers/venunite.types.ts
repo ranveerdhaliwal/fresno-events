@@ -22,6 +22,17 @@ export const VenunitePriceWatchSchema = z
   .nullable()
   .optional();
 
+export const VenuniteVenueDetailSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  address: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  zip: z.string().nullable().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional()
+});
+
 export const VenuniteEventSchema = z.object({
   id: z.number(),
   title: z.string(),
@@ -35,6 +46,7 @@ export const VenuniteEventSchema = z.object({
   sourceModule: z.string(),
   website: z.string().nullable().optional(),
   ticketUrl: z.string().nullable().optional(),
+  venueId: z.number().nullable().optional(),
   venue: VenuniteVenueSchema.nullable().optional(),
   categories: z.array(z.string()).optional(),
   category: z.string().nullable().optional(),
@@ -50,11 +62,13 @@ export const VenuniteResponseSchema = z.object({
 
 export type VenuniteEvent = z.infer<typeof VenuniteEventSchema>;
 export type VenuniteResponse = z.infer<typeof VenuniteResponseSchema>;
+export type VenuniteVenueDetail = z.infer<typeof VenuniteVenueDetailSchema>;
 
 export interface VenuniteConfig {
   state: string;
   cities: string;
   sort: string;
   pageDelayMs: number;
+  venueDetailDelayMs: number;
   skipModules: string[];
 }

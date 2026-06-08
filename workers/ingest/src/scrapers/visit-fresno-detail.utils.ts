@@ -1,6 +1,6 @@
 import { load } from "cheerio";
 
-import type { NormalizedEvent } from "@fresno-events/shared";
+import { resolveVenueLocationFields, type NormalizedEvent } from "@fresno-events/shared";
 
 export interface VisitFresnoDetailFields {
   descriptionText?: string;
@@ -106,7 +106,19 @@ export function mergeVisitFresnoDetail(
       : detail.descriptionText?.trim() && detail.descriptionText.length > (listing.descriptionText?.length ?? 0)
         ? { descriptionText: detail.descriptionText.trim() }
         : {}),
-    ...(detail.venueAddress?.trim() ? { venueAddress: detail.venueAddress.trim() } : {}),
+    ...(detail.venueAddress?.trim()
+      ? (() => {
+          const { venueAddress, venueCity } = resolveVenueLocationFields(
+            detail.venueAddress,
+            listing.venueCity,
+            "CA"
+          );
+          return {
+            ...(venueAddress ? { venueAddress } : {}),
+            ...(venueCity && venueCity !== listing.venueCity ? { venueCity } : {})
+          };
+        })()
+      : {}),
     ...(detail.venueName?.trim() ? { venueName: detail.venueName.trim() } : {}),
     ...(detail.ticketUrl?.trim() ? { ticketUrl: detail.ticketUrl.trim() } : {}),
     ...(detail.isFree === true ? { isFree: true } : {}),

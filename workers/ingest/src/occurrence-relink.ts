@@ -36,7 +36,8 @@ export function formatRelinkSummaryMessage(summary: OccurrenceRelinkSummary): st
     `  rows to update: ${summary.changed} (${summary.unchanged} already correct)`,
     `  linked as duplicate: ${summary.linked_as_duplicate}`,
     `  promoted duplicate → primary: ${summary.promoted_from_duplicate}`,
-    `  demoted → duplicate: ${summary.demoted_to_duplicate}`
+    `  demoted → duplicate: ${summary.demoted_to_duplicate}`,
+    `  priority inherited: ${summary.priority_inherited}`
   ];
   if (!summary.dry_run) {
     lines.push(`  applied: ${summary.applied}, errors: ${summary.errors}`);
@@ -54,6 +55,7 @@ interface RelinkCandidateDbRow {
   occurrence_id: string | null;
   occurrence_key: string | null;
   url_key: string | null;
+  suggested_priority: number | null;
   created_at: string;
   normalized_event: NormalizedEvent;
 }
@@ -73,7 +75,9 @@ function patchChanged(before: RelinkCandidateRow, patch: RelinkPatch): boolean {
     before.url_key !== patch.url_key ||
     before.canonical_candidate_id !== patch.canonical_candidate_id ||
     before.matched_event_id !== patch.matched_event_id ||
-    before.status !== patch.status
+    before.status !== patch.status ||
+    (patch.suggested_priority !== undefined &&
+      before.suggested_priority !== patch.suggested_priority)
   );
 }
 
@@ -87,7 +91,7 @@ async function fetchAllCandidates(
   while (true) {
     const params = new URLSearchParams({
       select:
-        "id,source,source_event_id,status,matched_event_id,canonical_candidate_id,occurrence_id,occurrence_key,url_key,created_at,normalized_event",
+        "id,source,source_event_id,status,matched_event_id,canonical_candidate_id,occurrence_id,occurrence_key,url_key,suggested_priority,created_at,normalized_event",
       order: "created_at.asc",
       limit: String(PAGE_SIZE),
       offset: String(offset)
@@ -135,6 +139,9 @@ async function applyPatch(supabase: SupabaseConfig, patch: RelinkPatch): Promise
       canonical_candidate_id: patch.canonical_candidate_id,
       matched_event_id: patch.matched_event_id,
       status: patch.status,
+      ...(patch.suggested_priority !== undefined
+        ? { suggested_priority: patch.suggested_priority }
+        : {}),
       updated_at: new Date().toISOString()
     })
   });

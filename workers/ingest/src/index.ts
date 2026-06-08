@@ -2,6 +2,7 @@ import type { IngestEnv } from "@/env";
 import { getJsonPromptBackend } from "@/llm/registry";
 import { runDetailBackfill } from "@/detail-backfill";
 import { runOccurrenceRelink } from "@/occurrence-relink";
+import { runVenueAddressBackfill } from "@/venue-address-backfill";
 import { compactRunSummaryForLog } from "@/log-compact.utils";
 import { runIngest, runPostIngestEnrichment } from "@/runner";
 import { listRunnableSources } from "@/planner";
@@ -131,6 +132,23 @@ export default {
       });
 
       return jsonResponse({ ok: true, data: { summary, dry_run: dryRun, limit } });
+    }
+
+    if (url.pathname === "/venue-address-backfill/trigger") {
+      const auth = await checkAdminAuth(req, env);
+      if (auth) {
+        return jsonResponse({ ok: false, error: auth }, auth.status);
+      }
+
+      const dryRun = url.searchParams.get("dry_run") === "true";
+      const sourceFilter = url.searchParams.get("source") ?? undefined;
+
+      const summary = await runVenueAddressBackfill(env, {
+        dryRun,
+        ...(sourceFilter ? { sourceFilter } : {})
+      });
+
+      return jsonResponse({ ok: true, data: { summary, dry_run: dryRun, source: sourceFilter } });
     }
 
     if (url.pathname === "/enrichment/trigger") {

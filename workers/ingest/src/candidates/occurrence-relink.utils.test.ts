@@ -18,6 +18,7 @@ function row(input: {
   occurrence_id?: string | null;
   occurrence_key?: string | null;
   url_key?: string | null;
+  suggested_priority?: number | null;
   created_at?: string;
   normalized_event?: Partial<NormalizedEvent>;
 }): RelinkCandidateRow {
@@ -41,6 +42,7 @@ function row(input: {
     occurrence_id: input.occurrence_id ?? crypto.randomUUID(),
     occurrence_key: input.occurrence_key ?? null,
     url_key: input.url_key ?? null,
+    suggested_priority: input.suggested_priority ?? null,
     created_at: input.created_at ?? "2026-01-01T00:00:00.000Z",
     normalized_event: normalizedEvent
   };
@@ -150,6 +152,81 @@ describe("computeRelinkPatches", () => {
     const tm = patches.find((patch) => patch.id === "tm");
 
     expect(tm?.status).toBe("pending_review");
+    expect(tm?.canonical_candidate_id).toBeNull();
+  });
+
+  it("links save mart and ticketmaster rows that share a ticketmaster event id across date drift", async () => {
+    const affiliate =
+      "https://ticketmaster.evyy.net/c/4241810/264167/4272?u=https%3A%2F%2Fwww.ticketmaster.com%2Fnate-bargatze-big-dumb-eyes-world-fresno-california-07-19-2026%2Fevent%2F1C00631A8DE414D4";
+    const direct =
+      "https://www.ticketmaster.com/nate-bargatze-big-dumb-eyes-world-fresno-california-07-19-2026/event/1C00631A8DE414D4";
+    const rows = [
+      row({
+        id: "savemart",
+        source: "scrape:www.savemartcenter.com",
+        title: "Nate Bargatze: Big Dumb Eyes World Tour",
+        normalized_event: {
+          venueName: "Save Mart Center",
+          startTs: "2026-07-21T02:00:00.000Z",
+          ticketUrl: affiliate
+        }
+      }),
+      row({
+        id: "tm",
+        source: "ticketmaster",
+        title: "Nate Bargatze: Big Dumb Eyes World Tour",
+        normalized_event: {
+          venueName: "Save Mart Center",
+          startTs: "2026-07-20T02:00:00.000Z",
+          ticketUrl: direct
+        }
+      })
+    ];
+
+    const { patches, summary } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const byId = new Map(patches.map((patch) => [patch.id, patch]));
+
+    expect(summary.multi_source_groups).toBe(1);
+    expect(byId.get("tm")?.canonical_candidate_id).toBeNull();
+    expect(byId.get("savemart")?.status).toBe("duplicate");
+    expect(byId.get("savemart")?.occurrence_id).toBe(byId.get("tm")?.occurrence_id);
+  });
+
+  it("inherits best suggested_priority onto ticketmaster primary from linked duplicates", async () => {
+    const affiliate =
+      "https://ticketmaster.evyy.net/c/4241810/264167/4272?u=https%3A%2F%2Fwww.ticketmaster.com%2Fnate-bargatze-big-dumb-eyes-world-fresno-california-07-19-2026%2Fevent%2F1C00631A8DE414D4";
+    const direct =
+      "https://www.ticketmaster.com/nate-bargatze-big-dumb-eyes-world-fresno-california-07-19-2026/event/1C00631A8DE414D4";
+    const rows = [
+      row({
+        id: "savemart",
+        source: "scrape:www.savemartcenter.com",
+        title: "Nate Bargatze: Big Dumb Eyes World Tour",
+        suggested_priority: 1,
+        normalized_event: {
+          venueName: "Save Mart Center",
+          startTs: "2026-07-21T02:00:00.000Z",
+          ticketUrl: affiliate
+        }
+      }),
+      row({
+        id: "tm",
+        source: "ticketmaster",
+        title: "Nate Bargatze: Big Dumb Eyes World Tour",
+        suggested_priority: 5,
+        normalized_event: {
+          venueName: "Save Mart Center",
+          startTs: "2026-07-20T02:00:00.000Z",
+          ticketUrl: direct
+        }
+      })
+    ];
+
+    const { patches, summary } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const tm = patches.find((patch) => patch.id === "tm");
+
+    expect(summary.priority_inherited).toBe(1);
+    expect(tm?.suggested_priority).toBe(1);
     expect(tm?.canonical_candidate_id).toBeNull();
   });
 

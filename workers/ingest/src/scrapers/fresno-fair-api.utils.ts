@@ -3,13 +3,22 @@ import { z } from "zod";
 
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 
+const FairLocationSchema = z.object({
+  Name: z.string().optional(),
+  AddressLine1: z.string().optional(),
+  Latitude: z.number().optional(),
+  Longitude: z.number().optional()
+});
+
 const FairItemSchema = z.object({
   EventID: z.number(),
   Name: z.string(),
   Date: z.string().optional(),
   Time: z.number().optional(),
   TimeIsSpecified: z.boolean().optional(),
-  TimeDisplay: z.string().optional()
+  TimeDisplay: z.string().optional(),
+  DetailURL: z.string().optional(),
+  Locations: z.array(FairLocationSchema).optional()
 });
 
 const FairDaySchema = z.object({
@@ -77,14 +86,34 @@ function parseDotNetDate(value: string | undefined): string | null {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-function pacificInstantFromFairDay(dateYmd: string, minutesFromMidnight: number | undefined): string | null {
-  if (minutesFromMidnight === undefined || !Number.isFinite(minutesFromMidnight)) {
-    return instantFromPacificLocal(dateYmd, "19:00");
+/** Fair `Time` is HHMM Pacific wall clock (e.g. 600 → 6:00 AM, 1900 → 7:00 PM). */
+export function fairTimeToClock(time: number | undefined): string | null {
+  if (time === undefined || !Number.isFinite(time) || time < 0) {
+    return null;
   }
-  const hour = Math.floor(minutesFromMidnight / 60);
-  const minute = minutesFromMidnight % 60;
-  const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-  return instantFromPacificLocal(dateYmd, time);
+
+  if (time >= 100 && time <= 2359) {
+    const hour = Math.floor(time / 100);
+    const minute = time % 100;
+    if (hour <= 23 && minute <= 59) {
+      return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    }
+  }
+
+  if (time < 1440) {
+    const hour = Math.floor(time / 60);
+    const minute = time % 60;
+    if (hour <= 23 && minute <= 59) {
+      return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    }
+  }
+
+  return null;
+}
+
+function pacificInstantFromFairDay(dateYmd: string, fairTime: number | undefined): string | null {
+  const clock = fairTimeToClock(fairTime) ?? "19:00";
+  return instantFromPacificLocal(dateYmd, clock);
 }
 
 export function fresnoFairResponseToEvents(
@@ -119,8 +148,12 @@ export function fresnoFairResponseToEvents(
         }
         seen.add(key);
 
-        const startTs =
-          pacificInstantFromFairDay(itemDate, item.Time) ?? `${itemDate}T19:00:00.000Z`;
+        const startTs = pacificInstantFromFairDay(itemDate, item.Time);
+        if (!startTs) {
+          continue;
+        }
+        const location = item.Locations?.[0];
+        const venueAddress = location?.AddressLine1?.trim();
 
         events.push({
           source: "scrape:www.fresnofair.com",
@@ -130,7 +163,10 @@ export function fresnoFairResponseToEvents(
           venueCity: "Fresno",
           startTs,
           category: "festival",
-          externalUrl: opts.listingUrl,
+          externalUrl: item.DetailURL ?? opts.listingUrl,
+          ...(venueAddress ? { venueAddress } : {}),
+          ...(location?.Latitude != null ? { venueLat: location.Latitude } : {}),
+          ...(location?.Longitude != null ? { venueLng: location.Longitude } : {}),
           ...(opts.seriesId ? { seriesId: opts.seriesId, seriesName: "Big Fresno Fair" } : {})
         });
       }

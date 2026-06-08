@@ -7,7 +7,7 @@ import type {
   OccurrenceMatchIndex,
   OccurrenceMatchStep
 } from "@/candidates/occurrence-match.types";
-import { urlKeyLinksWithOccurrenceLookup } from "@/candidates/occurrence-url-link.utils";
+import { urlKeyLinksAcrossSources } from "@/candidates/occurrence-url-link.utils";
 
 const ACTIVE_PRIMARY_STATUSES = new Set([
   "awaiting_enrichment",
@@ -101,7 +101,8 @@ function findScheduledEvent(
 function collectCandidatesForMatch(
   index: OccurrenceMatchIndex,
   fingerprints: Awaited<ReturnType<typeof computeOccurrenceFingerprints>>,
-  urlKey: string | null
+  urlKey: string | null,
+  event: NormalizedEvent
 ): { group: OccurrenceMatchCandidate[]; step: OccurrenceMatchStep } {
   const seen = new Map<string, OccurrenceMatchCandidate>();
 
@@ -117,7 +118,7 @@ function collectCandidatesForMatch(
 
   if (urlKey) {
     for (const row of index.candidatesByUrlKey.get(urlKey) ?? []) {
-      if (urlKeyLinksWithOccurrenceLookup(fingerprints, row.occurrence_key)) {
+      if (urlKeyLinksAcrossSources(fingerprints, row.occurrence_key, event)) {
         seen.set(row.id, row);
       }
     }
@@ -161,7 +162,7 @@ export async function resolveOccurrenceForPersist(
     });
   }
 
-  const { group, step } = collectCandidatesForMatch(input.matchIndex, fingerprints, urlKey);
+  const { group, step } = collectCandidatesForMatch(input.matchIndex, fingerprints, urlKey, input.event);
   const externalGroup = group.filter(
     (row) => candidateKey(row.source, row.source_event_id) !== selfKey
   );

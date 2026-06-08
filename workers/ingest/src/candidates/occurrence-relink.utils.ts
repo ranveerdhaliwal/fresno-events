@@ -1,8 +1,14 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
-import { computeOccurrenceFingerprints, sha256Hex, sourcePriorityRank } from "@fresno-events/shared";
+import {
+  computeOccurrenceFingerprints,
+  listingUrlsReferToSamePerformance,
+  sha256Hex,
+  sourcePriorityRank
+} from "@fresno-events/shared";
 
 import type { OccurrenceMatchCandidate } from "@/candidates/occurrence-match.types";
 import { occurrenceLookupKeysOverlap } from "@/candidates/occurrence-url-link.utils";
+import { primaryPriorityInheritUpdate } from "@/candidates/linked-priority.utils";
 
 export interface RelinkCandidateRow {
   id: string;
@@ -14,6 +20,7 @@ export interface RelinkCandidateRow {
   occurrence_id: string | null;
   occurrence_key: string | null;
   url_key: string | null;
+  suggested_priority: number | null;
   created_at: string;
   normalized_event: NormalizedEvent;
 }
@@ -33,6 +40,7 @@ export interface RelinkPatch {
   canonical_candidate_id: string | null;
   matched_event_id: string | null;
   status: string;
+  suggested_priority?: number;
 }
 
 export interface RelinkPlanSummary {
@@ -47,6 +55,7 @@ export interface RelinkPlanSummary {
   demoted_to_duplicate: number;
   occurrence_key_changed: number;
   occurrence_id_changed: number;
+  priority_inherited: number;
 }
 
 const RELINKABLE_STATUSES = new Set([
@@ -247,9 +256,14 @@ export async function computeRelinkPatches(
       for (let right = left + 1; right < ids.length; right += 1) {
         const leftId = ids[left]!;
         const rightId = ids[right]!;
+        const leftRow = relinkable.find((row) => row.id === leftId)!;
+        const rightRow = relinkable.find((row) => row.id === rightId)!;
         const leftFp = fingerprints.get(leftId)!;
         const rightFp = fingerprints.get(rightId)!;
-        if (occurrenceLookupKeysOverlap(leftFp, rightFp)) {
+        if (
+          occurrenceLookupKeysOverlap(leftFp, rightFp) ||
+          listingUrlsReferToSamePerformance(leftRow.normalized_event, rightRow.normalized_event)
+        ) {
           uf.union(leftId, rightId);
         }
       }
@@ -285,6 +299,7 @@ export async function computeRelinkPatches(
   let demotedToDuplicate = 0;
   let occurrenceKeyChanged = 0;
   let occurrenceIdChanged = 0;
+  let priorityInherited = 0;
   let multiSourceGroups = 0;
   const occurrenceIdByKey = new Map<string, string>();
 
@@ -354,12 +369,30 @@ export async function computeRelinkPatches(
       patches.push({
         id: row.id,
         occurrence_id: occurrenceId,
-        occurrence_key: fp.occurrenceKey || null,
-        url_key: fp.urlKey,
+        occurrence_key: occurrenceKey,
+        url_key: primaryFp.urlKey ?? fp.urlKey,
         canonical_candidate_id: canonicalCandidateId,
         matched_event_id: matchedEventId,
         status: nextStatus
       });
+    }
+
+    if (options.crossSourceDedupe && group.length > 1) {
+      const priorityInherit = primaryPriorityInheritUpdate(
+        group.map((row) => ({
+          id: row.id,
+          source: row.source,
+          suggested_priority: row.suggested_priority,
+          canonical_candidate_id: row.id === primary.id ? null : primary.id
+        }))
+      );
+      if (priorityInherit) {
+        const primaryPatch = patches.find((patch) => patch.id === priorityInherit.primaryId);
+        if (primaryPatch) {
+          primaryPatch.suggested_priority = priorityInherit.toPriority;
+          priorityInherited += 1;
+        }
+      }
     }
   }
 
@@ -376,7 +409,8 @@ export async function computeRelinkPatches(
       promoted_from_duplicate: promotedFromDuplicate,
       demoted_to_duplicate: demotedToDuplicate,
       occurrence_key_changed: occurrenceKeyChanged,
-      occurrence_id_changed: occurrenceIdChanged
+      occurrence_id_changed: occurrenceIdChanged,
+      priority_inherited: priorityInherited
     }
   };
 }

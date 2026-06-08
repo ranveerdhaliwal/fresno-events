@@ -30,6 +30,8 @@ export function fingerprintPayload(event: NormalizedEvent): string {
     descriptionText: event.descriptionText?.trim() ?? null,
     venueAddress: event.venueAddress?.trim() ?? null,
     venueCity: event.venueCity?.trim() ?? null,
+    venueLat: event.venueLat ?? null,
+    venueLng: event.venueLng ?? null,
     ticketUrl: event.ticketUrl?.trim() ?? null,
     externalUrl: event.externalUrl?.trim() ?? null,
     imageUrl: event.imageUrl?.trim() ?? null,

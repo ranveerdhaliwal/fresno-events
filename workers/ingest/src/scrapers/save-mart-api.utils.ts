@@ -1,7 +1,7 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 import { z } from "zod";
 
-import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
+import { getPacificDateTimeParts, instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 
 const SaveMartMediaSchema = z.object({
   mediaurl: z.string().optional()
@@ -41,23 +41,80 @@ export const SAVE_MART_LISTING_URL =
 function parseMongoDate(value: unknown): string | null {
   if (typeof value === "string") {
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+    return Number.isNaN(d.getTime()) ? null : pacificDateYmdFromInstant(d);
   }
   if (value && typeof value === "object" && "$date" in value) {
     const raw = (value as { $date?: string }).$date;
     if (typeof raw === "string") {
       const d = new Date(raw);
-      return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+      return Number.isNaN(d.getTime()) ? null : pacificDateYmdFromInstant(d);
     }
   }
   return null;
 }
 
+function pacificDateYmdFromInstant(instant: Date): string {
+  return getPacificDateTimeParts(instant).date;
+}
+
+/** Unwrap ticketmaster.evyy.net affiliate links to the nested ticket URL. */
+export function unwrapSaveMartTicketUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    for (const param of ["u", "url"]) {
+      const raw = parsed.searchParams.get(param);
+      if (!raw?.trim()) {
+        continue;
+      }
+      const decoded = decodeURIComponent(raw.trim());
+      if (/^https?:\/\//i.test(decoded)) {
+        return decoded;
+      }
+    }
+  } catch {
+    return url;
+  }
+  return url;
+}
+
+/**
+ * Ticketmaster event URLs embed the show date in the slug: `...-07-19-2026/event/...`
+ * Save Mart's API `date` field is often one Pacific calendar day ahead — prefer TM when present.
+ */
+export function extractTicketmasterSlugDateYmd(url: string | undefined): string | null {
+  if (!url?.trim()) {
+    return null;
+  }
+
+  const target = unwrapSaveMartTicketUrl(url.trim());
+  const match = /-(\d{2})-(\d{2})-(\d{4})\/event\//i.exec(target);
+  if (!match?.[1] || !match[2] || !match[3]) {
+    return null;
+  }
+
+  const month = match[1];
+  const day = match[2];
+  const year = match[3];
+  const ymd = `${year}-${month}-${day}`;
+  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null;
+}
+
 function parseStartTime(value: unknown): string {
   if (typeof value === "number" && Number.isFinite(value)) {
+    // HHMM wall clock (e.g. 1900 → 19:00, 730 → 07:30)
+    if (value >= 100 && value <= 2359) {
+      const hour = Math.floor(value / 100);
+      const minute = value % 100;
+      if (hour <= 23 && minute <= 59) {
+        return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+      }
+    }
+    // Minutes since midnight (e.g. 1140 → 19:00)
     const hour = Math.floor(value / 60);
     const minute = value % 60;
-    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    if (hour <= 23 && minute <= 59) {
+      return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    }
   }
   if (typeof value === "string") {
     const match = value.match(/^(\d{1,2}):(\d{2})/);
@@ -140,7 +197,9 @@ export function saveMartDocsToEvents(docs: unknown[]): NormalizedEvent[] {
     if (!title) {
       continue;
     }
-    const dateYmd = parseMongoDate(doc.date);
+    const dateYmd =
+      extractTicketmasterSlugDateYmd(doc.linkUrl?.startsWith("http") ? doc.linkUrl.trim() : undefined) ??
+      parseMongoDate(doc.date);
     if (!dateYmd) {
       continue;
     }
