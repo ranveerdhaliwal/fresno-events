@@ -6,6 +6,8 @@
 
 **Series events:** [SERIES_EVENTS.md](SERIES_EVENTS.md) — recurring shows, canonical `seriesId`, batch dedupe. Plan: [SERIES_EVENTS_PLAN.md](SERIES_EVENTS_PLAN.md).
 
+**Venue location (address, geocode, maps):** [VENUE_LOCATION.md](VENUE_LOCATION.md) — per-source coords matrix, `upsertVenue`, address backfill, `GOOGLE_MAPS_PLATFORM_API_KEY`, admin maintenance ops.
+
 Single ingest path for Fresno venue sources: **repo modules** under `workers/ingest/src/venues/<key>/`, orchestrated by the **`venue-ingest`** scraper. Replaces legacy `ai-crawl`, `seed_urls`, and separate API registry keys.
 
 Each venue has:
@@ -83,3 +85,18 @@ LIMIT 10;
 3. Preflight: `pnpm ingest:preflight --venue=<key>`.
 
 Cron runs **`venue-ingest`** only (no `seed_urls`, no `ai-crawl`).
+
+## Venue addresses after ingest
+
+Scrapers should populate `normalized_event.venueAddress`, `venueCity`, and `venueLat`/`venueLng` when the upstream API provides coordinates (see [VENUE_LOCATION.md](VENUE_LOCATION.md) per-source table).
+
+**String cleanup (not geocoding):**
+
+```bash
+pnpm db:backfill-addresses --dry-run
+pnpm db:backfill-addresses
+```
+
+Requires `pnpm ingest:dev`. Also available in admin **Queue maintenance → Venue addresses**.
+
+Coordinates are filled at **admin approve** (`upsertVenue` geocode) or **admin maintenance → Geocode venues**, not during ingest persist for Visit Fresno–style sources.

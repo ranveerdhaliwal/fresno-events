@@ -4,7 +4,7 @@ You only need to remember **three steps**:
 
 1. **Fetch** — pull raw events from a source (official API, or HTML + AI).
 2. **Save to dev** — normalize into `event_candidates` in your **dev** database.
-3. **Review** — open `/admin`, approve or reject. Approved rows become `events` on dev. **Prod** gets copies later via promote (one approval, not twice).
+3. **Review** — open `/admin`, approve or reject. Approved rows become `events` on dev. **Prod** gets copies later via promote (one approval, not twice). On approve, `upsertVenue` writes `venues.address` / `city` / `lat` / `lng` (geocoding when coords missing — see [VENUE_LOCATION.md](VENUE_LOCATION.md)).
 
 Cron is the same script on a schedule. When you merge ingest changes to `main`, the next cron run (or a manual trigger in Cloudflare) uses the new code.
 
@@ -14,6 +14,7 @@ Cron is the same script on a schedule. When you merge ingest changes to `main`, 
 
 | What | Where |
 | --- | --- |
+| **Venue addresses, lat/lng, geocoding, maps** | **[VENUE_LOCATION.md](VENUE_LOCATION.md)** |
 | Source list (Ticketmaster, ai-discovery, …) | [`workers/ingest/src/registry.ts`](../workers/ingest/src/registry.ts) |
 | Civic / venue URLs (legacy) | [`workers/ingest/src/sources/civic-urls.ts`](../workers/ingest/src/sources/civic-urls.ts) |
 | Crawl seeds (ai-crawl) | `public.seed_urls` + [AI_CRAWLER.md](AI_CRAWLER.md) |
