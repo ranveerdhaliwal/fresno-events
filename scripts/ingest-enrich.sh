@@ -3,7 +3,7 @@
 #
 # Examples:
 #   pnpm ingest:enrich --dry-run --limit=5
-#   pnpm ingest:enrich --source=api:visitfresnocounty --limit=50
+#   pnpm ingest:enrich --source=ticketmaster --all   # backlog in pending_review without [ai] notes
 #   pnpm ingest:enrich --all          # all pending, not yet AI-tagged (batches of 100)
 #   pnpm ingest:enrich --all --limit=30
 

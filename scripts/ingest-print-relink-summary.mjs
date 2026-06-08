@@ -57,6 +57,7 @@ function printRelinkSummary(body) {
   const demoted = num(summary.demoted_to_duplicate);
   const keyChanged = num(summary.occurrence_key_changed);
   const idChanged = num(summary.occurrence_id_changed);
+  const priorityInherited = num(summary.priority_inherited);
 
   const mode = dryRun ? "DRY RUN (no DB writes)" : "APPLIED";
   console.log(`=== Occurrence relink — ${mode} ===`);
@@ -87,13 +88,16 @@ function printRelinkSummary(body) {
   console.log(`  ${demoted} demoted to duplicate`);
   console.log("");
 
-  if (keyChanged > 0 || idChanged > 0) {
+  if (keyChanged > 0 || idChanged > 0 || priorityInherited > 0) {
     console.log("Key migrations");
     if (keyChanged > 0) {
       console.log(`  ${keyChanged} occurrence_key changes`);
     }
     if (idChanged > 0) {
       console.log(`  ${idChanged} occurrence_id changes`);
+    }
+    if (priorityInherited > 0) {
+      console.log(`  ${priorityInherited} primary priority inheritances`);
     }
     console.log("");
   }

@@ -110,8 +110,38 @@ ingest_print_relink_summary() {
   printf '%s' "$resp" | node "$script"
 }
 
+# Map candidate eventSource values (e.g. scrape:www.savemartcenter.com) to venue-ingest + --venue key.
+ingest_resolve_event_source_alias() {
+  local src="${SOURCE:-}"
+  [[ -n "$src" ]] || return 0
+  [[ -n "${VENUE:-}" ]] && return 0
+  [[ "$src" == *","* ]] && return 0
+
+  case "$src" in
+    ticketmaster | venunite | seatgeek | eventbrite | bandsintown | ai-discovery | venue-ingest | all)
+      return 0
+      ;;
+  esac
+
+  local repo="${REPO_ROOT:-}"
+  local config event_src venue_key
+  for config in "$repo"/workers/ingest/src/venues/*/venue.config.json; do
+    [[ -f "$config" ]] || continue
+    event_src="$(grep -E '"eventSource"' "$config" | sed -E 's/.*"eventSource"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' | head -1)"
+    venue_key="$(grep -E '"key"' "$config" | sed -E 's/.*"key"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' | head -1)"
+    if [[ "$event_src" == "$src" || "$venue_key" == "$src" ]]; then
+      VENUE="$venue_key"
+      SOURCE="venue-ingest"
+      echo "Note: resolved --source=$src → venue-ingest --venue=$venue_key (event source on candidates, not a scraper key)." >&2
+      return 0
+    fi
+  done
+}
+
 # When --venue is set, Fresno venues always use venue-ingest (method is per venue.config.json).
 ingest_apply_venue_source_defaults() {
+  ingest_resolve_event_source_alias
+
   if [[ -z "${VENUE:-}" ]]; then
     return 0
   fi
