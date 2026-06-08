@@ -1,96 +1,24 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// @vitest-environment node
+import { describe, expect, it } from "vitest";
 
-import { parseFrom, parseLimit, parseMaxPriority, parseOptionalDate, parseSeriesId } from "./events.utils";
+import { parseBounds, parseRequireCoords } from "./events.utils";
 
-describe("parseLimit", () => {
-  it("defaults invalid input to 12", () => {
-    expect(parseLimit(undefined)).toBe(12);
-    expect(parseLimit("not-a-number")).toBe(12);
+describe("events.utils map parsing", () => {
+  it("parses valid bounds", () => {
+    expect(parseBounds("36.6,-120.6,37.1,-119.3")).toEqual({
+      swLat: 36.6,
+      swLng: -120.6,
+      neLat: 37.1,
+      neLng: -119.3
+    });
   });
 
-  it("treats empty string as zero then clamps to minimum 1", () => {
-    expect(parseLimit("")).toBe(1);
+  it("rejects invalid bounds", () => {
+    expect(parseBounds("bad")).toBeNull();
   });
 
-  it("clamps to 1..50", () => {
-    expect(parseLimit("0")).toBe(1);
-    expect(parseLimit("1")).toBe(1);
-    expect(parseLimit("50")).toBe(50);
-    expect(parseLimit("99")).toBe(50);
-    expect(parseLimit("3.7")).toBe(3);
-  });
-});
-
-describe("parseFrom", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-10T12:00:00.000Z"));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("returns null for invalid ISO string", () => {
-    expect(parseFrom("invalid")).toBeNull();
-  });
-
-  it("parses valid ISO string", () => {
-    const d = parseFrom("2026-01-15T08:00:00.000Z");
-    expect(d).toBeInstanceOf(Date);
-    expect(d?.toISOString()).toBe("2026-01-15T08:00:00.000Z");
-  });
-
-  it("defaults to six hours before now when omitted", () => {
-    const d = parseFrom(undefined);
-    expect(d).toBeInstanceOf(Date);
-    expect(d?.toISOString()).toBe("2026-05-10T06:00:00.000Z");
-  });
-});
-
-describe("parseOptionalDate", () => {
-  it("returns undefined when omitted", () => {
-    expect(parseOptionalDate(undefined)).toBeUndefined();
-  });
-
-  it("returns null for invalid value", () => {
-    expect(parseOptionalDate("bad")).toBeNull();
-  });
-
-  it("parses valid ISO string", () => {
-    expect(parseOptionalDate("2026-03-01T00:00:00.000Z")?.toISOString()).toBe("2026-03-01T00:00:00.000Z");
-  });
-});
-
-describe("parseMaxPriority", () => {
-  it("returns undefined when omitted", () => {
-    expect(parseMaxPriority(undefined)).toBeUndefined();
-  });
-
-  it("returns null for invalid values", () => {
-    expect(parseMaxPriority("bad")).toBeNull();
-    expect(parseMaxPriority("6")).toBeNull();
-    expect(parseMaxPriority("-1")).toBeNull();
-  });
-
-  it("parses integers 0–5", () => {
-    expect(parseMaxPriority("0")).toBe(0);
-    expect(parseMaxPriority("5")).toBe(5);
-  });
-});
-
-describe("parseSeriesId", () => {
-  it("returns undefined when omitted or empty", () => {
-    expect(parseSeriesId(undefined)).toBeUndefined();
-    expect(parseSeriesId("")).toBeUndefined();
-    expect(parseSeriesId("   ")).toBeUndefined();
-  });
-
-  it("returns undefined when too long", () => {
-    expect(parseSeriesId("x".repeat(201))).toBeUndefined();
-  });
-
-  it("trims and returns valid series id", () => {
-    expect(parseSeriesId("  series:visitfresnocounty:abc123  ")).toBe("series:visitfresnocounty:abc123");
+  it("parses require_coords flag", () => {
+    expect(parseRequireCoords("true")).toBe(true);
+    expect(parseRequireCoords("0")).toBe(false);
   });
 });

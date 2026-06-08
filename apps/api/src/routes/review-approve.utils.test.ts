@@ -40,6 +40,11 @@ describe("resolveBulkApprovePriority", () => {
   it("defaults to 5 when no suggested priority", () => {
     expect(resolveBulkApprovePriority({})).toBe(5);
   });
+
+  it("clamps suggested or explicit P0 to default for organic candidates", () => {
+    expect(resolveBulkApprovePriority({ suggestedPriority: 0 })).toBe(5);
+    expect(resolveBulkApprovePriority({ suggestedPriority: 2 }, 0)).toBe(5);
+  });
 });
 
 describe("partitionCandidatesForApprove", () => {

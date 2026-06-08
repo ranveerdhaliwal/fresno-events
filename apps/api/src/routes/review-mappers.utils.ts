@@ -3,6 +3,7 @@ import {
   EVENT_PRIORITY_MAX,
   EVENT_PRIORITY_MIN,
   eventCategories,
+  pacificTimeBucketKey,
   type EventCandidateStatus,
   type EventCategory,
   type NormalizedEvent
@@ -166,18 +167,46 @@ function truncateSlugMiddle(value: string, maxLength: number): string {
   return `${value.slice(0, head)}-${value.slice(value.length - tail)}`;
 }
 
-/** Event slugs end with the occurrence date so recurring titles stay unique within 80 chars. */
+/** Pacific show date + time (30-min bucket) for slug suffixes — matches occurrence matching. */
+export function occurrenceDateTimeSuffixForSlug(startTs: string): string | null {
+  const bucket = pacificTimeBucketKey(startTs);
+  if (!bucket) {
+    return null;
+  }
+
+  const [date, time] = bucket.split("T");
+  if (!date || !time) {
+    return null;
+  }
+
+  return `${date}-${time.replace(":", "")}`;
+}
+
+/** Last-resort slug when date-time suffix still collides (e.g. legacy rows). */
+export function buildEventSlugDisambiguated(
+  title: string,
+  startTs: string,
+  disambiguator: string,
+  maxLength = DEFAULT_SLUG_MAX_LENGTH
+): string {
+  const token = slugify(disambiguator).slice(0, 8) || disambiguator.replace(/-/g, "").slice(0, 8);
+  const reserved = 1 + token.length;
+  const base = buildEventSlug(title, startTs, maxLength - reserved);
+  return `${base}-${token}`.slice(0, maxLength);
+}
+
+/** Event slugs end with Pacific show date-time so same-day multi-show runs stay unique. */
 export function buildEventSlug(
   title: string,
   startTs: string,
   maxLength = DEFAULT_SLUG_MAX_LENGTH
 ): string {
-  const datePart = startTs.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+  const dateTimePart = occurrenceDateTimeSuffixForSlug(startTs);
+  if (!dateTimePart) {
     return slugify(`${title}-${startTs}`, maxLength);
   }
 
-  const dateSuffix = `-${datePart}`;
+  const dateSuffix = `-${dateTimePart}`;
   const maxTitleLength = maxLength - dateSuffix.length;
   if (maxTitleLength < 8) {
     return slugify(datePart, maxLength);

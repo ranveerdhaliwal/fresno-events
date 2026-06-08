@@ -55,3 +55,35 @@ export function parseSeriesId(value: string | undefined): string | undefined {
 
   return trimmed;
 }
+
+export interface MapBounds {
+  swLat: number;
+  swLng: number;
+  neLat: number;
+  neLng: number;
+}
+
+export function parseBounds(value: string | undefined): MapBounds | null | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parts = value.split(",").map((part) => Number(part.trim()));
+  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) {
+    return null;
+  }
+
+  const swLat = parts[0]!;
+  const swLng = parts[1]!;
+  const neLat = parts[2]!;
+  const neLng = parts[3]!;
+  if (swLat > neLat || swLng > neLng) {
+    return null;
+  }
+
+  return { swLat, swLng, neLat, neLng };
+}
+
+export function parseRequireCoords(value: string | undefined): boolean {
+  return value === "true" || value === "1";
+}

@@ -1,4 +1,5 @@
 import {
+  clampSuggestedPriorityForOrganicEvent,
   EVENT_PRIORITY_DEFAULT,
   type CandidateBulkApproveChangesResponse,
   type CandidateBulkApproveResponse,
@@ -108,8 +109,10 @@ export async function approveCandidateCore(
     );
   }
 
-  const priority =
-    options.priority !== undefined ? options.priority : resolveBulkApprovePriority(candidate);
+  const priority = clampSuggestedPriorityForOrganicEvent(
+    options.priority !== undefined ? options.priority : resolveBulkApprovePriority(candidate),
+    false
+  );
 
   const siblings = await fetchCandidatesByOccurrenceId(
     env,

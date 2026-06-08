@@ -9,7 +9,12 @@ import {
   type CandidateBulkDeleteResponse,
   type CandidateBulkPriorityResponse,
   type CandidateBulkRejectResponse,
-  type ReviewDecisionResponse
+  type ReviewDecisionResponse,
+  type ReviewOccurrenceRelinkOpsResponse,
+  type ReviewPriorityTriageOpsResponse,
+  type ReviewQueueAuditResponse,
+  type ReviewVenueAddressBackfillOpsResponse,
+  type ReviewVenueGeocodeOpsResponse
 } from "@fresno-events/shared";
 
 import type { Env } from "@/env";
@@ -67,6 +72,11 @@ import {
   validateBulkApproveChangesIdCount
 } from "@/routes/review-approve-changes.utils";
 import { getPublishedEventForReview } from "@/routes/review-event.service";
+import { geocodeAddress } from "@/lib/geocode";
+import { runOccurrenceRelinkOps, runVenueAddressBackfillOps } from "@/routes/review-ops.service";
+import { runPriorityTriageOps } from "@/routes/review-priority-triage.service";
+import { runVenueGeocodeOps } from "@/routes/review-venue-geocode.service";
+import { runPreApproveAudit } from "@/routes/review-queue-audit.service";
 import { supabaseReviewRequest } from "@/routes/review-supabase.utils";
 import type { SupabaseCandidateRow } from "@/routes/review.types";
 
@@ -113,6 +123,68 @@ reviewRoute
       });
     } catch (error) {
       return handleReviewError(c, error, "Review candidates could not be loaded.");
+    }
+  })
+  .get("/candidates/pre-approve-audit", async (c) => {
+    try {
+      const audit = await runPreApproveAudit(c.env);
+      return ok<ReviewQueueAuditResponse>(c, audit);
+    } catch (error) {
+      return handleReviewError(c, error, "Pre-approve audit could not be run.");
+    }
+  })
+  .post("/ops/occurrence-relink", async (c) => {
+    const dryRun = c.req.query("dry_run") === "true";
+    try {
+      const result = await runOccurrenceRelinkOps(c.env, dryRun);
+      return ok<ReviewOccurrenceRelinkOpsResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Occurrence relink could not be run.");
+    }
+  })
+  .post("/ops/venue-address-backfill", async (c) => {
+    const dryRun = c.req.query("dry_run") === "true";
+    const source = c.req.query("source") ?? undefined;
+    try {
+      const result = await runVenueAddressBackfillOps(c.env, dryRun, source);
+      return ok<ReviewVenueAddressBackfillOpsResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Venue address cleanup could not be run.");
+    }
+  })
+  .post("/ops/priority-triage", async (c) => {
+    const dryRun = c.req.query("dry_run") === "true";
+    const source = c.req.query("source") ?? undefined;
+    try {
+      const result = await runPriorityTriageOps(c.env, {
+        dryRun,
+        ...(source ? { sourceFilter: source } : {})
+      });
+      return ok<ReviewPriorityTriageOpsResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Priority triage could not be run.");
+    }
+  })
+  .post("/ops/venue-geocode", async (c) => {
+    const dryRun = c.req.query("dry_run") === "true";
+    try {
+      const result = await runVenueGeocodeOps(c.env, dryRun);
+      return ok<ReviewVenueGeocodeOpsResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Venue geocode could not be run.");
+    }
+  })
+  .get("/geocode", async (c) => {
+    const address = c.req.query("address") ?? "";
+    const city = c.req.query("city") ?? "";
+    try {
+      const result = await geocodeAddress(c.env, { address, city });
+      if (!result) {
+        return fail(c, "geocode_not_found", "No coordinates found for that address.", 404);
+      }
+      return ok(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Geocode request failed.");
     }
   })
   .get("/candidates/:id", async (c) => {

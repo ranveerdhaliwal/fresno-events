@@ -8,7 +8,9 @@ DEV_TARGET_FILE="${DEV_TARGET_FILE:-${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[
 DEV_TARGET_API_KEYS=(
   ALLOWED_ORIGINS
   ADMIN_REVIEW_TOKEN
+  INGEST_URL
   R2_PUBLIC_BASE_URL
+  GOOGLE_MAPS_PLATFORM_API_KEY
 )
 
 # Keys read from dev-target.env and written to workers/ingest/.dev.vars (besides Supabase + APP_ENV)
@@ -213,6 +215,12 @@ dev_target_write_api_dev_vars() {
     echo ""
     echo "# Shared with workers/ingest (dev-target.env)"
     dev_target_emit_kv "ADMIN_REVIEW_TOKEN" "$admin_token"
+    dev_target_emit_kv "INGEST_URL" "${INGEST_URL:-http://127.0.0.1:8788}"
+    if [[ -n "${GOOGLE_MAPS_PLATFORM_API_KEY:-}" ]]; then
+      dev_target_emit_kv "GOOGLE_MAPS_PLATFORM_API_KEY" "${GOOGLE_MAPS_PLATFORM_API_KEY}"
+    else
+      echo "# GOOGLE_MAPS_PLATFORM_API_KEY=  # Geocoding, Weather, Air Quality, Pollen, …"
+    fi
     if [[ -n "$r2_base" ]]; then
       echo ""
       dev_target_emit_kv "R2_PUBLIC_BASE_URL" "$r2_base"

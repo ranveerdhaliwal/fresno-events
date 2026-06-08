@@ -7,7 +7,15 @@ import { resolveHomepageCuration, HomepageCurationError } from "@/lib/homepage-c
 import { getEventFromSupabase, listEventsFromSupabase, SupabaseEventsError } from "@/lib/supabase-events";
 import { fail, ok } from "@/lib/responses";
 
-import { parseFrom, parseLimit, parseMaxPriority, parseOptionalDate, parseSeriesId } from "./events.utils";
+import {
+  parseBounds,
+  parseFrom,
+  parseLimit,
+  parseMaxPriority,
+  parseOptionalDate,
+  parseRequireCoords,
+  parseSeriesId
+} from "./events.utils";
 
 export const eventsRoute = new Hono<{ Bindings: Env }>()
   .get("/homepage", async (c) => {
@@ -29,6 +37,8 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
     const until = parseOptionalDate(c.req.query("until"));
     const maxPriority = parseMaxPriority(c.req.query("maxPriority"));
     const seriesId = parseSeriesId(c.req.query("series_id"));
+    const bounds = parseBounds(c.req.query("bounds"));
+    const requireCoords = parseRequireCoords(c.req.query("require_coords"));
 
     if (!from) {
       return fail(c, "invalid_from", "The from query parameter must be a valid ISO date.", 400);
@@ -42,6 +52,10 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
       return fail(c, "invalid_max_priority", "maxPriority must be an integer 0–5.", 400);
     }
 
+    if (bounds === null) {
+      return fail(c, "invalid_bounds", "bounds must be swLat,swLng,neLat,neLng.", 400);
+    }
+
     try {
       return ok(
         c,
@@ -50,7 +64,9 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
           limit,
           ...(until ? { until } : {}),
           ...(maxPriority !== undefined ? { maxPriority } : {}),
-          ...(seriesId ? { seriesId } : {})
+          ...(seriesId ? { seriesId } : {}),
+          ...(requireCoords ? { requireCoords } : {}),
+          ...(bounds ? { bounds } : {})
         })
       );
     } catch (error) {

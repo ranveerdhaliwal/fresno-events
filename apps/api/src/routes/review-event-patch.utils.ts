@@ -33,6 +33,8 @@ export function publishedEventToNormalized(
     venueName: venue.name,
     ...(venue.address ? { venueAddress: venue.address } : {}),
     venueCity: venue.city,
+    ...(venue.lat !== undefined ? { venueLat: venue.lat } : {}),
+    ...(venue.lng !== undefined ? { venueLng: venue.lng } : {}),
     startTs: event.startTs,
     ...(event.endTs ? { endTs: event.endTs } : {}),
     timezone: event.timezone,
@@ -78,7 +80,9 @@ export async function patchPublishedEventById(
       socials: {},
       createdAt: existing.created_at,
       updatedAt: existing.updated_at,
-      ...(existing.venue?.address ? { address: existing.venue.address } : {})
+      ...(existing.venue?.address ? { address: existing.venue.address } : {}),
+      ...(existing.venue?.lat != null ? { lat: existing.venue.lat } : {}),
+      ...(existing.venue?.lng != null ? { lng: existing.venue.lng } : {})
     },
     existing.hero_image
       ? {
@@ -175,7 +179,7 @@ async function fetchPublishedEventRow(env: Env, eventId: string) {
       "hero_image_id",
       "created_at",
       "updated_at",
-      "venue:venues(name,city,address)",
+      "venue:venues(name,city,address,lat,lng)",
       "hero_image:images(id,storage_key,cdn_url,width,height,created_at)"
     ].join(","),
     id: `eq.${eventId}`,
@@ -211,7 +215,9 @@ export async function getPublishedEventForAdmin(env: Env, eventId: string) {
       socials: {},
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      ...(row.venue?.address ? { address: row.venue.address } : {})
+      ...(row.venue?.address ? { address: row.venue.address } : {}),
+      ...(row.venue?.lat != null ? { lat: row.venue.lat } : {}),
+      ...(row.venue?.lng != null ? { lng: row.venue.lng } : {})
     },
     ...(row.hero_image
       ? {

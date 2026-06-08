@@ -31,9 +31,24 @@ export class SupabaseEventsError extends Error {
   }
 }
 
+export interface MapBounds {
+  swLat: number;
+  swLng: number;
+  neLat: number;
+  neLng: number;
+}
+
 export async function listEventsFromSupabase(
   env: Env,
-  options: { from: Date; until?: Date; limit: number; maxPriority?: number; seriesId?: string }
+  options: {
+    from: Date;
+    until?: Date;
+    limit: number;
+    maxPriority?: number;
+    seriesId?: string;
+    requireCoords?: boolean;
+    bounds?: MapBounds;
+  }
 ): Promise<EventListResponse> {
   const { url, key } = getSupabaseConfig(env);
   const filters: Record<string, string> = {
@@ -59,11 +74,41 @@ export async function listEventsFromSupabase(
   }
 
   const rows = await fetchEventRows(url, key, params);
+  const mapped = rows.map(mapEventRow);
+  const { items, omittedNoCoords } = filterMapEvents(mapped, options);
 
   return {
-    items: rows.map(mapEventRow),
+    items,
     nextCursor: null,
-    generatedAt: new Date().toISOString()
+    generatedAt: new Date().toISOString(),
+    ...(omittedNoCoords > 0 ? { meta: { omittedNoCoords } } : {})
+  };
+}
+
+function filterMapEvents(
+  items: EventListItem[],
+  options: { requireCoords?: boolean; bounds?: MapBounds; limit: number }
+): { items: EventListItem[]; omittedNoCoords: number } {
+  let omittedNoCoords = 0;
+  const filtered = items.filter((item) => {
+    const { lat, lng } = item.venue;
+    const hasCoords = lat != null && lng != null;
+    if (options.requireCoords && !hasCoords) {
+      omittedNoCoords += 1;
+      return false;
+    }
+    if (options.bounds && hasCoords && lat != null && lng != null) {
+      const { swLat, swLng, neLat, neLng } = options.bounds;
+      if (lat < swLat || lat > neLat || lng < swLng || lng > neLng) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  return {
+    items: filtered.slice(0, options.limit),
+    omittedNoCoords
   };
 }
 
@@ -127,6 +172,101 @@ export async function listEventsByIds(env: Env, ids: string[]): Promise<EventLis
     const item = byId.get(id);
     return item ? [item] : [];
   });
+}
+
+export type AdminPublishedEventsScope = "future" | "past" | "all";
+
+export async function listPublishedEventsForAdmin(
+  env: Env,
+  options: {
+    limit: number;
+    offset: number;
+    scope: AdminPublishedEventsScope;
+    q?: string;
+  }
+): Promise<{ items: EventListItem[]; total: number }> {
+  const { url, key } = getSupabaseConfig(env);
+  const now = new Date();
+  const filters: Record<string, string> = {
+    status: `in.(${scheduledStatuses.join(",")})`,
+    limit: String(options.limit),
+    offset: String(options.offset)
+  };
+
+  if (options.scope === "future") {
+    filters.start_ts = `gte.${now.toISOString()}`;
+    filters.order = "start_ts.asc,priority.asc";
+  } else if (options.scope === "past") {
+    filters.start_ts = `lt.${now.toISOString()}`;
+    filters.order = "start_ts.desc,priority.asc";
+  } else {
+    filters.order = "start_ts.desc,priority.asc";
+  }
+
+  const trimmedQuery = options.q?.trim() ?? "";
+  if (trimmedQuery.length >= 2) {
+    filters.title = `ilike.*${trimmedQuery.replace(/[%_]/g, "")}*`;
+  }
+
+  const { rows, total } = await fetchEventRowsWithTotal(url, key, createEventParams(filters));
+  return { items: rows.map(mapEventRow), total };
+}
+
+export async function searchVenuesFromSupabase(
+  env: Env,
+  options: { q: string; limit: number }
+): Promise<Venue[]> {
+  const { url, key } = getSupabaseConfig(env);
+  const params = new URLSearchParams({
+    select: "id,slug,name,address,city,neighborhood,lat,lng,capacity,website,phone,socials,hero_image_id,description,primary_category,created_at,updated_at",
+    name: `ilike.*${options.q.replace(/[%_]/g, "")}*`,
+    order: "name.asc",
+    limit: String(options.limit)
+  });
+
+  const response = await fetch(`${url}/rest/v1/venues?${params}`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new SupabaseEventsError(`Supabase venues query failed with ${response.status}: ${body}`);
+  }
+
+  const rows = (await response.json()) as SupabaseVenueRow[];
+  return rows.map(mapVenue);
+}
+
+export async function searchArtistsFromSupabase(
+  env: Env,
+  options: { q: string; limit: number }
+): Promise<Array<{ id: string; slug: string; name: string }>> {
+  const { url, key } = getSupabaseConfig(env);
+  const params = new URLSearchParams({
+    select: "id,slug,name",
+    name: `ilike.*${options.q.replace(/[%_]/g, "")}*`,
+    order: "name.asc",
+    limit: String(options.limit)
+  });
+
+  const response = await fetch(`${url}/rest/v1/artists?${params}`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new SupabaseEventsError(`Supabase artists query failed with ${response.status}: ${body}`);
+  }
+
+  return (await response.json()) as Array<{ id: string; slug: string; name: string }>;
 }
 
 export async function searchEventsFromSupabase(
@@ -208,11 +348,21 @@ function createEventParams(filters: Record<string, string>) {
 }
 
 async function fetchEventRows(url: string, key: string, params: URLSearchParams) {
+  const { rows } = await fetchEventRowsWithTotal(url, key, params);
+  return rows;
+}
+
+async function fetchEventRowsWithTotal(
+  url: string,
+  key: string,
+  params: URLSearchParams
+): Promise<{ rows: SupabaseEventRow[]; total: number }> {
   const response = await fetch(`${url}/rest/v1/events?${params}`, {
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,
-      Accept: "application/json"
+      Accept: "application/json",
+      Prefer: "count=exact"
     }
   });
 
@@ -221,7 +371,23 @@ async function fetchEventRows(url: string, key: string, params: URLSearchParams)
     throw new SupabaseEventsError(`Supabase events query failed with ${response.status}: ${body}`);
   }
 
-  return await response.json() as SupabaseEventRow[];
+  const rows = (await response.json()) as SupabaseEventRow[];
+  const contentRange = response.headers.get("content-range");
+  const total = parseContentRangeTotal(contentRange, rows.length);
+  return { rows, total };
+}
+
+function parseContentRangeTotal(contentRange: string | null, fallback: number): number {
+  if (!contentRange) {
+    return fallback;
+  }
+  const slash = contentRange.lastIndexOf("/");
+  if (slash < 0) {
+    return fallback;
+  }
+  const totalPart = contentRange.slice(slash + 1);
+  const parsed = Number(totalPart);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 async function fetchImagesByIds(url: string, key: string, ids: string[]): Promise<ImageAsset[]> {

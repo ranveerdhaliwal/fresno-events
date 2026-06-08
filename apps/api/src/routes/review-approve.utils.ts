@@ -1,4 +1,5 @@
 import {
+  clampSuggestedPriorityForOrganicEvent,
   EVENT_PRIORITY_DEFAULT,
   EVENT_PRIORITY_MAX,
   EVENT_PRIORITY_MIN,
@@ -32,23 +33,24 @@ export function resolveBulkApprovePriority(
   explicit?: number
 ): number {
   if (explicit !== undefined) {
-    return clampPriority(explicit);
+    return clampOrganicApprovePriority(explicit);
   }
 
   const suggested = candidate.suggestedPriority;
   if (suggested !== undefined && Number.isInteger(suggested)) {
-    return clampPriority(suggested);
+    return clampOrganicApprovePriority(suggested);
   }
 
   return EVENT_PRIORITY_DEFAULT;
 }
 
-function clampPriority(value: number): number {
+/** Ingest candidates are organic; P0 is for manually published sponsored events only. */
+function clampOrganicApprovePriority(value: number): number {
   if (!Number.isInteger(value) || value < EVENT_PRIORITY_MIN || value > EVENT_PRIORITY_MAX) {
     return EVENT_PRIORITY_DEFAULT;
   }
 
-  return value;
+  return clampSuggestedPriorityForOrganicEvent(value, false);
 }
 
 export function partitionCandidatesForApprove(

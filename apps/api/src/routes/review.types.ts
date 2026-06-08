@@ -83,6 +83,8 @@ export interface SupabaseEventRow {
     name: string;
     city: string;
     address: string | null;
+    lat: number | null;
+    lng: number | null;
   } | null;
 }
 

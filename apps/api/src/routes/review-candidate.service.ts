@@ -10,7 +10,7 @@ import type {
 
 import type { Env } from "@/env";
 import { toEventSource } from "@/lib/event-source";
-import { clampEventPriority } from "@fresno-events/shared";
+import { clampSuggestedPriorityForOrganicEvent } from "@fresno-events/shared";
 import { partitionCandidatesForDelete } from "@/routes/review-delete.utils";
 import { candidateSelect } from "@/routes/review.constants";
 import { toCandidateStatus, toRecord } from "@/routes/review-mappers.utils";
@@ -245,7 +245,7 @@ export async function bulkUpdateSuggestedPriority(
   ids: string[],
   priority: number
 ): Promise<CandidateBulkPriorityResponse> {
-  const clamped = clampEventPriority(priority);
+  const clamped = clampSuggestedPriorityForOrganicEvent(priority, false);
   const uniqueIds = [...new Set(ids)];
   const failed: Array<{ id: string; message: string }> = [];
   let updated = 0;

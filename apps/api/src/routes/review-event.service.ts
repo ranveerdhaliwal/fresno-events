@@ -1,5 +1,6 @@
 import {
   EVENT_PRIORITY_DEFAULT,
+  normalizeVenueStreetAddress,
   parseLineup,
   type Event,
   type EventCandidate,
@@ -7,7 +8,9 @@ import {
 } from "@fresno-events/shared";
 
 import type { Env } from "@/env";
+import { geocodeAddress } from "@/lib/geocode";
 import { toEventSource } from "@/lib/event-source";
+import { logStructured } from "@/lib/structured-log";
 import {
   buildAlternatesFromCandidates,
   mergeSourceRefsWithAlternates
@@ -15,6 +18,7 @@ import {
 import { ReviewRouteError } from "@/routes/review.errors";
 import {
   buildEventSlug,
+  buildEventSlugDisambiguated,
   compactRecord,
   slugify,
   toEventCategory,
@@ -64,22 +68,78 @@ export function mapEventRow(row: SupabaseEventRow): Event {
   };
 }
 
+async function fetchVenueCoordsBySlug(
+  env: Env,
+  slug: string
+): Promise<{ lat: number | null; lng: number | null } | null> {
+  const params = new URLSearchParams({
+    select: "lat,lng",
+    slug: `eq.${slug}`,
+    limit: "1"
+  });
+  const rows = await supabaseReviewRequest<Array<{ lat: number | null; lng: number | null }>>(
+    env,
+    `/rest/v1/venues?${params}`
+  );
+  return rows[0] ?? null;
+}
+
 export async function upsertVenue(env: Env, event: NormalizedEvent) {
   const venueSlug = slugify(event.venueName);
+  const address = normalizeVenueStreetAddress(event.venueAddress, event.venueCity);
+  const city = event.venueCity ?? "Fresno";
+  const venueRow: Record<string, unknown> = {
+    slug: venueSlug,
+    name: event.venueName,
+    address,
+    city,
+    primary_category: event.category ?? "community",
+    updated_at: new Date().toISOString()
+  };
+
+  let lat =
+    typeof event.venueLat === "number" && Number.isFinite(event.venueLat) ? event.venueLat : undefined;
+  let lng =
+    typeof event.venueLng === "number" && Number.isFinite(event.venueLng) ? event.venueLng : undefined;
+
+  if (lat === undefined || lng === undefined) {
+    const existing = await fetchVenueCoordsBySlug(env, venueSlug);
+    if (existing?.lat != null && existing?.lng != null) {
+      lat = existing.lat;
+      lng = existing.lng;
+    }
+  }
+
+  if ((lat === undefined || lng === undefined) && address) {
+    try {
+      const geocoded = await geocodeAddress(env, { address, city });
+      if (geocoded) {
+        lat = geocoded.lat;
+        lng = geocoded.lng;
+        logStructured("venue_geocoded_on_upsert", { venueSlug, provider: geocoded.provider });
+      }
+    } catch (error) {
+      logStructured("venue_geocode_on_upsert_failed", {
+        venueSlug,
+        message: error instanceof Error ? error.message : "geocode failed"
+      });
+    }
+  }
+
+  if (lat !== undefined) {
+    venueRow.lat = lat;
+  }
+  if (lng !== undefined) {
+    venueRow.lng = lng;
+  }
+
   const rows = await supabaseReviewRequest<SupabaseVenueRow[]>(env, "/rest/v1/venues?on_conflict=slug", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Prefer: "resolution=merge-duplicates,return=representation"
     },
-    body: JSON.stringify({
-      slug: venueSlug,
-      name: event.venueName,
-      address: event.venueAddress ?? null,
-      city: event.venueCity ?? "Fresno",
-      primary_category: event.category ?? "community",
-      updated_at: new Date().toISOString()
-    })
+    body: JSON.stringify(venueRow)
   });
 
   const venue = rows[0];
@@ -161,7 +221,60 @@ export async function upsertEvent(
   );
 }
 
+function isEventSlugConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("23505") && message.includes("events_slug_key");
+}
+
 async function postApprovedEvent(
+  env: Env,
+  candidate: EventCandidate,
+  normalized: NormalizedEvent,
+  venueId: string,
+  heroImageId: string | null,
+  priority: number,
+  eventSlug: string,
+  siblings: EventCandidate[] = []
+): Promise<Event> {
+  const slugCandidates = [
+    eventSlug,
+    buildEventSlugDisambiguated(normalized.title, normalized.startTs, normalized.sourceEventId)
+  ].filter((slug, index, slugs) => slugs.indexOf(slug) === index);
+
+  let lastError: unknown;
+  for (const slug of slugCandidates) {
+    try {
+      return await insertApprovedEventWithSlug(
+        env,
+        candidate,
+        normalized,
+        venueId,
+        heroImageId,
+        priority,
+        slug,
+        siblings
+      );
+    } catch (error) {
+      if (!isEventSlugConflict(error)) {
+        throw error;
+      }
+      lastError = error;
+      logStructured("event_slug_conflict_retry", {
+        level: "warn",
+        candidate_id: candidate.id,
+        title: normalized.title,
+        slug,
+        source_event_id: normalized.sourceEventId
+      });
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new ReviewRouteError("Event slug conflict could not be resolved.");
+}
+
+async function insertApprovedEventWithSlug(
   env: Env,
   candidate: EventCandidate,
   normalized: NormalizedEvent,
