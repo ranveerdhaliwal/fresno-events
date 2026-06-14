@@ -346,6 +346,54 @@ function collectVenueEvents(metric, newItems) {
   return { rows };
 }
 
+/** @param {AuditItem[]} items @param {"new" | "changed"} kind */
+function printPersistItemList(items, kind) {
+  const prefix = kind === "new" ? "+" : "~";
+  for (const item of items) {
+    printEventLine({
+      title: item.title,
+      url: resolveEventUrl(item),
+      start_ts: item.start_ts
+    });
+    if (kind === "changed") {
+      const fields = Array.isArray(item.changed_fields) ? item.changed_fields.join(", ") : "?";
+      console.log(`    ${prefix} ${fields}`);
+    }
+  }
+}
+
+/** @param {{ new: number, changed: number, unchanged: number, new_items: AuditItem[], changed_items: AuditItem[] }} merged */
+function printPromotePersistSection(merged) {
+  const hasCounts = merged.new > 0 || merged.changed > 0 || merged.unchanged > 0;
+
+  console.log("");
+  console.log("=== Promote persist ===");
+
+  if (!hasCounts) {
+    console.log("Persist summary unavailable (venue-ingest may not have returned audit).");
+    return;
+  }
+
+  console.log(`+${merged.new} new  ~${merged.changed} changed  =${merged.unchanged} unchanged`);
+
+  if (merged.new === 0 && merged.changed === 0 && merged.unchanged > 0) {
+    console.log(`All ${merged.unchanged} events unchanged — nothing new to review from this run.`);
+    return;
+  }
+
+  if (merged.new_items.length > 0) {
+    console.log("");
+    console.log("New:");
+    printPersistItemList(merged.new_items, "new");
+  }
+
+  if (merged.changed_items.length > 0) {
+    console.log("");
+    console.log("Changed:");
+    printPersistItemList(merged.changed_items, "changed");
+  }
+}
+
 /** @param {SeedMetric[]} metrics @param {{ new: number, changed: number, unchanged: number, new_items: AuditItem[], changed_items: AuditItem[], batch_duplicate_items?: BatchDuplicateItem[] }} merged @param {Map<string, number>} [postDedupeCounts] */
 function printPreflightEventSummary(metrics, merged, postDedupeCounts) {
   const browserDryRunOnly =
@@ -766,35 +814,7 @@ if (isPromote) {
     }
   }
 
-  if (merged.new_items.length > 0 || merged.changed_items.length > 0) {
-    console.log("");
-    console.log("=== Promote persist preview ===");
-    console.log(`+${merged.new} new  ~${merged.changed} changed  =${merged.unchanged} unchanged`);
-    console.log("");
-    if (merged.new_items.length > 0) {
-      console.log("New:");
-      for (const item of merged.new_items) {
-        printEventLine({
-          title: item.title,
-          url: resolveEventUrl(item),
-          start_ts: item.start_ts
-        });
-      }
-    }
-    if (merged.changed_items.length > 0) {
-      console.log("");
-      console.log("Changed:");
-      for (const item of merged.changed_items) {
-        const fields = Array.isArray(item.changed_fields) ? item.changed_fields.join(", ") : "?";
-        printEventLine({
-          title: item.title,
-          url: resolveEventUrl(item),
-          start_ts: item.start_ts
-        });
-        console.log(`    (${fields})`);
-      }
-    }
-  }
+  printPromotePersistSection(merged);
 }
 
 console.log("");

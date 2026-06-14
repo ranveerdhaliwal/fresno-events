@@ -4,10 +4,8 @@
 # Prerequisite: pnpm ingest:dev in another terminal.
 #
 # Examples:
-#   pnpm ingest:run --venue=strummers --force
 #   pnpm ingest:run --source=ticketmaster --force
-#   pnpm ingest:run --source=ticketmaster,ai-discovery --force
-#   pnpm ingest:run --all --force
+#   pnpm ingest:run --source=ticketmaster,venunite --force
 
 set -euo pipefail
 
@@ -16,12 +14,11 @@ PORT="${INGEST_PORT:-8788}"
 SOURCE=""
 FORCE="false"
 DRY_RUN="false"
-RESUME_JOBS="false"
 NO_ENRICH="false"
-VENUE=""
+VENUE_FILTER=""
 
 usage() {
-  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [[ $# -gt 0 ]]; do
@@ -33,10 +30,13 @@ while [[ $# -gt 0 ]]; do
     --all) SOURCE="all"; FORCE="true" ;;
     --force) FORCE="true" ;;
     --dry-run) DRY_RUN="true" ;;
-    --resume-jobs) RESUME_JOBS="true" ;;
     --no-enrich) NO_ENRICH="true" ;;
-    --venue=*) VENUE="${1#*=}" ;;
-    --venue) shift; VENUE="${1:-}" ;;
+    --venue-filter=*) VENUE_FILTER="${1#*=}" ;;
+    --venue-filter) shift; VENUE_FILTER="${1:-}" ;;
+    --venue=*|--venue)
+      echo "Use --source=<key> via ingest:promote (not --venue= on ingest:run)." >&2
+      exit 2
+      ;;
     --port=*) PORT="${1#*=}" ;;
     --port) shift; PORT="${1:-8788}" ;;
     -h|--help)
@@ -52,12 +52,8 @@ while [[ $# -gt 0 ]]; do
   shift || true
 done
 
-# shellcheck source=scripts/ingest-lib.sh
-source "$REPO_ROOT/scripts/ingest-lib.sh"
-ingest_apply_venue_source_defaults || exit $?
-
-if [[ -z "$SOURCE" && -z "$VENUE" && "$FORCE" != "true" && "$DRY_RUN" != "true" ]]; then
-  echo "Specify --venue=<key>, --source=<key>, or --all --force (cron-style)." >&2
+if [[ -z "$SOURCE" && "$FORCE" != "true" && "$DRY_RUN" != "true" ]]; then
+  echo "Specify --source=<key> --force (use pnpm ingest:promote for the usual flow)." >&2
   exit 2
 fi
 
@@ -79,20 +75,15 @@ if [[ -z "${ADMIN_REVIEW_TOKEN:-}" ]]; then
   exit 1
 fi
 
-if [[ "$DRY_RUN" == "true" && "$RESUME_JOBS" == "true" ]]; then
-  echo "Cannot combine --dry-run and --resume-jobs." >&2
-  exit 2
-fi
-
-QUERY="force=$FORCE&dry_run=$DRY_RUN&resume_jobs=$RESUME_JOBS"
+QUERY="force=$FORCE&dry_run=$DRY_RUN"
 if [[ "$NO_ENRICH" == "true" ]]; then
   QUERY="${QUERY}&no_enrich=true"
 fi
 if [[ -n "$SOURCE" ]]; then
   QUERY="source=${SOURCE}&$QUERY"
 fi
-if [[ -n "$VENUE" ]]; then
-  QUERY="${QUERY}&venue=${VENUE}"
+if [[ -n "$VENUE_FILTER" ]]; then
+  QUERY="${QUERY}&venue=${VENUE_FILTER}"
 fi
 URL="http://127.0.0.1:${PORT}/trigger?${QUERY}"
 

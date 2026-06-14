@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Deterministic editorial priority pass on pending_review primaries (no LLM).
+# Re-rank display priority on pending candidates and published events (shared rule engine).
 #
 # Examples:
-#   pnpm admin:priority-triage --dry-run
-#   pnpm admin:priority-triage
-#   pnpm admin:priority-triage --source=venunite
+#   pnpm priority:rerank              # dry-run (both tables)
+#   pnpm priority:rerank -- --apply     # write changes
+#   pnpm priority:rerank -- --apply --events-only
 
 set -euo pipefail
 
@@ -22,4 +22,5 @@ if [[ -f "$DEV_VARS" ]]; then
   done < "$DEV_VARS"
 fi
 
-exec node "$REPO_ROOT/scripts/admin-priority-triage.mjs" "$@"
+pnpm --filter @fresno-events/shared build
+exec node "$REPO_ROOT/scripts/priority-rerank.mjs" "$@"
