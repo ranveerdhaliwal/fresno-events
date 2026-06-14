@@ -1,6 +1,8 @@
 import {
   EVENT_PRIORITY_DEFAULT,
   eventCategories,
+  pacificEndOfDay,
+  pacificStartOfDay,
   type Event,
   type EventCategory,
   type EventDetailResponse,
@@ -9,7 +11,8 @@ import {
   type EventListResponse,
   type EventStatus,
   type ImageAsset,
-  type Venue
+  type Venue,
+  type VenueDetailResponse
 } from "@fresno-events/shared";
 
 import type { Env } from "@/env";
@@ -146,11 +149,75 @@ export async function getEventFromSupabase(env: Env, slug: string): Promise<Even
     }
   }
 
+  const dayIso = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date(item.event.startTs));
+
+  const relatedParams = createEventParams({
+    status: `in.(${scheduledStatuses.join(",")})`,
+    id: `neq.${row.id}`,
+    start_ts: `gte.${pacificStartOfDay(dayIso).toISOString()}`,
+    order: "priority.asc,start_ts.asc",
+    limit: "12"
+  });
+  relatedParams.append("start_ts", `lt.${pacificEndOfDay(dayIso).toISOString()}`);
+
+  const relatedRows = await fetchEventRows(url, key, relatedParams);
+  const relatedEvents = relatedRows.map(mapEventRow).slice(0, 8);
+
   return {
     ...item,
     galleryImages,
-    relatedEvents: [],
+    relatedEvents,
     ...(seriesEvents ? { seriesEvents } : {})
+  };
+}
+
+export async function getVenueFromSupabase(env: Env, slug: string): Promise<VenueDetailResponse | null> {
+  const { url, key } = getSupabaseConfig(env);
+  const params = new URLSearchParams({
+    select: "id,slug,name,address,city,neighborhood,lat,lng,capacity,website,phone,socials,hero_image_id,description,primary_category,created_at,updated_at",
+    slug: `eq.${slug}`,
+    limit: "1"
+  });
+
+  const response = await fetch(`${url}/rest/v1/venues?${params}`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new SupabaseEventsError(`Supabase venues query failed with ${response.status}: ${body}`);
+  }
+
+  const rows = (await response.json()) as SupabaseVenueRow[];
+  const [venueRow] = rows;
+  if (!venueRow) {
+    return null;
+  }
+
+  const venue = mapVenue(venueRow);
+  const now = new Date();
+  const eventParams = createEventParams({
+    venue_id: `eq.${venue.id}`,
+    status: `in.(${scheduledStatuses.join(",")})`,
+    start_ts: `gte.${now.toISOString()}`,
+    order: "priority.asc,start_ts.asc",
+    limit: "50"
+  });
+
+  const eventRows = await fetchEventRows(url, key, eventParams);
+
+  return {
+    venue,
+    upcomingEvents: eventRows.map(mapEventRow)
   };
 }
 
@@ -311,6 +378,9 @@ function createEventParams(filters: Record<string, string>) {
       "title",
       "description_html",
       "description_text",
+      "posted_at",
+      "last_verified_at",
+      "source_sync_id",
       "venue_id",
       "start_ts",
       "end_ts",
@@ -338,6 +408,7 @@ function createEventParams(filters: Record<string, string>) {
       "series_id",
       "series_name",
       "lineup",
+      "map_pin_emoji",
       "created_at",
       "updated_at",
       "venue:venues(id,slug,name,address,city,neighborhood,lat,lng,capacity,website,phone,socials,hero_image_id,description,primary_category,created_at,updated_at)",
@@ -445,6 +516,9 @@ function mapEventRow(row: SupabaseEventRow): EventListItem {
     ...(row.source_event_id ? { sourceEventId: row.source_event_id } : {}),
     ...(row.description_html ? { descriptionHtml: row.description_html } : {}),
     ...(row.description_text ? { descriptionText: row.description_text } : {}),
+    ...(row.posted_at ? { postedAt: row.posted_at } : {}),
+    ...(row.last_verified_at ? { lastVerifiedAt: row.last_verified_at } : {}),
+    ...(row.source_sync_id ? { sourceSyncId: row.source_sync_id } : {}),
     ...(row.end_ts ? { endTs: row.end_ts } : {}),
     ...(row.doors_ts ? { doorsTs: row.doors_ts } : {}),
     ...(row.price_min !== null ? { priceMin: toNumber(row.price_min) } : {}),
@@ -461,7 +535,10 @@ function mapEventRow(row: SupabaseEventRow): EventListItem {
     priority: row.priority ?? EVENT_PRIORITY_DEFAULT,
     ...(row.series_id ? { seriesId: row.series_id } : {}),
     ...(row.series_name ? { seriesName: row.series_name } : {}),
-    ...(lineup ? { lineup } : {})
+    ...(lineup ? { lineup } : {}),
+    ...(row.map_pin_emoji != null && row.map_pin_emoji !== ""
+      ? { mapPinEmoji: row.map_pin_emoji }
+      : {})
   };
 
   const venue = mapVenue(row.venue);

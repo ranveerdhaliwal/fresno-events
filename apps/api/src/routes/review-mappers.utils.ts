@@ -55,6 +55,19 @@ export function parseOffset(value: string | undefined) {
   return Math.min(Math.trunc(parsed), 5000);
 }
 
+/** Parse PostgREST `Content-Range` total (e.g. `0-0/279` → 279). */
+export function parseContentRangeTotal(contentRange: string | null): number | null {
+  if (!contentRange) {
+    return null;
+  }
+  const match = /\/(\d+)$/.exec(contentRange.trim());
+  if (!match?.[1]) {
+    return null;
+  }
+  const total = Number(match[1]);
+  return Number.isFinite(total) ? total : null;
+}
+
 export function parseApprovePriority(body: Record<string, unknown>): number {
   const raw = body.priority;
   if (raw === undefined) {

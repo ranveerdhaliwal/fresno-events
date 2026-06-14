@@ -27,7 +27,7 @@ describe("review-priority-triage.rules", () => {
     ).toBe(2);
   });
 
-  it("Fresno Flea Market → P5", () => {
+  it("Fresno Flea Market at Big Fresno Fair → P4", () => {
     expect(
       suggestEditorialPriority(
         row({
@@ -37,6 +37,21 @@ describe("review-priority-triage.rules", () => {
           suggested_priority: 1
         })
       )?.priority
+    ).toBe(4);
+  });
+
+  it("delegates venue defaults (Save Mart Center → P2)", () => {
+    expect(
+      suggestEditorialPriority(
+        row({ title: "Some Touring Band", venue_name: "Save Mart Center", source: "ticketmaster" })
+      )?.priority
+    ).toBe(2);
+  });
+
+  it("delegates recurring demotions (karaoke → P5)", () => {
+    expect(
+      suggestEditorialPriority(row({ title: "Saturday Night Karaoke Party", source: "api:visitfresnocounty" }))
+        ?.priority
     ).toBe(5);
   });
 

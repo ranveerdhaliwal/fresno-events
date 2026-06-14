@@ -2,6 +2,7 @@ import {
   EVENT_PRIORITY_DEFAULT,
   normalizeVenueStreetAddress,
   parseLineup,
+  resolveEndTs,
   type Event,
   type EventCandidate,
   type NormalizedEvent
@@ -26,6 +27,7 @@ import {
   toStringRecord
 } from "@/routes/review-mappers.utils";
 import { supabaseReviewRequest } from "@/routes/review-supabase.utils";
+import { fetchVenueCoordsByAddress, fetchVenueCoordsBySlug } from "@/routes/review-venue-preview.utils";
 import type { SupabaseEventRow, SupabaseEventWithVenueRow, SupabaseVenueRow } from "@/routes/review.types";
 
 export function mapEventRow(row: SupabaseEventRow): Event {
@@ -53,6 +55,9 @@ export function mapEventRow(row: SupabaseEventRow): Event {
     ...(row.source_event_id ? { sourceEventId: row.source_event_id } : {}),
     ...(row.description_html ? { descriptionHtml: row.description_html } : {}),
     ...(row.description_text ? { descriptionText: row.description_text } : {}),
+    ...(row.posted_at ? { postedAt: row.posted_at } : {}),
+    ...(row.last_verified_at ? { lastVerifiedAt: row.last_verified_at } : {}),
+    ...(row.source_sync_id ? { sourceSyncId: row.source_sync_id } : {}),
     ...(row.end_ts ? { endTs: row.end_ts } : {}),
     ...(row.price_min !== null ? { priceMin: toNumber(row.price_min) } : {}),
     ...(row.price_max !== null ? { priceMax: toNumber(row.price_max) } : {}),
@@ -64,24 +69,9 @@ export function mapEventRow(row: SupabaseEventRow): Event {
     ...(row.last_seen_at ? { lastSeenAt: row.last_seen_at } : {}),
     ...(row.series_id ? { seriesId: row.series_id } : {}),
     ...(row.series_name ? { seriesName: row.series_name } : {}),
-    ...(lineup ? { lineup } : {})
+    ...(lineup ? { lineup } : {}),
+    ...(row.map_pin_emoji != null ? { mapPinEmoji: row.map_pin_emoji } : {})
   };
-}
-
-async function fetchVenueCoordsBySlug(
-  env: Env,
-  slug: string
-): Promise<{ lat: number | null; lng: number | null } | null> {
-  const params = new URLSearchParams({
-    select: "lat,lng",
-    slug: `eq.${slug}`,
-    limit: "1"
-  });
-  const rows = await supabaseReviewRequest<Array<{ lat: number | null; lng: number | null }>>(
-    env,
-    `/rest/v1/venues?${params}`
-  );
-  return rows[0] ?? null;
 }
 
 export async function upsertVenue(env: Env, event: NormalizedEvent) {
@@ -107,6 +97,14 @@ export async function upsertVenue(env: Env, event: NormalizedEvent) {
     if (existing?.lat != null && existing?.lng != null) {
       lat = existing.lat;
       lng = existing.lng;
+    }
+  }
+
+  if ((lat === undefined || lng === undefined) && address) {
+    const byAddress = await fetchVenueCoordsByAddress(env, address, city);
+    if (byAddress) {
+      lat = byAddress.lat;
+      lng = byAddress.lng;
     }
   }
 
@@ -313,7 +311,9 @@ async function insertApprovedEventWithSlug(
         description_text: normalized.descriptionText ?? null,
         venue_id: venueId,
         start_ts: normalized.startTs,
-        end_ts: normalized.endTs ?? null,
+        end_ts: resolveEndTs(normalized.startTs, normalized.endTs),
+        last_verified_at: now,
+        source_sync_id: normalized.sourceEventId ?? null,
         timezone: normalized.timezone ?? "America/Los_Angeles",
         category: normalized.category ?? "community",
         subcategories: normalized.subcategories ?? [],
@@ -336,6 +336,7 @@ async function insertApprovedEventWithSlug(
         series_id: normalized.seriesId ?? null,
         series_name: normalized.seriesName ?? null,
         lineup: normalized.lineup ?? null,
+        map_pin_emoji: normalized.mapPinEmoji ?? null,
         updated_at: now
       })
     }
@@ -380,12 +381,15 @@ export async function patchApprovedEvent(
       description_text: normalized.descriptionText ?? null,
       venue_id: venueId,
       start_ts: normalized.startTs,
-      end_ts: normalized.endTs ?? null,
+      end_ts: resolveEndTs(normalized.startTs, normalized.endTs),
+      last_verified_at: now,
+      source_sync_id: normalized.sourceEventId ?? null,
       ticket_url: normalized.ticketUrl ?? null,
       external_url: normalized.externalUrl ?? candidate.sourceUrl ?? null,
       hero_image_id: heroImageId,
       priority,
       occurrence_id: candidate.occurrenceId,
+      map_pin_emoji: normalized.mapPinEmoji ?? null,
       last_seen_at: now,
       updated_at: now
     })
@@ -457,7 +461,9 @@ export async function getPublishedEventForReview(env: Env, eventId: string) {
       category: row.category,
       ...(row.venue?.name ? { venueName: row.venue.name } : {}),
       ...(row.venue?.city ? { venueCity: row.venue.city } : {}),
-      ...(row.venue?.address ? { venueAddress: row.venue.address } : {})
+      ...(row.venue?.address ? { venueAddress: row.venue.address } : {}),
+      ...(row.price_min !== null ? { priceMin: toNumber(row.price_min) } : {}),
+      ...(row.price_max !== null ? { priceMax: toNumber(row.price_max) } : {})
     }
   };
 }

@@ -4,6 +4,7 @@ import {
   type Event,
   type EventCandidateDetailResponse,
   type EventCandidateListResponse,
+  type EventCandidateTabCounts,
   type CandidateBulkApproveResponse,
   type CandidateBulkApproveChangesResponse,
   type CandidateBulkDeleteResponse,
@@ -11,7 +12,7 @@ import {
   type CandidateBulkRejectResponse,
   type ReviewDecisionResponse,
   type ReviewOccurrenceRelinkOpsResponse,
-  type ReviewPriorityTriageOpsResponse,
+  type ReviewPriorityRerankOpsResponse,
   type ReviewQueueAuditResponse,
   type ReviewVenueAddressBackfillOpsResponse,
   type ReviewVenueGeocodeOpsResponse
@@ -31,6 +32,7 @@ import {
   deleteCandidates,
   bulkRejectCandidates,
   bulkUpdateSuggestedPriority,
+  countCandidateTabTotals,
   fetchCandidatesByOccurrenceId,
   getCandidate,
   listAllCandidatesByStatus,
@@ -53,6 +55,7 @@ import {
   toCandidateStatus
 } from "@/routes/review-mappers.utils";
 import { toLinkedCandidate } from "@/routes/review-occurrence.utils";
+import { resolvePublishVenuePreview } from "@/routes/review-venue-preview.utils";
 import {
   linkCandidatesAsSeries,
   resolveSeriesSiblingsForCandidate,
@@ -74,8 +77,9 @@ import {
 import { getPublishedEventForReview } from "@/routes/review-event.service";
 import { geocodeAddress } from "@/lib/geocode";
 import { runOccurrenceRelinkOps, runVenueAddressBackfillOps } from "@/routes/review-ops.service";
-import { runPriorityTriageOps } from "@/routes/review-priority-triage.service";
+import { runPriorityRerankOps } from "@/routes/review-priority-rerank.service";
 import { runVenueGeocodeOps } from "@/routes/review-venue-geocode.service";
+import { stream } from "hono/streaming";
 import { runPreApproveAudit } from "@/routes/review-queue-audit.service";
 import { supabaseReviewRequest } from "@/routes/review-supabase.utils";
 import type { SupabaseCandidateRow } from "@/routes/review.types";
@@ -102,7 +106,7 @@ reviewRoute
     const params = new URLSearchParams({
       select: candidateSelect,
       status: `eq.${status}`,
-      order: "created_at.desc",
+      order: status === "approved" || status === "rejected" ? "reviewed_at.desc" : "created_at.desc",
       limit: String(limit),
       offset: String(offset)
     });
@@ -133,6 +137,14 @@ reviewRoute
       return handleReviewError(c, error, "Pre-approve audit could not be run.");
     }
   })
+  .get("/candidates/counts", async (c) => {
+    try {
+      const counts = await countCandidateTabTotals(c.env);
+      return ok<EventCandidateTabCounts>(c, counts);
+    } catch (error) {
+      return handleReviewError(c, error, "Review queue counts could not be loaded.");
+    }
+  })
   .post("/ops/occurrence-relink", async (c) => {
     const dryRun = c.req.query("dry_run") === "true";
     try {
@@ -152,23 +164,43 @@ reviewRoute
       return handleReviewError(c, error, "Venue address cleanup could not be run.");
     }
   })
-  .post("/ops/priority-triage", async (c) => {
+  .post("/ops/priority-rerank", async (c) => {
     const dryRun = c.req.query("dry_run") === "true";
     const source = c.req.query("source") ?? undefined;
+    const scope = c.req.query("scope");
     try {
-      const result = await runPriorityTriageOps(c.env, {
+      const result = await runPriorityRerankOps(c.env, {
         dryRun,
-        ...(source ? { sourceFilter: source } : {})
+        ...(source ? { sourceFilter: source } : {}),
+        ...(scope === "candidates" ? { candidatesOnly: true } : {}),
+        ...(scope === "events" ? { eventsOnly: true } : {})
       });
-      return ok<ReviewPriorityTriageOpsResponse>(c, result);
+      return ok<ReviewPriorityRerankOpsResponse>(c, result);
     } catch (error) {
-      return handleReviewError(c, error, "Priority triage could not be run.");
+      return handleReviewError(c, error, "Priority rerank could not be run.");
     }
   })
   .post("/ops/venue-geocode", async (c) => {
     const dryRun = c.req.query("dry_run") === "true";
+    const useStream = c.req.query("stream") === "true";
+    const singleBatch = c.req.query("single_batch") === "true";
+
     try {
-      const result = await runVenueGeocodeOps(c.env, dryRun);
+      if (!dryRun && useStream) {
+        return stream(c, async (streamWriter) => {
+          const result = await runVenueGeocodeOps(c.env, false, {
+            singleBatch,
+            onBatch: async (progress) => {
+              await streamWriter.write(
+                `${JSON.stringify({ type: "batch", ...progress })}\n`
+              );
+            }
+          });
+          await streamWriter.write(`${JSON.stringify({ type: "complete", ...result })}\n`);
+        });
+      }
+
+      const result = await runVenueGeocodeOps(c.env, dryRun, { singleBatch });
       return ok<ReviewVenueGeocodeOpsResponse>(c, result);
     } catch (error) {
       return handleReviewError(c, error, "Venue geocode could not be run.");
@@ -214,16 +246,21 @@ reviewRoute
         candidate.id,
         candidate.occurrenceKey
       );
-      const linkedCandidates = siblings.map(toLinkedCandidate);
+      const linkedCandidates = siblings
+        .filter((row) => row.source !== candidate.source)
+        .filter((row) => row.status !== "duplicate")
+        .map(toLinkedCandidate);
 
       const seriesSiblings = await resolveSeriesSiblingsForCandidate(c.env, candidate);
+      const publishVenuePreview = await resolvePublishVenuePreview(c.env, candidate.normalizedEvent);
 
       return ok<EventCandidateDetailResponse>(c, {
         candidate,
         ...(linkedCandidates.length > 0 ? { linkedCandidates } : {}),
         ...(seriesSiblings.length > 0 ? { seriesSiblings } : {}),
         ...(publishedEvent ? { publishedEvent } : {}),
-        ...(contentDiff ? { contentDiff } : {})
+        ...(contentDiff ? { contentDiff } : {}),
+        ...(publishVenuePreview ? { publishVenuePreview } : {})
       });
     } catch (error) {
       return handleReviewError(c, error, "Review candidate could not be loaded.");

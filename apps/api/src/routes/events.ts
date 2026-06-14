@@ -1,8 +1,14 @@
 import { Hono } from "hono";
 
-import type { HomepageCurationResponse } from "@fresno-events/shared";
+import type {
+  CalendarMonthResponse,
+  EventSectionsResponse,
+  HomepageCurationResponse
+} from "@fresno-events/shared";
 
 import type { Env } from "@/env";
+import { parseCalendarMonthQuery, resolveCalendarMonth } from "@/lib/event-calendar";
+import { resolveEventSections } from "@/lib/event-sections";
 import { resolveHomepageCuration, HomepageCurationError } from "@/lib/homepage-curation";
 import { getEventFromSupabase, listEventsFromSupabase, SupabaseEventsError } from "@/lib/supabase-events";
 import { fail, ok } from "@/lib/responses";
@@ -29,6 +35,31 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
         return fail(c, "events_unavailable", error.message, error.status === 503 ? 503 : 502);
       }
       return fail(c, "events_unavailable", "The homepage curation could not be loaded.", 502);
+    }
+  })
+  .get("/sections", async (c) => {
+    try {
+      return ok<EventSectionsResponse>(c, await resolveEventSections(c.env));
+    } catch (error) {
+      if (error instanceof SupabaseEventsError) {
+        return fail(c, "events_unavailable", error.message, error.status === 503 ? 503 : 502);
+      }
+      return fail(c, "events_unavailable", "Event sections could not be loaded.", 502);
+    }
+  })
+  .get("/calendar", async (c) => {
+    const parsed = parseCalendarMonthQuery(c.req.query("year"), c.req.query("month"));
+    if (!parsed) {
+      return fail(c, "invalid_month", "year and month must be valid integers.", 400);
+    }
+
+    try {
+      return ok<CalendarMonthResponse>(c, await resolveCalendarMonth(c.env, parsed.year, parsed.month));
+    } catch (error) {
+      if (error instanceof SupabaseEventsError) {
+        return fail(c, "events_unavailable", error.message, error.status === 503 ? 503 : 502);
+      }
+      return fail(c, "events_unavailable", "Calendar data could not be loaded.", 502);
     }
   })
   .get("/", async (c) => {

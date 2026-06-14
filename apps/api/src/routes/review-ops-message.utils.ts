@@ -1,9 +1,18 @@
 import type {
+  ReviewOccurrenceRelinkLinkExample,
   ReviewOccurrenceRelinkOpsResponse,
   ReviewOccurrenceRelinkSummary,
   ReviewVenueAddressBackfillOpsResponse,
   ReviewVenueAddressBackfillSummary
 } from "@fresno-events/shared";
+
+interface IngestRelinkLinkExample {
+  title?: string;
+  primary_source?: string;
+  linked_sources?: string[];
+  cross_source?: boolean;
+  would_change?: boolean;
+}
 
 interface IngestRelinkSummary {
   dry_run?: boolean;
@@ -22,6 +31,9 @@ interface IngestRelinkSummary {
   occurrence_key_changed?: number;
   occurrence_id_changed?: number;
   priority_inherited?: number;
+  link_groups?: number;
+  link_groups_changed?: number;
+  link_examples?: IngestRelinkLinkExample[];
 }
 
 interface IngestAddressBackfillSummary {
@@ -34,6 +46,27 @@ interface IngestAddressBackfillSummary {
 
 function num(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function mapLinkExample(raw: IngestRelinkLinkExample): ReviewOccurrenceRelinkLinkExample | null {
+  const title = raw.title?.trim();
+  const primarySource = raw.primary_source?.trim();
+  if (!title || !primarySource) {
+    return null;
+  }
+
+  const linkedSources = (raw.linked_sources ?? []).map((source) => source.trim()).filter(Boolean);
+  if (linkedSources.length === 0) {
+    return null;
+  }
+
+  return {
+    title,
+    primarySource,
+    linkedSources,
+    crossSource: raw.cross_source === true,
+    wouldChange: raw.would_change === true
+  };
 }
 
 export function mapOccurrenceRelinkSummary(raw: IngestRelinkSummary): ReviewOccurrenceRelinkSummary {
@@ -52,33 +85,60 @@ export function mapOccurrenceRelinkSummary(raw: IngestRelinkSummary): ReviewOccu
     demotedToDuplicate: num(raw.demoted_to_duplicate),
     occurrenceKeyChanged: num(raw.occurrence_key_changed),
     occurrenceIdChanged: num(raw.occurrence_id_changed),
-    priorityInherited: num(raw.priority_inherited)
+    priorityInherited: num(raw.priority_inherited),
+    linkGroups: num(raw.link_groups),
+    linkGroupsChanged: num(raw.link_groups_changed),
+    linkExamples: (raw.link_examples ?? [])
+      .map(mapLinkExample)
+      .filter((example): example is ReviewOccurrenceRelinkLinkExample => example !== null)
   };
+}
+
+function formatLinkExample(example: ReviewOccurrenceRelinkLinkExample): string {
+  const linked = example.linkedSources.join(", ");
+  const tag = example.crossSource ? "cross-source" : "same source";
+  return `${example.title} — ${example.primarySource} + ${linked} (${tag})`;
 }
 
 export function buildOccurrenceRelinkMessage(
   dryRun: boolean,
   summary: ReviewOccurrenceRelinkSummary
 ): string {
-  const mode = dryRun ? "Check only — no database writes" : "Applied";
-  const lines = [
-    `Occurrence relink (${mode})`,
-    `${summary.candidates} candidates (${summary.relinkable} relinkable)`,
-    `${summary.groups} show nights (${summary.multiSourceGroups} cross-source)`,
-    dryRun
-      ? `${summary.changed} row(s) would update · ${summary.unchanged} already correct`
-      : `${summary.changed} row(s) updated · ${summary.applied} patches applied · ${summary.errors} error(s)`,
-    `Duplicate links: ${summary.linkedAsDuplicate} linked · ${summary.promotedFromDuplicate} promoted · ${summary.demotedToDuplicate} demoted`
-  ];
-  if (summary.occurrenceKeyChanged > 0 || summary.occurrenceIdChanged > 0) {
-    lines.push(
-      `Key migrations: ${summary.occurrenceKeyChanged} occurrence_key · ${summary.occurrenceIdChanged} occurrence_id`
-    );
+  if (dryRun) {
+    if (summary.changed === 0) {
+      return "Nothing to fix — duplicate links already match current rules.";
+    }
+
+    const crossSourceNote =
+      summary.linkGroupsChanged > 0 && summary.multiSourceGroups > 0
+        ? `, including ${summary.multiSourceGroups} cross-source`
+        : "";
+    const lines = [
+      `Would update ${summary.changed} row(s) across ${summary.linkGroupsChanged} link group(s)${crossSourceNote}.`
+    ];
+
+    const linkExamples = summary.linkExamples ?? [];
+    if (linkExamples.length > 0) {
+      lines.push("", "Examples:");
+      for (const example of linkExamples) {
+        lines.push(`• ${formatLinkExample(example)}`);
+      }
+      const shownChanged = linkExamples.filter((example) => example.wouldChange).length;
+      const remaining = summary.linkGroupsChanged - shownChanged;
+      if (remaining > 0) {
+        lines.push(`• …and ${remaining} more link group(s)`);
+      }
+    }
+
+    lines.push("", "Click Run to apply.");
+    return lines.join("\n");
   }
-  if (dryRun && summary.changed === 0) {
-    lines.push("Nothing to fix — all candidates match current matching rules.");
-  } else if (dryRun) {
-    lines.push("Run without check mode to apply these updates.");
+
+  const lines = [
+    `Updated ${summary.applied} row(s) across ${summary.linkGroupsChanged || summary.linkGroups} link group(s).`
+  ];
+  if (summary.errors > 0) {
+    lines.push(`${summary.errors} error(s).`);
   }
   return lines.join("\n");
 }

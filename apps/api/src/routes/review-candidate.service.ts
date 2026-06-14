@@ -5,6 +5,7 @@ import type {
   CandidateDetailStatus,
   EventCandidate,
   EventCandidateStatus,
+  EventCandidateTabCounts,
   NormalizedEvent
 } from "@fresno-events/shared";
 
@@ -13,8 +14,8 @@ import { toEventSource } from "@/lib/event-source";
 import { clampSuggestedPriorityForOrganicEvent } from "@fresno-events/shared";
 import { partitionCandidatesForDelete } from "@/routes/review-delete.utils";
 import { candidateSelect } from "@/routes/review.constants";
-import { toCandidateStatus, toRecord } from "@/routes/review-mappers.utils";
-import { supabaseReviewRequest } from "@/routes/review-supabase.utils";
+import { parseContentRangeTotal, toCandidateStatus, toRecord } from "@/routes/review-mappers.utils";
+import { getSupabaseServiceConfigOrThrow, supabaseReviewRequest } from "@/routes/review-supabase.utils";
 import type { CandidatePatch, SupabaseCandidateRow } from "@/routes/review.types";
 
 function toDetailStatus(raw: string): CandidateDetailStatus {
@@ -168,6 +169,48 @@ export async function fetchCandidatesBySeriesId(
   return rows.map(mapCandidateRow);
 }
 
+const REVIEW_TAB_COUNT_STATUSES = [
+  "pending_review",
+  "needs_changes",
+  "approved",
+  "rejected"
+] as const satisfies readonly EventCandidateStatus[];
+
+export async function countCandidatesByStatus(env: Env, status: EventCandidateStatus): Promise<number> {
+  const params = new URLSearchParams({
+    select: "id",
+    status: `eq.${status}`,
+    limit: "0"
+  });
+  if (status === "pending_review") {
+    params.set("canonical_candidate_id", "is.null");
+  }
+
+  const { url, key } = getSupabaseServiceConfigOrThrow(env);
+  const response = await fetch(`${url}/rest/v1/event_candidates?${params}`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "count=exact"
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Supabase count failed with ${response.status}: ${body}`);
+  }
+
+  const total = parseContentRangeTotal(response.headers.get("content-range"));
+  return total ?? 0;
+}
+
+export async function countCandidateTabTotals(env: Env): Promise<EventCandidateTabCounts> {
+  const [pending_review, needs_changes, approved, rejected] = await Promise.all(
+    REVIEW_TAB_COUNT_STATUSES.map((status) => countCandidatesByStatus(env, status))
+  );
+  return { pending_review, needs_changes, approved, rejected };
+}
+
 export async function listAllCandidatesByStatus(
   env: Env,
   status: EventCandidateStatus,
@@ -181,7 +224,7 @@ export async function listAllCandidatesByStatus(
     const params = new URLSearchParams({
       select: candidateSelect,
       status: `eq.${status}`,
-      order: "created_at.asc",
+      order: status === "approved" || status === "rejected" ? "reviewed_at.desc" : "created_at.asc",
       limit: String(pageSize),
       offset: String(offset)
     });

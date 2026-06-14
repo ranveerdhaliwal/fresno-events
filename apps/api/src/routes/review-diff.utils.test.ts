@@ -47,4 +47,23 @@ describe("buildContentDiff", () => {
     expect(diff?.entries[0]?.before).toBe("Old title");
     expect(diff?.entries[0]?.after).toBe("Updated title");
   });
+
+  it("includes price changes", () => {
+    const diff = buildContentDiff(
+      {
+        title: proposed.title,
+        startTs: proposed.startTs,
+        category: proposed.category ?? "other",
+        venueName: proposed.venueName,
+        descriptionText: proposed.descriptionText,
+        priceMin: 20,
+        priceMax: 40
+      },
+      { ...proposed, priceMin: 45, priceMax: 65 }
+    );
+
+    expect(diff?.changedFields).toEqual(["priceMin", "priceMax"]);
+    expect(diff?.entries[0]?.before).toBe("20");
+    expect(diff?.entries[0]?.after).toBe("45");
+  });
 });

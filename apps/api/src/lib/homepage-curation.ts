@@ -1,11 +1,12 @@
-import type {
-  EventListItem,
-  EventStatus,
-  HomepageCurationResponse,
-  HomepageSection,
-  HomepageSlotItem,
-  HomepageSlotRow,
-  HomepageSlotsResponse
+import {
+  resolvePacificDateWindow,
+  type EventListItem,
+  type EventStatus,
+  type HomepageCurationResponse,
+  type HomepageSection,
+  type HomepageSlotItem,
+  type HomepageSlotRow,
+  type HomepageSlotsResponse
 } from "@fresno-events/shared";
 
 import type { Env } from "@/env";
@@ -74,7 +75,8 @@ async function resolveSection(
   section: HomepageSection,
   pins: Map<string, string | null>,
   placedIds: Set<string>,
-  from: Date
+  from: Date,
+  until: Date
 ): Promise<HomepageSlotItem[]> {
   const items: HomepageSlotItem[] = [];
   const pinnedIds: Array<string | null> = [];
@@ -99,7 +101,7 @@ async function resolveSection(
   }
 
   while (items.length < SLOTS_PER_SECTION) {
-    const auto = await nextAutoEvent(env, from, placedIds);
+    const auto = await nextAutoEvent(env, from, until, placedIds);
     if (!auto) {
       break;
     }
@@ -113,9 +115,10 @@ async function resolveSection(
 async function nextAutoEvent(
   env: Env,
   from: Date,
+  until: Date,
   exclude: Set<string>
 ): Promise<EventListItem | null> {
-  const pool = await listEventsFromSupabase(env, { from, limit: 50 });
+  const pool = await listEventsFromSupabase(env, { from, until, limit: 50 });
   for (const item of pool.items) {
     if (!exclude.has(item.event.id) && isEventEligibleForHomepage(item.event)) {
       return item;
@@ -124,19 +127,30 @@ async function nextAutoEvent(
   return null;
 }
 
+async function resolveBiggestMonth(env: Env, now: Date): Promise<EventListItem[]> {
+  const monthWindow = resolvePacificDateWindow("thisMonth", now);
+  const pool = await listEventsFromSupabase(env, {
+    from: monthWindow.from,
+    until: monthWindow.until,
+    limit: 50
+  });
+  return pool.items.slice(0, 10);
+}
+
 export async function resolveHomepageCuration(env: Env): Promise<HomepageCurationResponse> {
   const now = new Date();
   const from = homepageListFrom(now);
+  const weekWindow = resolvePacificDateWindow("thisWeek", now);
   const rows = await loadSlotRows(env);
   const pins = slotMap(rows);
   const placedIds = new Set<string>();
 
-  const featured = await resolveSection(env, "featured", pins, placedIds, from);
-  const popular = await resolveSection(env, "popular", pins, placedIds, from);
+  const featured = await resolveSection(env, "featured", pins, placedIds, from, weekWindow.until);
+  const biggestMonth = await resolveBiggestMonth(env, now);
 
   return {
     featured,
-    popular,
+    biggestMonth,
     generatedAt: now.toISOString()
   };
 }

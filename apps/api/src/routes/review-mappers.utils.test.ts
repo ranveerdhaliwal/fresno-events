@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEventSlug } from "@/routes/review-mappers.utils";
+import { buildEventSlug, parseContentRangeTotal } from "@/routes/review-mappers.utils";
 
 const FASHION_FAIR_TITLE =
   "Fashion Fair Mall Free Kids Club, hosted by Miss Mia | Presented by Central California Parent";
@@ -44,5 +44,13 @@ describe("buildEventSlug", () => {
     expect(matinee.endsWith("-2026-07-05-1300")).toBe(true);
     expect(evening.endsWith("-2026-07-05-1700")).toBe(true);
     expect(matinee).not.toBe(evening);
+  });
+});
+
+describe("parseContentRangeTotal", () => {
+  it("parses PostgREST content-range totals", () => {
+    expect(parseContentRangeTotal("0-0/279")).toBe(279);
+    expect(parseContentRangeTotal("0-49/187")).toBe(187);
+    expect(parseContentRangeTotal(null)).toBeNull();
   });
 });

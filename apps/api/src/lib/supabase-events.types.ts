@@ -7,6 +7,9 @@ export interface SupabaseEventRow {
   title: string;
   description_html: string | null;
   description_text: string | null;
+  posted_at: string | null;
+  last_verified_at: string | null;
+  source_sync_id: string | null;
   venue_id: string;
   start_ts: string;
   end_ts: string | null;
@@ -34,6 +37,7 @@ export interface SupabaseEventRow {
   series_id: string | null;
   series_name: string | null;
   lineup: unknown;
+  map_pin_emoji: string | null;
   created_at: string;
   updated_at: string;
   venue: SupabaseVenueRow | null;

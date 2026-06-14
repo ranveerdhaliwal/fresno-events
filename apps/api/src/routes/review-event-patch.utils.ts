@@ -2,6 +2,7 @@ import {
   EVENT_PRIORITY_DEFAULT,
   EVENT_PRIORITY_MAX,
   EVENT_PRIORITY_MIN,
+  resolveEndTs,
   type Event,
   type EventCategory,
   type ImageAsset,
@@ -13,6 +14,7 @@ import type { Env } from "@/env";
 import { toEventSource } from "@/lib/event-source";
 import { mirrorImageToR2 } from "@/lib/images";
 import { mergeNormalizedEvent, toEventCategory } from "@/routes/review-mappers.utils";
+import { updateCandidate } from "@/routes/review-candidate.service";
 import { upsertVenue } from "@/routes/review-event.service";
 import { supabaseReviewRequest } from "@/routes/review-supabase.utils";
 import { ReviewRouteError } from "@/routes/review.errors";
@@ -121,7 +123,9 @@ export async function patchPublishedEventById(
       description_text: normalized.descriptionText ?? null,
       venue_id: venue.id,
       start_ts: normalized.startTs,
-      end_ts: normalized.endTs ?? null,
+      end_ts: resolveEndTs(normalized.startTs, normalized.endTs),
+      last_verified_at: now,
+      map_pin_emoji: normalized.mapPinEmoji ?? null,
       timezone: normalized.timezone ?? "America/Los_Angeles",
       category: normalized.category ?? "community",
       price_min: normalized.priceMin ?? null,
@@ -139,7 +143,36 @@ export async function patchPublishedEventById(
     throw new ReviewRouteError("Event patch did not return a row.");
   }
 
+  await syncLinkedCandidatesNormalizedEvent(env, eventId, options.eventOverride);
+
   return mapEventRow(row);
+}
+
+async function syncLinkedCandidatesNormalizedEvent(
+  env: Env,
+  eventId: string,
+  eventOverride: unknown
+): Promise<void> {
+  if (!eventOverride || typeof eventOverride !== "object" || Array.isArray(eventOverride)) {
+    return;
+  }
+
+  const params = new URLSearchParams({
+    select: "id,normalized_event",
+    matched_event_id: `eq.${eventId}`
+  });
+  const rows = await supabaseReviewRequest<Array<{ id: string; normalized_event: NormalizedEvent }>>(
+    env,
+    `/rest/v1/event_candidates?${params}`
+  );
+
+  await Promise.all(
+    rows.map((linked) =>
+      updateCandidate(env, linked.id, {
+        normalized_event: mergeNormalizedEvent(linked.normalized_event, eventOverride)
+      })
+    )
+  );
 }
 
 async function fetchPublishedEventRow(env: Env, eventId: string) {

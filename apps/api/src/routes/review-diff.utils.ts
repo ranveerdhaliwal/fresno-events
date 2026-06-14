@@ -10,7 +10,9 @@ const DIFF_FIELD_LABELS: Record<ContentDiffField, string> = {
   descriptionText: "Description",
   ticketUrl: "Ticket URL",
   externalUrl: "External URL",
-  category: "Category"
+  category: "Category",
+  priceMin: "Price min",
+  priceMax: "Price max"
 };
 
 const DIFF_FIELDS: ContentDiffField[] = [
@@ -23,7 +25,9 @@ const DIFF_FIELDS: ContentDiffField[] = [
   "descriptionText",
   "ticketUrl",
   "externalUrl",
-  "category"
+  "category",
+  "priceMin",
+  "priceMax"
 ];
 
 export interface PublishedDiffSource {
@@ -37,6 +41,8 @@ export interface PublishedDiffSource {
   venueName?: string;
   venueCity?: string;
   venueAddress?: string;
+  priceMin?: number;
+  priceMax?: number;
 }
 
 function normalize(value: string | null | undefined): string | null {
@@ -45,6 +51,13 @@ function normalize(value: string | null | undefined): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizePrice(value: number | null | undefined): string | null {
+  if (value === undefined || value === null || !Number.isFinite(value)) {
+    return null;
+  }
+  return String(value);
 }
 
 export function publishedToDiffSlice(source: PublishedDiffSource): Record<ContentDiffField, string | null> {
@@ -58,7 +71,9 @@ export function publishedToDiffSlice(source: PublishedDiffSource): Record<Conten
     descriptionText: normalize(source.descriptionText),
     ticketUrl: normalize(source.ticketUrl),
     externalUrl: normalize(source.externalUrl),
-    category: normalize(source.category)
+    category: normalize(source.category),
+    priceMin: normalizePrice(source.priceMin),
+    priceMax: normalizePrice(source.priceMax)
   };
 }
 
@@ -73,7 +88,9 @@ export function normalizedToDiffSlice(event: NormalizedEvent): Record<ContentDif
     descriptionText: normalize(event.descriptionText),
     ticketUrl: normalize(event.ticketUrl),
     externalUrl: normalize(event.externalUrl),
-    category: normalize(event.category)
+    category: normalize(event.category),
+    priceMin: normalizePrice(event.priceMin),
+    priceMax: normalizePrice(event.priceMax)
   };
 }
 

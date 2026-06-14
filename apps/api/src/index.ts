@@ -4,6 +4,7 @@ import type { Env } from "@/env";
 import { ok } from "@/lib/responses";
 import { pacificRequestLogger } from "@/lib/structured-log";
 import { artistsRoute } from "@/routes/artists";
+import { contextRoute } from "@/routes/context";
 import { eventsRoute } from "@/routes/events";
 import { imagesRoute } from "@/routes/images";
 import { ogRoute } from "@/routes/og";
@@ -77,6 +78,7 @@ app.get("/health", (c) =>
 );
 
 app.route("/events", eventsRoute);
+app.route("/context", contextRoute);
 app.route("/venues", venuesRoute);
 app.route("/artists", artistsRoute);
 app.route("/search", searchRoute);

@@ -8,17 +8,38 @@ import {
 describe("review-ops-message.utils", () => {
   it("maps relink summary for dry run", () => {
     const response = buildOccurrenceRelinkOpsResponse(true, {
-      candidates: 100,
-      relinkable: 95,
       changed: 12,
-      unchanged: 83,
-      multi_source_groups: 8
+      link_groups_changed: 8,
+      multi_source_groups: 3,
+      link_examples: [
+        {
+          title: "Miss California 2026",
+          primary_source: "ticketmaster",
+          linked_sources: ["visitfresnocounty", "events.fresnoconventioncenter.com"],
+          cross_source: true,
+          would_change: true
+        }
+      ]
     });
 
     expect(response.summary.changed).toBe(12);
+    expect(response.summary.linkGroupsChanged).toBe(8);
     expect(response.dryRun).toBe(true);
-    expect(response.message).toContain("Check only");
-    expect(response.message).toContain("12 row(s) would update");
+    expect(response.message).toContain("Would update 12 row(s)");
+    expect(response.message).toContain("8 link group(s)");
+    expect(response.message).toContain("Miss California 2026");
+    expect(response.message).toContain("Click Run to apply.");
+  });
+
+  it("defaults missing link example fields", () => {
+    const response = buildOccurrenceRelinkOpsResponse(true, {
+      changed: 2,
+      link_groups_changed: 1
+    });
+
+    expect(response.summary.linkExamples).toEqual([]);
+    expect(response.summary.linkGroupsChanged).toBe(1);
+    expect(response.message).toContain("Would update 2 row(s)");
   });
 
   it("maps address backfill summary", () => {

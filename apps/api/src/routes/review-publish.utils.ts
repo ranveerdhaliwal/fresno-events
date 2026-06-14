@@ -121,7 +121,7 @@ export async function approveCandidateCore(
     candidate.occurrenceKey
   );
 
-  const { event } = await publishCandidateToEvent(env, candidate, {
+  const { event, normalized } = await publishCandidateToEvent(env, candidate, {
     eventOverride: options.eventOverride,
     priority,
     reviewedBy: options.reviewedBy ?? "admin",
@@ -133,7 +133,8 @@ export async function approveCandidateCore(
     review_notes: options.notes ?? candidate.reviewNotes ?? null,
     reviewed_by: options.reviewedBy ?? "admin",
     reviewed_at: new Date().toISOString(),
-    matched_event_id: event.id
+    matched_event_id: event.id,
+    normalized_event: normalized
   });
 
   await linkOccurrenceSiblings(env, candidate.occurrenceId, event.id, candidate.id);
@@ -171,7 +172,7 @@ export async function approveChangesCore(
       ? options.priority
       : (published.event.priority ?? EVENT_PRIORITY_DEFAULT);
 
-  const { event } = await publishCandidateToEvent(env, candidate, {
+  const { event, normalized } = await publishCandidateToEvent(env, candidate, {
     eventOverride: options.eventOverride,
     priority,
     reviewedBy: options.reviewedBy ?? "admin",
@@ -183,7 +184,8 @@ export async function approveChangesCore(
     review_notes: options.notes ?? candidate.reviewNotes ?? null,
     reviewed_by: options.reviewedBy ?? "admin",
     reviewed_at: new Date().toISOString(),
-    matched_event_id: event.id
+    matched_event_id: event.id,
+    normalized_event: normalized
   });
 
   return { candidate: updated ?? candidate, event };
