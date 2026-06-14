@@ -6,7 +6,19 @@ import {
 } from "@fresno-events/shared";
 
 import configJson from "./venunite.config.json";
-import type { VenuniteConfig, VenuniteEvent, VenuniteResponse, VenuniteVenueDetail } from "./venunite.types";
+import {
+  buildVenuniteTags,
+  detailVenueToVenueDetail,
+  mergeVenuniteDetailFields,
+  resolveVenuniteDescriptionText
+} from "./venunite-detail.utils";
+import type {
+  VenuniteConfig,
+  VenuniteEvent,
+  VenuniteEventDetail,
+  VenuniteResponse,
+  VenuniteVenueDetail
+} from "./venunite.types";
 import { VenuniteResponseSchema } from "./venunite.types";
 
 const VENUNITE_API = "https://venunite.com/api/events";
@@ -15,6 +27,23 @@ export const venuniteConfig = configJson as VenuniteConfig;
 
 export function shouldSkipModule(sourceModule: string, skipModules: readonly string[]): boolean {
   return skipModules.includes(sourceModule);
+}
+
+export function shouldSkipVenue(
+  event: VenuniteEvent,
+  cfg: Pick<VenuniteConfig, "skipVenueSlugs" | "skipVenueNameIncludes"> = venuniteConfig
+): boolean {
+  const slug = event.venue?.slug?.trim().toLowerCase();
+  if (slug && (cfg.skipVenueSlugs ?? []).some((s) => s.toLowerCase() === slug)) {
+    return true;
+  }
+
+  const venueName = event.venue?.name?.trim().toLowerCase() ?? "";
+  if (venueName && (cfg.skipVenueNameIncludes ?? []).some((needle) => venueName.includes(needle.toLowerCase()))) {
+    return true;
+  }
+
+  return false;
 }
 
 export function buildVenunitePageUrl(page: number, cfg: VenuniteConfig = venuniteConfig): string {
@@ -73,7 +102,8 @@ export function resolveVenuniteVenueLocation(
 
 export function toNormalizedEvent(
   event: VenuniteEvent,
-  venueDetails: ReadonlyMap<number, VenuniteVenueDetail> = new Map()
+  venueDetails: ReadonlyMap<number, VenuniteVenueDetail> = new Map(),
+  eventDetail?: VenuniteEventDetail | null
 ): NormalizedEvent | null {
   const venueName = event.venue?.name?.trim();
   if (!venueName || !event.title.trim() || !event.startDate) {
@@ -83,27 +113,32 @@ export function toNormalizedEvent(
   const listingUrl = event.website?.trim() || undefined;
   const minCents = event.priceWatch?.minPriceCents;
   const maxCents = event.priceWatch?.maxPriceCents;
-  const venueDetail = event.venueId != null ? venueDetails.get(event.venueId) : undefined;
+  const embeddedVenue = eventDetail ? detailVenueToVenueDetail(eventDetail) : undefined;
+  const venueDetail =
+    embeddedVenue ?? (event.venueId != null ? venueDetails.get(event.venueId) : undefined);
+  const descriptionText = resolveVenuniteDescriptionText(event, eventDetail);
 
-  return {
+  const listing: NormalizedEvent = {
     source: "venunite",
     sourceEventId: resolveSourceEventId(event),
     title: event.title.trim(),
-    venueName,
+    venueName: embeddedVenue?.name?.trim() || venueName,
     startTs: event.startDate,
-    timezone: event.timezone ?? "America/Los_Angeles",
-    category: mapVenuniteCategory(event.category, event.categories),
-    subcategories: event.categories ?? [],
-    tags: ["venunite", "api", `upstream:${event.sourceModule}`],
-    currency: event.priceWatch?.currency ?? "USD",
+    timezone: eventDetail?.timezone ?? event.timezone ?? "America/Los_Angeles",
+    category: mapVenuniteCategory(eventDetail?.category ?? event.category, eventDetail?.categories ?? event.categories),
+    subcategories: eventDetail?.categories ?? event.categories ?? [],
+    tags: buildVenuniteTags(event, eventDetail),
+    currency: eventDetail?.priceWatch?.currency ?? event.priceWatch?.currency ?? "USD",
     ...resolveVenuniteVenueLocation(event, venueDetail),
-    ...(event.endDate ? { endTs: event.endDate } : {}),
-    ...(event.cost ? { descriptionText: `Cost: ${event.cost}` } : {}),
+    ...(eventDetail?.endDate || event.endDate ? { endTs: eventDetail?.endDate ?? event.endDate } : {}),
+    ...(descriptionText ? { descriptionText } : {}),
     ...(minCents != null && minCents > 0 ? { priceMin: minCents / 100 } : {}),
     ...(maxCents != null && maxCents > 0 ? { priceMax: maxCents / 100 } : {}),
     ...(listingUrl ? { externalUrl: listingUrl, ticketUrl: listingUrl } : {}),
     ...(event.imageUrl ? { imageUrl: event.imageUrl } : {})
   };
+
+  return mergeVenuniteDetailFields(listing, event, eventDetail);
 }
 
 export function mapVenuniteCategory(
@@ -129,14 +164,18 @@ export function mapVenuniteCategory(
 export function mapVenuniteEvents(
   events: VenuniteEvent[],
   skipModules: readonly string[] = venuniteConfig.skipModules,
-  venueDetails: ReadonlyMap<number, VenuniteVenueDetail> = new Map()
+  venueDetails: ReadonlyMap<number, VenuniteVenueDetail> = new Map(),
+  eventDetails: ReadonlyMap<string, VenuniteEventDetail> = new Map()
 ): NormalizedEvent[] {
   const out: NormalizedEvent[] = [];
   for (const event of events) {
     if (shouldSkipModule(event.sourceModule, skipModules)) {
       continue;
     }
-    const mapped = toNormalizedEvent(event, venueDetails);
+    if (shouldSkipVenue(event)) {
+      continue;
+    }
+    const mapped = toNormalizedEvent(event, venueDetails, eventDetails.get(event.slug));
     if (mapped) {
       out.push(mapped);
     }
@@ -144,6 +183,4 @@ export function mapVenuniteEvents(
   return out;
 }
 
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+export { sleep } from "@/lib/sleep";

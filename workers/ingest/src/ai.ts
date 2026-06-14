@@ -6,12 +6,9 @@ import {
 } from "@fresno-events/shared";
 
 import { clampEnrichmentConfidence, clampSuggestedPriority } from "@/ai-enrichment.utils";
-import { isPlausibleEvent } from "@/ai/validation";
 import type { IngestEnv } from "@/env";
 import { getJsonPromptBackend } from "@/llm/registry";
 import type { JsonPromptBackend, TextProviderRole } from "@/llm/types";
-import { fresnoSearchArea } from "@/sources";
-
 export interface AiEnrichment {
   confidence: number;
   category: EventCategory | null;
@@ -28,6 +25,8 @@ export interface AiDiscoveryItem {
   venueName: string;
   venueAddress?: string;
   venueCity?: string;
+  venueLat?: number;
+  venueLng?: number;
   category?: string;
   descriptionText?: string;
   ticketUrl?: string;
@@ -58,7 +57,15 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
     "cleaned_title (string or null), tags (array of short strings), is_junk (boolean), reasoning (short string),",
     "suggested_priority (integer 0..5).",
     `Display priority rubric (lower = more prominent in feed): ${priorityRubric}.`,
-    "Never assign suggested_priority 0 unless the listing is clearly sponsored/ad content; use 1 for the biggest city-wide draws, 5 when unsure."
+    "Priority is editorial prominence, not how much you like the event. Be conservative: most events are P4 or P5.",
+    "P1 and P2 are rare and reserved — do NOT hand them out generously. When unsure, prefer 4 or 5, never round up.",
+    "Calibration for Fresno:",
+    "P1 = once-in-a-period citywide marquee draw (e.g. Ringling Bros at the arena, a stadium headliner everyone knows).",
+    "P2 = arena/major shows and big touring names (Save Mart Center concerts, major comedians, marquee festivals).",
+    "P3 = notable venue shows (Tower Theatre, Saroyan/Selland, Warnors, Big Fresno Fair concerts, Fresno Grizzlies games).",
+    "P4 = bigger-than-usual local listing (club shows at Fulton 55 / Strummer's / Rainbow Ballroom, community runs/walks, zoo special events).",
+    "P5 = routine recurring community listing (farmers markets, karaoke, trivia, open mic, bingo, wine walks, fitness-in-the-park, story time, scavenger hunts, meetups, workshops/classes/camps, away minor-league games).",
+    "Never assign suggested_priority 0 unless the listing is clearly sponsored/ad content."
   ].join(" ");
 
   const user = [
@@ -73,7 +80,7 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
       externalUrl: event.externalUrl,
       ticketUrl: event.ticketUrl
     })}`,
-    "Mark is_junk=true for ads, gift cards, parking, livestream-only, NSFW, or events more than 50 miles from Fresno."
+    "Mark is_junk=true for ads, gift cards, parking, livestream-only, NSFW, Shen Yun, or events more than 50 miles from Fresno."
   ].join("\n");
 
   const result = await backend.generateJson<Partial<AiEnrichment>>({ system, user });
@@ -82,44 +89,6 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
   }
 
   return normalizeEnrichment(result);
-}
-
-export async function discoverEventsFromHtml(
-  env: IngestEnv,
-  args: { url: string; html: string; label: string },
-): Promise<AiDiscoveryItem[]> {
-  const backend = getJsonPromptBackend(env, "discovery");
-  if (!backend) {
-    return [];
-  }
-
-  const cleaned = stripHtml(args.html).slice(0, 24_000);
-  if (cleaned.length < 200) {
-    return [];
-  }
-
-  const system = [
-    "You extract upcoming public events from a single web page.",
-    "Only return events happening within 50 miles of Fresno, California in the next 90 days.",
-    "Return minified JSON with key `events`: an array of objects with the keys",
-    "title (string), startTs (ISO 8601), venueName (string), venueAddress (string, optional), venueCity (string, optional),",
-    `category (one of ${eventCategories.join(", ")}), descriptionText (string, optional),`,
-    "ticketUrl (string, optional), externalUrl (string, optional), imageUrl (string, optional), priceMin (number, optional), priceMax (number, optional).",
-    "If a date is missing, omit the event. Never invent details."
-  ].join(" ");
-
-  const user = [
-    `Source label: ${args.label}`,
-    `Source URL: ${args.url}`,
-    `Search area: lat=${fresnoSearchArea.lat}, lng=${fresnoSearchArea.lng}, radius=${fresnoSearchArea.radiusMiles}mi`,
-    "Page text follows between the markers --- BEGIN --- and --- END ---.",
-    "--- BEGIN ---",
-    cleaned,
-    "--- END ---"
-  ].join("\n");
-
-  const result = await backend.generateJson<{ events?: AiDiscoveryItem[] }>({ system, user });
-  return Array.isArray(result?.events) ? result.events.filter(isPlausibleEvent) : [];
 }
 
 function normalizeEnrichment(input: Partial<AiEnrichment>): AiEnrichment {
@@ -145,13 +114,3 @@ function normalizeEnrichment(input: Partial<AiEnrichment>): AiEnrichment {
   };
 }
 
-function stripHtml(html: string) {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}

@@ -35,7 +35,10 @@ export function fingerprintPayload(event: NormalizedEvent): string {
     ticketUrl: event.ticketUrl?.trim() ?? null,
     externalUrl: event.externalUrl?.trim() ?? null,
     imageUrl: event.imageUrl?.trim() ?? null,
-    category: event.category ?? null
+    category: event.category ?? null,
+    priceMin: event.priceMin ?? null,
+    priceMax: event.priceMax ?? null,
+    priceNotes: event.priceNotes?.trim() ?? null
   });
 }
 

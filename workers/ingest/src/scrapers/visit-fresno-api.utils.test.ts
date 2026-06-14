@@ -7,9 +7,12 @@ import {
   buildVisitFresnoDateRanges,
   buildVisitFresnoUrl,
   extractVisitFresnoDocs,
+  looksLikePhoneLocation,
   parseVisitFresnoSimpleTokenBody,
   parseVisitFresnoStartTs,
   parseVisitFresnoTimesField,
+  parseVisitFresnoEndTs,
+  resolveVisitFresnoStartMeta,
   toNormalizedEvent,
   visitFresnoTotalCount
 } from "./visit-fresno-api.utils";
@@ -108,14 +111,15 @@ describe("visit-fresno-api.utils", () => {
   });
 
   it("parseVisitFresnoStartTs uses date-only sentinel when time is unknown", () => {
-    const startIso = parseVisitFresnoStartTs({
+    const meta = resolveVisitFresnoStartMeta({
       _id: "no-time",
       recid: "1",
       title: "Mystery Event",
       dates: { eventDate: "2026-06-03T06:59:59.000Z" }
     } as import("./visit-fresno-api.types").VisitFresnoDoc);
 
-    expect(startIso).toBe("2026-06-02T12:00:00.000Z");
+    expect(meta?.startTs).toBe("2026-06-02T12:00:00.000Z");
+    expect(meta?.timeUnknown).toBe(true);
 
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: "America/Los_Angeles",
@@ -123,7 +127,7 @@ describe("visit-fresno-api.utils", () => {
       day: "numeric",
       hour: "numeric",
       hour12: false
-    }).formatToParts(new Date(startIso!));
+    }).formatToParts(new Date(meta!.startTs));
     const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
     expect(get("month")).toBe("6");
     expect(get("day")).toBe("2");
@@ -161,13 +165,67 @@ describe("visit-fresno-api.utils", () => {
     const event = toNormalizedEvent(firstDoc!);
     expect(event).not.toBeNull();
     expect(event?.source).toBe("api:visitfresnocounty");
-    expect(event?.sourceEventId).toBe(firstDoc!._id);
+    expect(event?.sourceEventId).toMatch(/^\d+:\d{4}-\d{2}-\d{2}$/);
     expect(event?.title.length).toBeGreaterThan(0);
     expect(event?.startTs).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     const normalized = docs.map((doc) => toNormalizedEvent(doc)).filter((e) => e !== null);
     const ids = normalized.map((e) => e.sourceEventId);
     expect(new Set(ids).size).toBe(ids.length);
+  }, 15_000);
+
+  it("formats listing API descriptions with paragraphs, lists, and decoded entities", () => {
+    const raw = readFileSync(fixturePath, "utf8");
+    const parsed = VisitFresnoResponseSchema.parse(JSON.parse(raw));
+    const docs = extractVisitFresnoDocs(parsed);
+    const fashionFair = docs.find((doc) => doc.title === "Fashion Fair Family Fridays");
+    expect(fashionFair).toBeDefined();
+    const event = toNormalizedEvent(fashionFair!);
+    expect(event?.descriptionText).toContain("July 12th - Giant Bubbles");
+    expect(event?.descriptionText).toContain("Face Painting & Balloon Art");
+    expect(event?.descriptionText).not.toContain("&amp;");
+    expect(event?.descriptionText?.split("\n\n").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("maps API endTime onto normalized events", () => {
+    const event = toNormalizedEvent({
+      _id: "market-3850",
+      recid: "3850",
+      title: "Old Town Clovis Farmers Market",
+      dates: { eventDate: "2026-06-27T06:59:59.000Z" },
+      startTime: "09:00:00",
+      endTime: "11:00:00",
+      location: "Old Town Clovis",
+      city: "Clovis",
+      state: "CA"
+    } as import("./visit-fresno-api.types").VisitFresnoDoc);
+
+    expect(event?.timeUnknown).toBeFalsy();
+    expect(event?.endTs).toBeTruthy();
+    const endHour = Number(
+      new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: "America/Los_Angeles"
+      }).format(new Date(event!.endTs!))
+    );
+    expect(endHour).toBe(11);
+  });
+
+  it("marks recurring listings without wall time as timeUnknown", () => {
+    const event = toNormalizedEvent({
+      _id: "cobra-4874",
+      recid: "4874",
+      title: "The Cobra Comedy Open Mic",
+      dates: { eventDate: "2026-06-14T06:59:59.000Z" },
+      recurrence: "Recurring weekly on Sunday",
+      location: "Full Circle Brewing Company",
+      city: "Fresno",
+      state: "CA"
+    } as import("./visit-fresno-api.types").VisitFresnoDoc);
+
+    expect(event?.timeUnknown).toBe(true);
+    expect(event?.endTs).toBeUndefined();
   });
 
   it("stores street-only venueAddress from full mailing lines", () => {
@@ -221,5 +279,27 @@ describe("visit-fresno-api.utils", () => {
 
     const [withSeries] = await applySeriesMetadata([mapped!]);
     expect(withSeries?.seriesId).toMatch(/^series:visitfresnocounty:[a-f0-9]{64}$/);
+  });
+
+  it("uses hostname when location is a phone and maps API coordinates", () => {
+    const raw = readFileSync(fixturePath, "utf8");
+    const parsed = VisitFresnoResponseSchema.parse(JSON.parse(raw));
+    const doc = extractVisitFresnoDocs(parsed).find((d) => d.title.includes("Civic Academy"));
+    expect(doc).toBeDefined();
+
+    const event = toNormalizedEvent(doc!);
+    expect(event?.sourceEventId).toBe("8739:2026-06-02");
+    expect(event?.venueName).toBe("City of Fresno Office of Community Affairs");
+    expect(event?.venueAddress).toBeUndefined();
+    expect(event?.venueCity).toBe("Fresno");
+    expect(event?.venueLat).toBeCloseTo(36.7377981, 5);
+    expect(event?.venueLng).toBeCloseTo(-119.7871247, 5);
+    expect(event?.seriesPresentedBy).toBeUndefined();
+  });
+
+  it("looksLikePhoneLocation detects Visit Fresno contact phones", () => {
+    expect(looksLikePhoneLocation("559-508-6421")).toBe(true);
+    expect(looksLikePhoneLocation("(559) 508-6421")).toBe(true);
+    expect(looksLikePhoneLocation("The Backyard Social Club")).toBe(false);
   });
 });

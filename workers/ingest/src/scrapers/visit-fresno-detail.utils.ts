@@ -1,11 +1,146 @@
-import { load } from "cheerio";
+import { load, type CheerioAPI, type Element } from "cheerio";
 
 import { resolveVenueLocationFields, type NormalizedEvent } from "@fresno-events/shared";
+
+import { getPacificDateTimeParts, instantFromPacificLocal } from "@/lib/pacific-instant.utils";
+
+function normalizeInlineWhitespace(text: string): string {
+  return text.replace(/[\t\u00a0]+/g, " ").replace(/ +/g, " ").trim();
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+function formatSimpleVisitFresnoDescriptionHtml(html: string): string {
+  const text = decodeHtmlEntities(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, ""));
+  const lines = text
+    .split("\n")
+    .map((line) => normalizeInlineWhitespace(line))
+    .filter(Boolean);
+  return lines.join("\n").trim();
+}
+
+function needsStructuredVisitFresnoDescriptionParse(html: string): boolean {
+  if (/<(ul|ol|li|h[3-5])\b/i.test(html)) {
+    return true;
+  }
+  return (html.match(/<p\b/gi)?.length ?? 0) > 1;
+}
+
+function paragraphText($: CheerioAPI, el: Element): string {
+  const clone = $(el).clone();
+  clone.find("br").replaceWith("\n");
+  const lines = clone
+    .text()
+    .split("\n")
+    .map((line) => normalizeInlineWhitespace(line))
+    .filter(Boolean);
+  return lines.join("\n");
+}
+
+function listBlockText($: CheerioAPI, el: Element): string {
+  const lines: string[] = [];
+  $(el)
+    .children("li")
+    .each((_, li) => {
+      const line = normalizeInlineWhitespace($(li).text());
+      if (line) {
+        lines.push(line);
+      }
+    });
+  return lines.join("\n");
+}
+
+function blockFromElement($: CheerioAPI, el: Element): string | null {
+  const tag = el.tagName?.toLowerCase();
+  if (!tag) {
+    return null;
+  }
+
+  if (tag === "ul" || tag === "ol") {
+    return listBlockText($, el) || null;
+  }
+
+  if (tag === "p" || tag === "div" || tag === "h3" || tag === "h4" || tag === "h5") {
+    return paragraphText($, el) || null;
+  }
+
+  const text = normalizeInlineWhitespace($(el).text());
+  return text || null;
+}
+
+/** Plain text from Visit Fresno CMS HTML — paragraphs, list lines, decoded entities. */
+export function formatVisitFresnoDescriptionHtml(html: string): string {
+  const trimmed = html.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (!needsStructuredVisitFresnoDescriptionParse(trimmed)) {
+    return formatSimpleVisitFresnoDescriptionHtml(trimmed);
+  }
+
+  const $ = load(`<div data-vf-root>${trimmed}</div>`, null, false);
+  const blocks: string[] = [];
+
+  $("[data-vf-root]")
+    .children()
+    .each((_, el) => {
+      const block = blockFromElement($, el);
+      if (block) {
+        blocks.push(block);
+      }
+    });
+
+  if (blocks.length === 0) {
+    return formatSimpleVisitFresnoDescriptionHtml(trimmed);
+  }
+
+  return blocks.join("\n\n").trim();
+}
+
+function descriptionFromDetailSection($: CheerioAPI): string | undefined {
+  const heading = $("h2")
+    .filter((_, el) => $(el).text().trim().toLowerCase() === "description")
+    .first();
+  if (!heading.length) {
+    return undefined;
+  }
+
+  const htmlChunks: string[] = [];
+  let node = heading.next();
+  while (node.length && !node.is("h2")) {
+    htmlChunks.push($.html(node));
+    node = node.next();
+  }
+
+  if (htmlChunks.length === 0) {
+    return undefined;
+  }
+
+  const formatted = formatVisitFresnoDescriptionHtml(htmlChunks.join(""));
+  return formatted || undefined;
+}
+
+export interface VisitFresnoTimeRange {
+  startClock: string;
+  endClock: string;
+}
 
 export interface VisitFresnoDetailFields {
   descriptionText?: string;
   venueAddress?: string;
   venueName?: string;
+  timeRange?: VisitFresnoTimeRange;
   priceNotes?: string;
   isFree?: boolean;
   priceMin?: number;
@@ -17,6 +152,77 @@ export interface VisitFresnoDetailFields {
 function readInfoListValue($: ReturnType<typeof load>, name: string): string | undefined {
   const value = $(`li[data-name="${name}"] .info-list-value`).first().text().replace(/\s+/g, " ").trim();
   return value || undefined;
+}
+
+function parseAmPmClockToken(token: string): string | null {
+  const match = token.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (!match?.[1] || !match[3]) {
+    return null;
+  }
+
+  let hour = Number(match[1]);
+  const minute = match[2] ? Number(match[2]) : 0;
+  const meridiem = match[3].toLowerCase();
+  if (meridiem === "pm" && hour < 12) {
+    hour += 12;
+  }
+  if (meridiem === "am" && hour === 12) {
+    hour = 0;
+  }
+  if (hour > 23 || minute > 59) {
+    return null;
+  }
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+/** Parse Simpleview info-list time lines like "9:00 AM to 11:30 AM". */
+export function parseVisitFresnoTimeRangeText(raw: string): VisitFresnoTimeRange | null {
+  const normalized = raw.replace(/\s+/g, " ").trim();
+  const match = normalized.match(
+    /^(\d{1,2}(?::\d{2})?\s*(?:am|pm))\s*(?:to|-)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm))$/i
+  );
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  const startClock = parseAmPmClockToken(match[1]);
+  const endClock = parseAmPmClockToken(match[2]);
+  if (!startClock || !endClock) {
+    return null;
+  }
+
+  return { startClock, endClock };
+}
+
+function pacificDateYmdFromIso(iso: string): string | null {
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) {
+    return null;
+  }
+  return getPacificDateTimeParts(instant).date;
+}
+
+function applyVisitFresnoTimeRange(
+  listing: NormalizedEvent,
+  timeRange: VisitFresnoTimeRange
+): Partial<Pick<NormalizedEvent, "startTs" | "endTs" | "timeUnknown">> {
+  const dateYmd = pacificDateYmdFromIso(listing.startTs);
+  if (!dateYmd) {
+    return {};
+  }
+
+  const startTs = instantFromPacificLocal(dateYmd, timeRange.startClock);
+  const endTs = instantFromPacificLocal(dateYmd, timeRange.endClock);
+  if (!startTs) {
+    return {};
+  }
+
+  return {
+    startTs,
+    ...(endTs ? { endTs } : {}),
+    timeUnknown: false
+  };
 }
 
 export function parseVisitFresnoPriceText(raw: string): Pick<
@@ -58,18 +264,18 @@ export function parseVisitFresnoDetailPage(html: string): VisitFresnoDetailField
     return null;
   }
 
-  const descriptionBlock = $("h2")
-    .filter((_, el) => $(el).text().trim().toLowerCase() === "description")
-    .first()
-    .next();
-  const descriptionFromSection = descriptionBlock.text().replace(/\s+/g, " ").trim();
   const descriptionText =
-    descriptionFromSection ||
-    $('meta[property="og:description"]').attr("content")?.trim() ||
-    $('meta[name="description"]').attr("content")?.trim();
+    descriptionFromDetailSection($) ||
+    formatVisitFresnoDescriptionHtml(
+      $('meta[property="og:description"]').attr("content")?.trim() ?? ""
+    ) ||
+    formatVisitFresnoDescriptionHtml($('meta[name="description"]').attr("content")?.trim() ?? "") ||
+    undefined;
 
   const venueAddress = readInfoListValue($, "address");
   const venueName = readInfoListValue($, "location");
+  const timeRaw = readInfoListValue($, "time");
+  const timeRange = timeRaw ? parseVisitFresnoTimeRangeText(timeRaw) : undefined;
   const priceRaw = readInfoListValue($, "price");
   const priceFields = priceRaw ? parseVisitFresnoPriceText(priceRaw) : {};
 
@@ -83,6 +289,7 @@ export function parseVisitFresnoDetailPage(html: string): VisitFresnoDetailField
     ...(descriptionText ? { descriptionText } : {}),
     ...(venueAddress ? { venueAddress } : {}),
     ...(venueName ? { venueName } : {}),
+    ...(timeRange ? { timeRange } : {}),
     ...priceFields,
     ...(ticketHref?.startsWith("http") ? { ticketUrl: ticketHref } : {})
   };
@@ -101,6 +308,7 @@ export function mergeVisitFresnoDetail(
 
   return {
     ...listing,
+    ...(detail.timeRange ? applyVisitFresnoTimeRange(listing, detail.timeRange) : {}),
     ...(detail.descriptionText?.trim() && !listing.descriptionText?.trim()
       ? { descriptionText: detail.descriptionText.trim() }
       : detail.descriptionText?.trim() && detail.descriptionText.length > (listing.descriptionText?.length ?? 0)

@@ -45,4 +45,48 @@ describe("ticketmaster.utils", () => {
   it("maps sports category", () => {
     expect(toCategory({ segment: { name: "Sports" } })).toBe("sports");
   });
+
+  it("omits price and coords when Discovery API does not provide them", () => {
+    const raw: TicketmasterEvent = {
+      id: "monster-jam",
+      name: "Monster Jam",
+      url: "https://www.ticketmaster.com/event/monster-jam",
+      dates: {
+        timezone: "America/Los_Angeles",
+        start: { dateTime: "2026-08-22T02:00:00Z" }
+      },
+      classifications: [{ segment: { name: "Sports" } }],
+      _embedded: {
+        venues: [
+          {
+            name: "Save Mart Center",
+            address: { line1: "2650 East Shaw Ave." },
+            city: { name: "Fresno" }
+          }
+        ]
+      }
+    };
+
+    const [event] = toNormalizedEvent(raw);
+    expect(event?.venueAddress).toBe("2650 East Shaw Ave.");
+    expect(event?.priceMin).toBeUndefined();
+    expect(event?.priceMax).toBeUndefined();
+    expect(event?.venueLat).toBeUndefined();
+    expect(event?.venueLng).toBeUndefined();
+    expect(event?.ticketUrl).toContain("ticketmaster.com");
+  });
+
+  it("maps priceRanges when Discovery includes them", () => {
+    const raw: TicketmasterEvent = {
+      id: "tm-priced",
+      name: "Comedy Show",
+      dates: { start: { dateTime: "2026-06-10T02:00:00Z" } },
+      priceRanges: [{ min: 25, max: 75, currency: "USD" }],
+      _embedded: { venues: [{ name: "Warnors Theatre", city: { name: "Fresno" } }] }
+    };
+
+    const [event] = toNormalizedEvent(raw);
+    expect(event?.priceMin).toBe(25);
+    expect(event?.priceMax).toBe(75);
+  });
 });

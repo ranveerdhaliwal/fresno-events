@@ -60,9 +60,31 @@ export const VenuniteResponseSchema = z.object({
   totalPages: z.number()
 });
 
+export const VenuniteEventDetailVenueSchema = VenuniteVenueDetailSchema.extend({
+  slug: z.string().optional(),
+  phone: z.string().nullable().optional(),
+  website: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
+  timezone: z.string().nullable().optional()
+});
+
+export const VenuniteEventDetailSchema = VenuniteEventSchema.extend({
+  description: z.string().nullable().optional(),
+  doorTime: z.string().nullable().optional(),
+  age: z.string().nullable().optional(),
+  agePolicy: z.string().nullable().optional(),
+  audienceIntent: z.string().nullable().optional(),
+  isCancelled: z.boolean().optional(),
+  soldOut: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
+  artists: z.array(z.unknown()).optional(),
+  venue: VenuniteEventDetailVenueSchema.nullable().optional()
+});
+
 export type VenuniteEvent = z.infer<typeof VenuniteEventSchema>;
 export type VenuniteResponse = z.infer<typeof VenuniteResponseSchema>;
 export type VenuniteVenueDetail = z.infer<typeof VenuniteVenueDetailSchema>;
+export type VenuniteEventDetail = z.infer<typeof VenuniteEventDetailSchema>;
 
 export interface VenuniteConfig {
   state: string;
@@ -70,5 +92,10 @@ export interface VenuniteConfig {
   sort: string;
   pageDelayMs: number;
   venueDetailDelayMs: number;
+  eventDetailDelayMs: number;
   skipModules: string[];
+  /** Venunite venue slugs to drop (e.g. church ward halls). */
+  skipVenueSlugs?: string[];
+  /** Case-insensitive venue name substrings to drop. */
+  skipVenueNameIncludes?: string[];
 }

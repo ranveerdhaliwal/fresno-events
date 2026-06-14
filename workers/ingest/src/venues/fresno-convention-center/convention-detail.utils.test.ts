@@ -37,5 +37,7 @@ describe("parseConventionDetailPage", () => {
     expect(detail?.imageUrl).toContain("sonic.jpg");
     expect(detail?.ticketUrl).toContain("atgtickets.com");
     expect(detail?.descriptionText).toContain("Celebrate 35 years");
+    expect(detail?.venueAddress).toBe("730 M St");
+    expect(detail?.venueCity).toBe("Fresno");
   });
 });

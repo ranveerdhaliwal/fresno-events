@@ -10,7 +10,10 @@ export const FINGERPRINT_DIFF_FIELDS = [
   "venueCity",
   "ticketUrl",
   "externalUrl",
-  "category"
+  "category",
+  "priceMin",
+  "priceMax",
+  "priceNotes"
 ] as const;
 
 export type FingerprintDiffField = (typeof FINGERPRINT_DIFF_FIELDS)[number];
@@ -27,6 +30,8 @@ export interface PersistAuditItemNew {
 export interface PersistAuditItemChanged {
   source_event_id: string;
   title: string;
+  start_ts?: string;
+  external_url?: string;
   changed_fields: FingerprintDiffField[];
   before: Partial<Record<FingerprintDiffField, string | null>>;
   after: Partial<Record<FingerprintDiffField, string | null>>;
@@ -77,7 +82,10 @@ export function normalizedEventToDiffSlice(event: NormalizedEvent): Record<Finge
     venueCity: normalizeDiffValue(event.venueCity),
     ticketUrl: normalizeDiffValue(event.ticketUrl),
     externalUrl: normalizeDiffValue(event.externalUrl),
-    category: normalizeDiffValue(event.category)
+    category: normalizeDiffValue(event.category),
+    priceMin: typeof event.priceMin === "number" ? String(event.priceMin) : null,
+    priceMax: typeof event.priceMax === "number" ? String(event.priceMax) : null,
+    priceNotes: normalizeDiffValue(event.priceNotes)
   };
 }
 
@@ -123,12 +131,17 @@ export function buildNewAuditItem(event: NormalizedEvent): PersistAuditItemNew {
 
 export function buildChangedAuditItem(before: NormalizedEvent, after: NormalizedEvent): PersistAuditItemChanged {
   const diff = diffNormalizedEvents(before, after);
+  const externalUrl =
+    after.externalUrl?.trim() ||
+    (after.sourceEventId.startsWith("http") ? after.sourceEventId.trim() : undefined);
   return {
     source_event_id: after.sourceEventId,
     title: after.title,
+    start_ts: after.startTs,
     changed_fields: diff.changedFields,
     before: diff.before,
-    after: diff.after
+    after: diff.after,
+    ...(externalUrl ? { external_url: externalUrl } : {})
   };
 }
 

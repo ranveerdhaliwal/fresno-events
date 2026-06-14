@@ -1,10 +1,13 @@
 {
   "key": "chaffee-zoo",
+  "promoteSource": "chaffeezoo",
   "label": "Fresno Chaffee Zoo",
   "enabled": true,
   "strategy": "html_parse",
   "listingUrl": "https://fcz.org/events/",
   "sourceHostname": "fcz.org",
   "ingestLane": "direct",
-  "detailMode": "none"
+  "detailMode": "none",
+  "listingDiscovery": "br_if_empty",
+  "minEventsWarn": 2
 }

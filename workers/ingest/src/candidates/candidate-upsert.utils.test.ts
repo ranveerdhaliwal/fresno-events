@@ -10,12 +10,13 @@ import {
 import type { ExistingCandidateRow } from "@/candidates/content-fingerprint.utils";
 import type { OccurrencePersistFields } from "@/candidates/occurrence-resolve.utils";
 import { candidateNeedsEnrichment } from "@/candidates/enrichment-candidate.utils";
+import { applyIngestDefaults } from "@/lib/ingest-defaults.utils";
 
 const base: NormalizedEvent = {
   source: "api:visitfresnocounty",
   sourceEventId: "evt-1",
   title: "Summer Concert",
-  venueName: "Woodward Park",
+  venueName: "Selland Arena",
   startTs: "2026-06-01T02:00:00.000Z",
   category: "music",
   descriptionText: "Live music outdoors"
@@ -114,7 +115,7 @@ describe("candidate-upsert.utils", () => {
 
     expect(row.confidence_score).toBe(0.7);
     expect(row.raw_payload).toEqual({});
-    expect(row.normalized_event).toEqual(base);
+    expect(row.normalized_event).toEqual(applyIngestDefaults(base));
     expect(row.review_notes).toBeNull();
   });
 
@@ -196,14 +197,16 @@ describe("candidate-upsert.utils", () => {
     expect(shouldResetConfidenceOnChangedUpsert("awaiting_enrichment")).toBe(false);
   });
 
-  it("needs_changes with ai notes still needs enrichment after content change", () => {
+  it("needs_changes needs enrichment after content change clears ai notes", () => {
+    // On a content re-scrape, buildFullUpsertRow clears review_notes (contentChanged && existing),
+    // so the needs_changes row re-enters enrichment for one fresh pass.
     expect(
       candidateNeedsEnrichment({
         id: "c1",
         status: "needs_changes",
         normalized_event: base,
         confidence_score: 0.98,
-        review_notes: "[ai] stale notes cleared on upsert in practice",
+        review_notes: null,
         suggested_priority: 2,
         matched_event_id: "e1"
       })

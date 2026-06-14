@@ -43,6 +43,14 @@ export interface RelinkPatch {
   suggested_priority?: number;
 }
 
+export interface RelinkLinkExample {
+  title: string;
+  primary_source: string;
+  linked_sources: string[];
+  cross_source: boolean;
+  would_change: boolean;
+}
+
 export interface RelinkPlanSummary {
   candidates: number;
   relinkable: number;
@@ -56,6 +64,9 @@ export interface RelinkPlanSummary {
   occurrence_key_changed: number;
   occurrence_id_changed: number;
   priority_inherited: number;
+  link_groups: number;
+  link_groups_changed: number;
+  link_examples: RelinkLinkExample[];
 }
 
 const RELINKABLE_STATUSES = new Set([
@@ -209,6 +220,96 @@ function resolveRelinkStatus(row: RelinkCandidateRow, isPrimary: boolean, crossS
     return row.status;
   }
   return "duplicate";
+}
+
+function formatRelinkSourceLabel(source: string): string {
+  return source
+    .replace(/^api:/, "")
+    .replace(/^scrape:/, "")
+    .replace(/_/g, " ")
+    .trim();
+}
+
+export function summarizeRelinkLinkGroups(
+  rows: RelinkCandidateRow[],
+  patches: RelinkPatch[],
+  changedIds: Set<string>,
+  options: { crossSourceDedupe: boolean; maxExamples?: number }
+): Pick<RelinkPlanSummary, "link_groups" | "link_groups_changed" | "link_examples"> {
+  if (!options.crossSourceDedupe) {
+    return { link_groups: 0, link_groups_changed: 0, link_examples: [] };
+  }
+
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  const byOccurrence = new Map<string, RelinkPatch[]>();
+  for (const patch of patches) {
+    const bucket = byOccurrence.get(patch.occurrence_id) ?? [];
+    bucket.push(patch);
+    byOccurrence.set(patch.occurrence_id, bucket);
+  }
+
+  let linkGroups = 0;
+  let linkGroupsChanged = 0;
+  const examples: RelinkLinkExample[] = [];
+
+  for (const groupPatches of byOccurrence.values()) {
+    if (groupPatches.length < 2) {
+      continue;
+    }
+
+    const primaryPatch = groupPatches.find((patch) => patch.canonical_candidate_id === null);
+    if (!primaryPatch) {
+      continue;
+    }
+
+    const linkedPatches = groupPatches.filter((patch) => patch.canonical_candidate_id === primaryPatch.id);
+    if (linkedPatches.length === 0) {
+      continue;
+    }
+
+    linkGroups += 1;
+    const wouldChange = groupPatches.some((patch) => changedIds.has(patch.id));
+    if (wouldChange) {
+      linkGroupsChanged += 1;
+    }
+
+    const primaryRow = rowById.get(primaryPatch.id);
+    if (!primaryRow) {
+      continue;
+    }
+
+    const sources = new Set(
+      groupPatches.map((patch) => rowById.get(patch.id)?.source).filter((source): source is string => Boolean(source))
+    );
+
+    examples.push({
+      title: primaryRow.normalized_event.title,
+      primary_source: formatRelinkSourceLabel(primaryRow.source),
+      linked_sources: [
+        ...new Set(
+          linkedPatches.map((patch) => formatRelinkSourceLabel(rowById.get(patch.id)!.source))
+        )
+      ],
+      cross_source: sources.size > 1,
+      would_change: wouldChange
+    });
+  }
+
+  examples.sort((left, right) => {
+    if (left.would_change !== right.would_change) {
+      return left.would_change ? -1 : 1;
+    }
+    if (left.cross_source !== right.cross_source) {
+      return left.cross_source ? -1 : 1;
+    }
+    return right.linked_sources.length - left.linked_sources.length;
+  });
+
+  return {
+    link_groups: linkGroups,
+    link_groups_changed: linkGroupsChanged,
+    link_examples: examples.slice(0, options.maxExamples ?? 10)
+  };
 }
 
 export async function computeRelinkPatches(
@@ -410,7 +511,10 @@ export async function computeRelinkPatches(
       demoted_to_duplicate: demotedToDuplicate,
       occurrence_key_changed: occurrenceKeyChanged,
       occurrence_id_changed: occurrenceIdChanged,
-      priority_inherited: priorityInherited
+      priority_inherited: priorityInherited,
+      link_groups: 0,
+      link_groups_changed: 0,
+      link_examples: []
     }
   };
 }

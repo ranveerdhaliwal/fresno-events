@@ -30,11 +30,6 @@ export function isVisitFresnoEndOfDayUtc(iso: string): boolean {
 }
 
 /** Matches admin “empty start time = all-day” (`${date}T12:00:00Z`). */
-export function isDateOnlyStartTs(iso: string): boolean {
-  const d = new Date(iso);
-  return !Number.isNaN(d.getTime()) && d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
-}
-
 /** Pacific calendar date with no known wall time — not a real noon start. */
 export function dateOnlyStartTs(dateYmd: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateYmd)) {

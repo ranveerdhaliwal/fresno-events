@@ -1,4 +1,5 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
+import { formatIngestExclusionNotes, getIngestExclusion } from "@fresno-events/shared";
 
 import { enrichCandidate, getAiBackend } from "@/ai";
 import {
@@ -6,13 +7,15 @@ import {
   ENRICHMENT_QUEUE_STATUSES,
   formatEnrichmentDoneLine,
   isBlockedByPendingDetail,
+  needsSufficientConfidenceBackfill,
   reasoningPreview,
-  shouldPromoteSufficientWithoutLlm,
+  SUFFICIENT_WITHOUT_LLM_CONFIDENCE,
   summarizeEnrichmentDelta,
   type EnrichmentCandidateRow
 } from "@/candidates/enrichment-candidate.utils";
 import { harmonizeSeriesSuggestedPriority } from "@/candidates/series-enrichment.utils";
 import { harmonizeLinkedOccurrencePriority } from "@/candidates/linked-priority-harmonize.utils";
+import { harmonizeLinkedOccurrencePricing } from "@/candidates/linked-price-harmonize.utils";
 import { applyVenuePriorityOverride, resolveVenueSuggestedPriority } from "@/candidates/venue-priority.utils";
 import type { IngestEnv } from "@/env";
 import type { SupabaseConfig } from "@/sources";
@@ -170,14 +173,18 @@ export async function enrichRecentCandidates(
         summary.skipped_pending_detail += 1;
         continue;
       }
+      if (await rejectIngestExcludedCandidate(supabase, row, options.dryRun ?? false)) {
+        summary.auto_rejected += 1;
+        if (!options.dryRun) {
+          summary.updated += 1;
+        }
+        continue;
+      }
       if (candidateNeedsEnrichment(row)) {
         toProcess.push(row);
         if (toProcess.length >= limit) {
           break;
         }
-        continue;
-      }
-      if (row.status !== "awaiting_enrichment") {
         continue;
       }
       summary.skipped_sufficient_data += 1;
@@ -193,13 +200,17 @@ export async function enrichRecentCandidates(
         venue: row.normalized_event.venueName,
         action: options.dryRun ? "would_tag_without_llm" : "tagged_without_llm"
       });
-      if (!options.dryRun && shouldPromoteSufficientWithoutLlm(row)) {
+      if (!options.dryRun && needsSufficientConfidenceBackfill(row)) {
         await markSufficientWithoutLlm(supabase, row);
         summary.updated += 1;
 
         const linked = await harmonizeLinkedOccurrencePriority(supabase, row.occurrence_id);
         if (linked.primaryUpdated) {
           summary.updated += 1;
+        }
+        const priced = await harmonizeLinkedOccurrencePricing(supabase, row.occurrence_id);
+        if (priced.rowsUpdated > 0) {
+          summary.updated += priced.rowsUpdated;
         }
       }
     }
@@ -240,6 +251,14 @@ export async function enrichRecentCandidates(
     const progress = { index, total: toProcess.length };
 
     try {
+      if (await rejectIngestExcludedCandidate(supabase, row, options.dryRun ?? false)) {
+        summary.auto_rejected += 1;
+        if (!options.dryRun) {
+          summary.updated += 1;
+        }
+        continue;
+      }
+
       const enrichment = await enrichCandidate(env, row.normalized_event);
       if (!enrichment) {
         const shortTitle = ev.title.length > 48 ? `${ev.title.slice(0, 47)}…` : ev.title;
@@ -348,13 +367,20 @@ export async function enrichRecentCandidates(
           summary.updated += 1;
         }
 
+        const priced = await harmonizeLinkedOccurrencePricing(supabase, row.occurrence_id);
+        if (priced.rowsUpdated > 0) {
+          summary.updated += priced.rowsUpdated;
+        }
+
         console.log(doneLine);
         logStruct(env, "ai_enrichment_item_done", {
           ...doneLog,
           series_priority_unified: harmonized.unified,
           series_siblings_updated: harmonized.siblingsUpdated,
           linked_primary_priority: linked.unified,
-          linked_primary_updated: linked.primaryUpdated
+          linked_primary_updated: linked.primaryUpdated,
+          linked_price_rows_updated: priced.rowsUpdated,
+          linked_price_from_source: priced.pricedFromSource
         });
       }
     } catch (error) {
@@ -545,7 +571,9 @@ interface CandidatePatch {
 
 async function markSufficientWithoutLlm(supabase: SupabaseConfig, row: EnrichmentCandidateRow) {
   const venuePriority = resolveVenueSuggestedPriority(row.normalized_event);
-  const priority = venuePriority ?? 5;
+  // Preserve an already-set editorial priority (e.g. confidence backfill on a re-scraped
+  // pending_review row); only seed from the venue override / default for fresh rows.
+  const priority = row.suggested_priority ?? venuePriority ?? 5;
   const notes =
     venuePriority !== null
       ? `[ingest] skipped LLM — source already has title, time, category, and description · [venue] → P${priority}`
@@ -553,11 +581,38 @@ async function markSufficientWithoutLlm(supabase: SupabaseConfig, row: Enrichmen
 
   await patchCandidate(supabase, row.id, {
     ...(row.status === "awaiting_enrichment" ? { status: "pending_review" as const } : {}),
-    confidence_score: 0.95,
+    confidence_score: SUFFICIENT_WITHOUT_LLM_CONFIDENCE,
     suggested_priority: priority,
     review_notes: notes,
     updated_at: new Date().toISOString()
   });
+}
+
+async function rejectIngestExcludedCandidate(
+  supabase: SupabaseConfig,
+  row: EnrichmentCandidateRow,
+  dryRun: boolean
+): Promise<boolean> {
+  if (row.status === "rejected") {
+    return false;
+  }
+  const exclusion = getIngestExclusion({
+    title: row.normalized_event.title,
+    descriptionText: row.normalized_event.descriptionText
+  });
+  if (!exclusion) {
+    return false;
+  }
+  if (!dryRun) {
+    await patchCandidate(supabase, row.id, {
+      status: "rejected",
+      reviewed_by: "ingest",
+      reviewed_at: new Date().toISOString(),
+      review_notes: formatIngestExclusionNotes(exclusion),
+      updated_at: new Date().toISOString()
+    });
+  }
+  return true;
 }
 
 async function patchCandidate(supabase: SupabaseConfig, id: string, patch: CandidatePatch) {

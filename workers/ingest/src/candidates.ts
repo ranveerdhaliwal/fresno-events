@@ -2,6 +2,9 @@ import type { EventSource, NormalizedEvent, ScrapeResult } from "@fresno-events/
 
 import { buildCandidateUpsertRow } from "@/candidates/candidate-upsert.utils";
 import {
+  harmonizeLinkedOccurrencePricingBatch
+} from "@/candidates/linked-price-harmonize.utils";
+import {
   type ExistingCandidateRow
 } from "@/candidates/content-fingerprint.utils";
 import { buildOccurrenceMatchIndex } from "@/candidates/occurrence-match-fetch.utils";
@@ -17,11 +20,13 @@ import {
 import { buildPublishedEventPatchBody } from "@/candidates/sync-published-event.utils";
 import type { IngestEnv } from "@/env";
 import { compactPersistAuditForLog } from "@/log-compact.utils";
+import { filterUpcomingIngestEvents } from "@/lib/upcoming-events.utils";
 import { getSupabaseConfig, type SupabaseConfig } from "@/sources";
+import { visitFresnoPersistAliasKey } from "@/scrapers/visit-fresno-source-id.utils";
 
 export type PersistenceResult =
   | { persisted: false; reason: string }
-  | { persisted: true; candidates: number };
+  | { persisted: true; candidates: number; audit?: PersistAuditSummary };
 
 export type { PersistAuditSummary };
 
@@ -32,7 +37,7 @@ export async function previewPersistScrapeResult(
   result: ScrapeResult
 ): Promise<PersistAuditSummary | null> {
   const config = getSupabaseConfig(env);
-  const uniqueEvents = dedupeEventsBySourceId(result.events);
+  const uniqueEvents = prepareEventsForPersist(result.events, result.runId);
 
   if (!config) {
     return null;
@@ -49,7 +54,7 @@ export async function previewPersistScrapeResult(
 
 export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult): Promise<PersistenceResult> {
   const config = getSupabaseConfig(env);
-  const uniqueEvents = dedupeEventsBySourceId(result.events);
+  const uniqueEvents = prepareEventsForPersist(result.events, result.runId);
 
   if (!config) {
     return {
@@ -114,7 +119,11 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
         })
       );
     }
-    return { persisted: true, candidates: 0 };
+    return {
+      persisted: true,
+      candidates: 0,
+      audit: buildPersistAuditSummary({ newItems: [], changedItems: [], unchangedCount: 0 })
+    };
   }
 
   const existingByKey = await fetchExistingCandidatesForEvents(config, validEvents);
@@ -125,6 +134,7 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
   const auditNew: PersistAuditItemNew[] = [];
   const auditChanged: PersistAuditItemChanged[] = [];
   let unchanged = 0;
+  const occurrenceIdsForPricing = new Set<string>();
 
   console.log(
     JSON.stringify({
@@ -141,9 +151,10 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
     const chunk = validEvents.slice(offset, offset + CANDIDATE_UPSERT_BATCH_SIZE);
     const { analyses } = await analyzeEventsForPersist(chunk, existingByKey);
     const rows: Array<Record<string, unknown>> = [];
+    const migrationRows: Array<Record<string, unknown>> = [];
 
     for (const analysis of analyses) {
-      const { event, existing, fingerprint, status, contentChanged, auditKind, auditNew: newItem, auditChanged: changedItem } =
+      const { event, existing, fingerprint, status, contentChanged, auditKind, auditNew: newItem, auditChanged: changedItem, ingestExclusion } =
         analysis;
 
       if (auditKind === "new" && newItem) {
@@ -190,18 +201,27 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       });
 
       const rowStatus = occurrence.statusOverride ?? status;
-      rows.push(
-        await buildCandidateUpsertRow({
-          auditKind,
-          runId: result.runId,
-          event,
-          fingerprint,
-          status: rowStatus,
-          ...(existing ? { existing } : {}),
-          contentChanged,
-          occurrence
-        })
-      );
+      const upsertRow = await buildCandidateUpsertRow({
+        auditKind,
+        runId: result.runId,
+        event,
+        fingerprint,
+        status: rowStatus,
+        ...(existing ? { existing } : {}),
+        contentChanged,
+        occurrence,
+        ...(ingestExclusion ? { ingestExclusion } : {})
+      });
+
+      if (existing && existing.source_event_id !== event.sourceEventId) {
+        migrationRows.push({ ...upsertRow, id: existing.id });
+      } else {
+        rows.push(upsertRow);
+      }
+
+      if (occurrence.occurrenceId) {
+        occurrenceIdsForPricing.add(occurrence.occurrenceId);
+      }
 
       const syncEventId = occurrence.matchedEventId ?? existing?.matched_event_id ?? null;
       if (syncEventId) {
@@ -242,14 +262,32 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       }
     }
 
-    await supabaseRequest(config, "/rest/v1/event_candidates?on_conflict=source,source_event_id", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=minimal"
-      },
-      body: JSON.stringify(rows)
-    });
+    for (const row of migrationRows) {
+      const id = row.id;
+      if (typeof id !== "string") {
+        continue;
+      }
+      const { id: _omit, ...patch } = row;
+      await supabaseRequest(config, `/rest/v1/event_candidates?id=eq.${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify(patch)
+      });
+    }
+
+    if (rows.length > 0) {
+      await supabaseRequest(config, "/rest/v1/event_candidates?on_conflict=source,source_event_id", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates,return=minimal"
+        },
+        body: JSON.stringify(rows)
+      });
+    }
   }
 
   const auditSummary = buildPersistAuditSummary({
@@ -257,6 +295,21 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
     changedItems: auditChanged,
     unchangedCount: unchanged
   });
+
+  const priceHarmonize = await harmonizeLinkedOccurrencePricingBatch(config, [
+    ...occurrenceIdsForPricing
+  ]);
+  if (priceHarmonize.rowsUpdated > 0) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_linked_price_harmonize",
+        run_id: result.runId,
+        source: result.source,
+        occurrences: priceHarmonize.occurrences,
+        rows_updated: priceHarmonize.rowsUpdated
+      })
+    );
+  }
 
   console.log(
     JSON.stringify({
@@ -286,10 +339,26 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
     })
   );
 
-  return { persisted: true, candidates: validEvents.length };
+  return { persisted: true, candidates: validEvents.length, audit: auditSummary };
 }
 
 /** Postgres upsert rejects duplicate (source, source_event_id) in one batch. */
+function prepareEventsForPersist(events: NormalizedEvent[], runId: string, now = new Date()): NormalizedEvent[] {
+  const unique = dedupeEventsBySourceId(events);
+  const upcoming = filterUpcomingIngestEvents(unique, now);
+  const skippedPast = unique.length - upcoming.length;
+  if (skippedPast > 0) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_skip_past_events",
+        run_id: runId,
+        skipped: skippedPast
+      })
+    );
+  }
+  return upcoming;
+}
+
 function dedupeEventsBySourceId(events: NormalizedEvent[]): NormalizedEvent[] {
   const byKey = new Map<string, NormalizedEvent>();
   for (const event of events) {
@@ -383,12 +452,18 @@ async function fetchExistingCandidatesForSource(
   const rows = (await response.json()) as ExistingCandidateRowRaw[];
   const map = new Map<string, ExistingCandidateRow>();
   for (const row of rows) {
-    map.set(candidateKey(row.source, row.source_event_id), {
+    const parsed: ExistingCandidateRow = {
       ...row,
       confidence_score: row.confidence_score ?? 0.7,
       raw_payload: row.raw_payload ?? {},
       normalized_event: parseNormalizedEvent(row)
-    });
+    };
+    map.set(candidateKey(row.source, row.source_event_id), parsed);
+
+    const alias = visitFresnoPersistAliasKey(parsed.normalized_event);
+    if (alias) {
+      map.set(alias, parsed);
+    }
   }
   return map;
 }

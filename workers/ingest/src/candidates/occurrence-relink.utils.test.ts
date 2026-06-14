@@ -4,6 +4,7 @@ import type { NormalizedEvent } from "@fresno-events/shared";
 
 import {
   computeRelinkPatches,
+  summarizeRelinkLinkGroups,
   type RelinkCandidateRow
 } from "@/candidates/occurrence-relink.utils";
 
@@ -333,5 +334,32 @@ describe("computeRelinkPatches", () => {
     if (one?.occurrence_key) {
       expect(one.occurrence_id).toBe(await occurrenceIdFromKey(one.occurrence_key));
     }
+  });
+
+  it("summarizeRelinkLinkGroups returns human-readable link examples", async () => {
+    const rows = [
+      row({
+        id: "visit",
+        source: "api:visitfresnocounty",
+        title: "Miss California Competition Week",
+        created_at: "2026-01-01T00:00:00.000Z"
+      }),
+      row({
+        id: "tm",
+        source: "ticketmaster",
+        title: "Miss California 2026",
+        created_at: "2026-01-03T00:00:00.000Z"
+      })
+    ];
+
+    const { patches } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const changedIds = new Set(patches.map((patch) => patch.id));
+    const summary = summarizeRelinkLinkGroups(rows, patches, changedIds, { crossSourceDedupe: true });
+
+    expect(summary.link_groups).toBe(1);
+    expect(summary.link_groups_changed).toBe(1);
+    expect(summary.link_examples[0]?.title).toContain("Miss California");
+    expect(summary.link_examples[0]?.primary_source).toBe("ticketmaster");
+    expect(summary.link_examples[0]?.linked_sources).toContain("visitfresnocounty");
   });
 });

@@ -30,6 +30,15 @@ describe("persist-audit.utils", () => {
     expect(diff.after.title).toBe("New title");
   });
 
+  it("diffNormalizedEvents reports price fields", () => {
+    const after = { ...base, priceMin: 45, priceMax: 65, priceNotes: "In-Person: $45/$65" };
+    const diff = diffNormalizedEvents(base, after);
+
+    expect(diff.changedFields).toEqual(["priceMin", "priceMax", "priceNotes"]);
+    expect(diff.after.priceMin).toBe("45");
+    expect(diff.after.priceMax).toBe("65");
+  });
+
   it("buildNewAuditItem captures listing fields and external_url", () => {
     expect(buildNewAuditItem({ ...base, externalUrl: "https://example.com/game" })).toEqual({
       source: "api:milb",

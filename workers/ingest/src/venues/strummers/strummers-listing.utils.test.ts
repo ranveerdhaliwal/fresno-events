@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getPacificDateTimeParts } from "@/lib/pacific-instant.utils";
+import type { VenueConfig } from "@/venues/venue.types";
 
 import configJson from "./venue.config.json";
 import {
@@ -9,7 +10,7 @@ import {
   parseWallClock12hr
 } from "./strummers-listing.utils";
 
-const config = configJson;
+const config = configJson as VenueConfig;
 
 const STEVE_HOFSTETTER_CARD = `
 <article class="eventlist-event eventlist-event--upcoming eventlist-event--hasimg">

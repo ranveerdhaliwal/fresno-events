@@ -4,10 +4,17 @@
   "sort": "date-asc",
   "pageDelayMs": 400,
   "venueDetailDelayMs": 250,
+  "eventDetailDelayMs": 200,
   "skipModules": [
     "ticketmaster_ca",
     "ticketmaster",
     "fresno_grizzlies",
     "strummer_s_bar_grill_fresno"
+  ],
+  "skipVenueSlugs": [
+    "the-church-of-jesus-christ-of-latter-day-saints-fresno-ca"
+  ],
+  "skipVenueNameIncludes": [
+    "church of jesus christ of latter-day saints"
   ]
 }

@@ -1,5 +1,6 @@
 {
   "key": "big-fresno-fair",
+  "promoteSource": "fresnofair",
   "label": "Big Fresno Fair",
   "enabled": true,
   "strategy": "api",

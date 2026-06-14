@@ -1,4 +1,4 @@
-import { resolveVenueLocationFields, type NormalizedEvent } from "@fresno-events/shared";
+import { isValidCoordinate, resolveVenueLocationFields, type NormalizedEvent } from "@fresno-events/shared";
 
 import {
   dateOnlyStartTs,
@@ -6,7 +6,9 @@ import {
   instantFromPacificLocal,
   isVisitFresnoEndOfDayUtc
 } from "@/lib/pacific-instant.utils";
+import { formatVisitFresnoDescriptionHtml } from "@/scrapers/visit-fresno-detail.utils";
 import type { VisitFresnoDoc, VisitFresnoResponse } from "./visit-fresno-api.types";
+import { buildVisitFresnoSourceEventId } from "./visit-fresno-source-id.utils";
 
 const PACIFIC = "America/Los_Angeles";
 
@@ -94,7 +96,7 @@ export interface VisitFresnoDateRange {
   end: Date;
 }
 
-/** Weekly windows avoid CMS 500s on deep skip pagination over a 30-day horizon. */
+/** Weekly windows + paginated `limit` keep responses small; unfiltered queries can exceed 16MB. */
 export function buildVisitFresnoDateRanges(now: Date, windowDays = 7, horizonDays = 30): VisitFresnoDateRange[] {
   const ranges: VisitFresnoDateRange[] = [];
   const windowMs = windowDays * 86_400_000;
@@ -152,7 +154,7 @@ export function visitFresnoTotalCount(payload: VisitFresnoResponse): number | un
 }
 
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return formatVisitFresnoDescriptionHtml(html);
 }
 
 function parseVisitFresnoWallClock(dateYmd: string, timeHms: string): string | null {
@@ -255,7 +257,76 @@ export function parseVisitFresnoTimesField(times: string, dateYmd: string): stri
 }
 
 /** Parse Visit Fresno `eventDate` + optional `startTime` (avoids 11:59 PM PT sentinel). */
+/** CMS sometimes puts a contact phone in `location` instead of a venue name. */
+export function looksLikePhoneLocation(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 11) {
+    return false;
+  }
+  return trimmed.replace(/[\d\s().+-]/g, "").length === 0;
+}
+
+/** Prefer real venue names; fall back to organizer hostname when `location` is a phone. */
+export function resolveVisitFresnoVenueName(location?: string, hostname?: string): string {
+  const loc = location?.trim() ?? "";
+  const host = hostname?.trim() ?? "";
+  if (loc && !looksLikePhoneLocation(loc)) {
+    return loc;
+  }
+  if (host) {
+    return host;
+  }
+  return loc || "Unknown venue";
+}
+
+function readVisitFresnoCoordinate(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function isMeaningfulCoordinatePair(lat: number, lng: number): boolean {
+  return isValidCoordinate(lat) && isValidCoordinate(lng) && !(lat === 0 && lng === 0);
+}
+
+/** Visit Fresno exposes `latitude`/`longitude` and GeoJSON `loc` ([lng, lat]). */
+export function readVisitFresnoCoordinates(
+  raw: Pick<VisitFresnoDoc, "latitude" | "longitude" | "loc">
+): { lat: number; lng: number } | null {
+  const lat = readVisitFresnoCoordinate(raw.latitude);
+  const lng = readVisitFresnoCoordinate(raw.longitude);
+  if (lat !== null && lng !== null && isMeaningfulCoordinatePair(lat, lng)) {
+    return { lat, lng };
+  }
+
+  const coords = raw.loc?.coordinates;
+  if (coords && coords.length >= 2) {
+    const lngFromLoc = readVisitFresnoCoordinate(coords[0]);
+    const latFromLoc = readVisitFresnoCoordinate(coords[1]);
+    if (latFromLoc !== null && lngFromLoc !== null && isMeaningfulCoordinatePair(latFromLoc, lngFromLoc)) {
+      return { lat: latFromLoc, lng: lngFromLoc };
+    }
+  }
+
+  return null;
+}
+
 export function parseVisitFresnoStartTs(raw: VisitFresnoDoc): string | null {
+  return resolveVisitFresnoStartMeta(raw)?.startTs ?? null;
+}
+
+export function resolveVisitFresnoStartMeta(
+  raw: VisitFresnoDoc
+): { startTs: string; timeUnknown: boolean } | null {
   const eventDate = raw.dates.eventDate;
   if (!eventDate) {
     return null;
@@ -270,7 +341,7 @@ export function parseVisitFresnoStartTs(raw: VisitFresnoDoc): string | null {
   if (startTime) {
     const wall = parseVisitFresnoWallClock(dateYmd, startTime);
     if (wall) {
-      return wall;
+      return { startTs: wall, timeUnknown: false };
     }
   }
 
@@ -278,26 +349,50 @@ export function parseVisitFresnoStartTs(raw: VisitFresnoDoc): string | null {
   if (timesClock) {
     const wall = instantFromPacificLocal(dateYmd, timesClock);
     if (wall) {
-      return wall;
+      return { startTs: wall, timeUnknown: false };
     }
   }
 
   if (isVisitFresnoEndOfDayUtc(eventDate)) {
-    return dateOnlyStartTs(dateYmd);
+    const ts = dateOnlyStartTs(dateYmd);
+    return ts ? { startTs: ts, timeUnknown: true } : null;
   }
 
   const parsed = new Date(eventDate);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  return Number.isNaN(parsed.getTime()) ? null : { startTs: parsed.toISOString(), timeUnknown: false };
 }
 
-export function toNormalizedEvent(raw: VisitFresnoDoc): NormalizedEvent | null {
-  const startIso = parseVisitFresnoStartTs(raw);
-  if (!raw.title || !startIso) {
+export function parseVisitFresnoEndTs(raw: VisitFresnoDoc): string | null {
+  const eventDate = raw.dates.eventDate;
+  if (!eventDate) {
     return null;
   }
 
-  const venueName = raw.location?.trim() || "Unknown venue";
+  const dateYmd = visitFresnoPacificDateYmd(eventDate);
+  if (!dateYmd) {
+    return null;
+  }
+
+  const endTime = raw.endTime?.trim();
+  if (!endTime) {
+    return null;
+  }
+
+  return parseVisitFresnoWallClock(dateYmd, endTime);
+}
+
+export function toNormalizedEvent(raw: VisitFresnoDoc): NormalizedEvent | null {
+  const schedule = resolveVisitFresnoStartMeta(raw);
+  if (!raw.title || !schedule) {
+    return null;
+  }
+
+  const startIso = schedule.startTs;
+  const endFromApi = parseVisitFresnoEndTs(raw);
+
+  const venueName = resolveVisitFresnoVenueName(raw.location, raw.hostname);
   const imageUrl = raw.media_raw?.find((m) => m.mediaurl)?.mediaurl;
+  const coordinates = readVisitFresnoCoordinates(raw);
 
   const { venueAddress: resolvedAddress, venueCity: resolvedCity } = resolveVenueLocationFields(
     raw.address1,
@@ -309,19 +404,23 @@ export function toNormalizedEvent(raw: VisitFresnoDoc): NormalizedEvent | null {
   const descriptionText = raw.description ? stripHtml(raw.description) : undefined;
   const externalUrl = raw.absoluteUrl ?? raw.linkUrl;
   const recurrence = raw.recurrence?.trim();
+  const presentedBy = raw.hostname?.trim();
 
   return {
     source: "api:visitfresnocounty",
-    // `recid` is a series/listing id (many occurrences share it); `_id` is unique per occurrence.
-    sourceEventId: raw._id,
+    // `recid` is a series/listing id (many occurrences share it); `_id` can rotate on CMS re-publish.
+    sourceEventId: buildVisitFresnoSourceEventId(raw, startIso),
     title: raw.title,
     venueName,
     venueCity,
     startTs: startIso,
+    ...(schedule.timeUnknown ? { timeUnknown: true } : {}),
+    ...(endFromApi ? { endTs: endFromApi } : {}),
     ...(raw.recid ? { seriesListingRecId: String(raw.recid) } : {}),
     ...(recurrence ? { seriesName: recurrence } : {}),
-    ...(raw.hostname?.trim() ? { seriesPresentedBy: raw.hostname.trim() } : {}),
+    ...(presentedBy && presentedBy !== venueName ? { seriesPresentedBy: presentedBy } : {}),
     ...(venueAddress ? { venueAddress } : {}),
+    ...(coordinates ? { venueLat: coordinates.lat, venueLng: coordinates.lng } : {}),
     ...(descriptionText ? { descriptionText } : {}),
     ...(externalUrl ? { externalUrl } : {}),
     ...(imageUrl ? { imageUrl } : {})

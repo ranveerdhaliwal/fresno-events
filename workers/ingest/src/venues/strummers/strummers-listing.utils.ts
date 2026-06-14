@@ -3,6 +3,7 @@ import { load } from "cheerio";
 
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 import { canonicalStrummersShowUrl } from "@/venues/_shared/link-discover.utils";
+import { warnIfSelectorEmpty } from "@/venues/_shared/selector-observability.utils";
 import type { VenueConfig } from "@/venues/venue.types";
 
 function sourceHost(config: VenueConfig): string {
@@ -52,7 +53,10 @@ export function parseStrummersListingHtml(html: string, config: VenueConfig): No
   const host = sourceHost(config);
   const byKey = new Map<string, NormalizedEvent>();
 
-  $("article.eventlist-event").each((_, articleEl) => {
+  const $articles = $("article.eventlist-event");
+  warnIfSelectorEmpty({ venueKey: config.key, selector: "article.eventlist-event", matched: $articles.length });
+
+  $articles.each((_, articleEl) => {
     const article = $(articleEl);
     const title = article.find("h1.eventlist-title a.eventlist-title-link").first().text().trim();
     if (!title) {

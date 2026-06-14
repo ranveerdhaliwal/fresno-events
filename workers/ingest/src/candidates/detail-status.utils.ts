@@ -1,10 +1,25 @@
-import type { NormalizedEvent } from "@fresno-events/shared";
+import type { CandidateDetailStatus, NormalizedEvent } from "@fresno-events/shared";
 
 import { hasSufficientReviewData } from "@/candidates/enrichment-candidate.utils";
+import { buildVenuniteEventPublicUrl } from "@/scrapers/venunite-detail.utils";
 
-export type CandidateDetailStatus = "complete" | "pending";
+function venuniteSlugFromTags(tags: string[] | undefined): string | null {
+  const tag = tags?.find((entry) => entry.startsWith("venunite_slug:"));
+  if (!tag) {
+    return null;
+  }
+  const slug = tag.slice("venunite_slug:".length).trim();
+  return slug || null;
+}
 
 export function canonicalDetailPageUrl(event: NormalizedEvent): string | null {
+  if (event.source === "venunite") {
+    const slug = venuniteSlugFromTags(event.tags);
+    if (slug) {
+      return buildVenuniteEventPublicUrl(slug);
+    }
+  }
+
   const raw = event.externalUrl?.trim() ?? event.ticketUrl?.trim();
   if (!raw?.startsWith("http")) {
     return null;

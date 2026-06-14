@@ -6,6 +6,7 @@ import type { ExistingCandidateRow } from "@/candidates/content-fingerprint.util
 import { contentFingerprint } from "@/candidates/content-fingerprint.utils";
 import { analyzeEventsForPersist, mergePersistAuditSummaries } from "@/candidates/persist-analysis.utils";
 import { buildPersistAuditSummary } from "@/candidates/persist-audit.utils";
+import { applyIngestDefaults } from "@/lib/ingest-defaults.utils";
 
 const base: NormalizedEvent = {
   source: "api:milb",
@@ -41,15 +42,16 @@ function existingRow(overrides: Partial<ExistingCandidateRow> = {}): ExistingCan
 
 describe("persist-analysis.utils", () => {
   it("analyzeEventsForPersist classifies new, changed, and unchanged rows", async () => {
-    const fingerprint = await contentFingerprint(base);
+    const fingerprint = await contentFingerprint(applyIngestDefaults(base));
+    const defaults = applyIngestDefaults(base);
     const existingByKey = new Map<string, ExistingCandidateRow>([
-      ["api:milb:game-1", existingRow({ content_fingerprint: fingerprint })],
+      ["api:milb:game-1", existingRow({ content_fingerprint: fingerprint, normalized_event: defaults })],
       [
         "api:milb:game-2",
         existingRow({
           source_event_id: "game-2",
           content_fingerprint: fingerprint,
-          normalized_event: { ...base, sourceEventId: "game-2" }
+          normalized_event: { ...defaults, sourceEventId: "game-2" }
         })
       ]
     ]);
@@ -93,6 +95,70 @@ describe("persist-analysis.utils", () => {
     expect(summary.new).toBe(0);
     expect(summary.changed).toBe(1);
     expect(summary.changed_items[0]?.changed_fields).toContain("title");
+  });
+
+  it("analyzeEventsForPersist classifies fair imageUrl backfill as changed", async () => {
+    const fairBase: NormalizedEvent = {
+      source: "scrape:www.fresnofair.com",
+      sourceEventId: "venue:big-fresno-fair:3714:2026-10-07",
+      title: "Kansas With Starship feat. Mickey Thomas",
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-08T02:00:00.000Z",
+      category: "festival"
+    };
+    const fingerprint = await contentFingerprint(applyIngestDefaults(fairBase));
+    const existingByKey = new Map<string, ExistingCandidateRow>([
+      [
+        "scrape:www.fresnofair.com:venue:big-fresno-fair:3714:2026-10-07",
+        existingRow({
+          source: "scrape:www.fresnofair.com",
+          source_event_id: "venue:big-fresno-fair:3714:2026-10-07",
+          content_fingerprint: fingerprint,
+          normalized_event: fairBase
+        })
+      ]
+    ]);
+
+    const { summary, analyses } = await analyzeEventsForPersist(
+      [
+        {
+          ...fairBase,
+          imageUrl: "https://cdn.saffire.com/images.ashx?i=Kansas_OnScreen.jpg"
+        }
+      ],
+      existingByKey
+    );
+
+    expect(summary.changed).toBe(1);
+    expect(summary.unchanged).toBe(0);
+    expect(analyses[0]?.auditKind).toBe("changed");
+  });
+
+  it("analyzeEventsForPersist does not flag default endTs as a content change", async () => {
+    const incoming: NormalizedEvent = {
+      ...base,
+      venueName: "Selland Arena"
+    };
+    const stored = {
+      ...applyIngestDefaults(incoming),
+      endTs: "2026-06-01T04:00:00.000Z"
+    };
+    const fingerprint = await contentFingerprint(stored);
+    const existingByKey = new Map<string, ExistingCandidateRow>([
+      [
+        "api:milb:game-1",
+        existingRow({
+          content_fingerprint: fingerprint,
+          normalized_event: stored,
+          venue_name: "Selland Arena"
+        })
+      ]
+    ]);
+
+    const { summary } = await analyzeEventsForPersist([incoming], existingByKey);
+
+    expect(summary.changed).toBe(0);
+    expect(summary.unchanged).toBe(1);
   });
 
   it("mergePersistAuditSummaries aggregates per-source previews", () => {

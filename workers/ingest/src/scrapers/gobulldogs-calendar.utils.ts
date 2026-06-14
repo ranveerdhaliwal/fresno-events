@@ -1,7 +1,7 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 
 import { withDefaultImageUrl } from "@/lib/default-image.utils";
-import { dateOnlyStartTs } from "@/lib/pacific-instant.utils";
+import { dateOnlyStartTs, instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 import { isGobulldogsFinalEvent } from "@/scrapers/gobulldogs-priority.utils";
 
 const BASE = "https://gobulldogs.com";
@@ -185,19 +185,89 @@ export function parseGobulldogsCalendarDays(json: unknown): GobulldogsCalendarDa
   return days;
 }
 
+function opponentTitleHasMatchupLabel(title: string): boolean {
+  return /scrimmage/i.test(title) || /\bvs\.?\b/i.test(title);
+}
+
 export function buildGobulldogsGameTitle(game: GobulldogsCalendarGame): string {
   const { sport, opponent, atVs } = game;
-  if (/scrimmage/i.test(opponent.title) || /\bvs\.?\b/i.test(opponent.title)) {
-    return `${sport.title} vs ${opponent.title}`;
+  const opponentName = opponent.title.trim();
+
+  // Sidearm puts invitational doubleheaders and scrimmages in opponent.title
+  // (e.g. "UC Irvine vs. New Mexico State") — don't prepend another "vs".
+  if (opponentTitleHasMatchupLabel(opponentName)) {
+    return `${sport.title}: ${opponentName}`;
   }
 
   const prefix = atVs.toLowerCase() === "at" ? "at" : "vs";
-  return `${sport.title} ${prefix} ${opponent.title}`;
+  return `${sport.title} ${prefix} ${opponentName}`;
+}
+
+function buildGobulldogsDescription(game: GobulldogsCalendarGame): string | undefined {
+  const parts: string[] = [];
+  const opponentName = game.opponent.title.trim();
+
+  if (game.opponent.tournamentTitle) {
+    parts.push(game.opponent.tournamentTitle);
+  }
+  if (game.conferenceTitle) {
+    parts.push(game.conferenceTitle);
+  }
+  if (game.gamePromotionText) {
+    parts.push(game.gamePromotionText);
+  }
+
+  if (!opponentTitleHasMatchupLabel(opponentName)) {
+    const homeAway = game.atVs.toLowerCase() === "at" ? "at" : "vs";
+    parts.push(`${homeAway} ${opponentName}`);
+  }
+
+  if (game.facility?.title) {
+    parts.push(game.facility.title);
+  }
+  if (game.location) {
+    parts.push(game.location);
+  }
+
+  const timeIsUnset = game.tbd || /^tb[ad]$/i.test(game.time);
+  const timeLabel = game.time.trim();
+  if (timeIsUnset) {
+    if (timeLabel) {
+      parts.push(timeLabel);
+    }
+  } else if (timeLabel) {
+    parts.push(timeLabel);
+  }
+
+  parts.push(`Full schedule: ${BASE}/sports/${game.sport.globalSportShortname}/schedule`);
+
+  return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
 function parseVenueCity(location: string): string {
   const city = location.split(",")[0]?.trim();
   return city || "Fresno";
+}
+
+/** Sidearm `time` is a Pacific wall clock like "6:00 PM" / "7 PM" (or "TBA"/"TBD"). */
+function parseGobulldogsClock(time: string): string | null {
+  const match = time.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (!match?.[1] || !match[3]) {
+    return null;
+  }
+  let hour = Number(match[1]);
+  const minute = match[2] ? Number(match[2]) : 0;
+  const meridiem = match[3].toLowerCase();
+  if (meridiem === "pm" && hour < 12) {
+    hour += 12;
+  }
+  if (meridiem === "am" && hour === 12) {
+    hour = 0;
+  }
+  if (hour > 23 || minute > 59) {
+    return null;
+  }
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 function gameStartTs(game: GobulldogsCalendarGame, dayDate: string): string | null {
@@ -209,11 +279,23 @@ function gameStartTs(game: GobulldogsCalendarGame, dayDate: string): string | nu
   }
 
   const dayYmd = dayDate.slice(0, 10);
+
+  // No UTC instant (TBD/older feed) — recover the known wall-clock time before falling
+  // back to the all-day noon sentinel, so an evening game isn't flattened to midday.
+  const hhmm = parseGobulldogsClock(game.time);
+  if (hhmm) {
+    const pacific = instantFromPacificLocal(dayYmd, hhmm);
+    if (pacific) {
+      return pacific;
+    }
+  }
+
   return dateOnlyStartTs(dayYmd);
 }
 
 function gameExternalUrl(game: GobulldogsCalendarGame): string {
-  return `${BASE}/sports/${game.sport.globalSportShortname}/schedule#${game.id}`;
+  // Sidearm has no per-game detail pages for most sports — only the season schedule.
+  return `${BASE}/sports/${game.sport.globalSportShortname}/schedule`;
 }
 
 function buildGobulldogsTags(game: GobulldogsCalendarGame, title: string): string[] {
@@ -253,9 +335,7 @@ export function gobulldogsGameToNormalizedEvent(
   const venueName = game.facility?.title || game.location || "Fresno State";
   const venueCity = parseVenueCity(game.location || "Fresno, CA");
   const tags = buildGobulldogsTags(game, title);
-  const contextBits = [game.gamePromotionText, game.conferenceTitle, game.opponent.tournamentTitle]
-    .filter(Boolean)
-    .join(" · ");
+  const descriptionText = buildGobulldogsDescription(game);
 
   const event: NormalizedEvent = {
     source: SOURCE,
@@ -267,8 +347,7 @@ export function gobulldogsGameToNormalizedEvent(
     timezone: "America/Los_Angeles",
     externalUrl: gameExternalUrl(game),
     category: "sports",
-    ...(game.tbd || /^tba$/i.test(game.time) ? { description: game.time || "TBA" } : {}),
-    ...(contextBits ? { descriptionText: contextBits } : {}),
+    ...(descriptionText ? { descriptionText } : {}),
     ...(tags.length > 0 ? { tags } : {}),
     ...(game.gameImageUrl ? { imageUrl: game.gameImageUrl } : {})
   };

@@ -1,23 +1,9 @@
-import type { EventCategory, NormalizedEvent } from "@fresno-events/shared";
+import { eventCategories, type EventCategory, type NormalizedEvent } from "@fresno-events/shared";
 
 import type { AiDiscoveryItem } from "@/ai";
 import { hashSync } from "@/ai/hash";
 
-const ALLOWED_CATEGORIES = new Set<EventCategory>([
-  "music",
-  "comedy",
-  "theater",
-  "sports",
-  "food_drink",
-  "festival",
-  "family",
-  "art",
-  "nightlife",
-  "community",
-  "outdoor",
-  "wellness",
-  "education"
-]);
+const ALLOWED_CATEGORIES: ReadonlySet<string> = new Set(eventCategories);
 
 export interface DiscoveryNormalizeExtras {
   seriesId?: string;
@@ -29,7 +15,7 @@ export function toNormalizedEventFromDiscovery(
   item: AiDiscoveryItem,
   pageUrl: string,
   seedUrl: string,
-  tag: "ai-discovery" | "ai-crawl" | "venue-ingest",
+  tag: "venue-ingest",
   extras: DiscoveryNormalizeExtras = {}
 ): NormalizedEvent | null {
   if (!item.title.trim() || !item.venueName.trim() || !item.startTs) {

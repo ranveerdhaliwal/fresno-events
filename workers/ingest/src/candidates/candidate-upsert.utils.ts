@@ -1,6 +1,8 @@
-import type { NormalizedEvent } from "@fresno-events/shared";
+import type { IngestExclusion, NormalizedEvent } from "@fresno-events/shared";
+import { formatIngestExclusionNotes } from "@fresno-events/shared";
 
 import { resolveCandidateDetailFields } from "@/candidates/detail-status.utils";
+import { applyIngestDefaults } from "@/lib/ingest-defaults.utils";
 import type { ExistingCandidateRow } from "@/candidates/content-fingerprint.utils";
 import type { OccurrencePersistFields } from "@/candidates/occurrence-resolve.utils";
 import type { PersistEventAuditKind } from "@/candidates/persist-analysis.utils";
@@ -14,6 +16,7 @@ export interface BuildCandidateUpsertRowInput {
   existing?: ExistingCandidateRow;
   contentChanged: boolean;
   occurrence: OccurrencePersistFields;
+  ingestExclusion?: IngestExclusion;
 }
 
 /** Scrape-default confidence before first enrichment (ticketmaster slightly higher). */
@@ -82,7 +85,9 @@ async function buildFullUpsertRow(
   input: BuildCandidateUpsertRowInput,
   now: string
 ): Promise<Record<string, unknown>> {
-  const { auditKind, runId, event, fingerprint, status, existing, contentChanged, occurrence } = input;
+  const { auditKind, runId, event: rawEvent, fingerprint, status, existing, contentChanged, occurrence, ingestExclusion } =
+    input;
+  const event = applyIngestDefaults(rawEvent);
 
   const detail = resolveCandidateDetailFields(event);
 
@@ -106,10 +111,14 @@ async function buildFullUpsertRow(
     url_key: occurrence.urlKey,
     canonical_candidate_id: occurrence.canonicalCandidateId,
     updated_at: now,
-    reviewed_at: existing?.reviewed_at ?? null,
-    reviewed_by: existing?.reviewed_by ?? null,
+    reviewed_at: ingestExclusion ? now : (existing?.reviewed_at ?? null),
+    reviewed_by: ingestExclusion ? "ingest" : (existing?.reviewed_by ?? null),
     matched_event_id: occurrence.matchedEventId ?? existing?.matched_event_id ?? null,
-    review_notes: contentChanged && existing ? null : (existing?.review_notes ?? null)
+    review_notes: ingestExclusion
+      ? formatIngestExclusionNotes(ingestExclusion)
+      : contentChanged && existing
+        ? null
+        : (existing?.review_notes ?? null)
   };
 
   // PostgREST bulk upsert requires identical keys on every object (PGRST102).

@@ -1,5 +1,6 @@
 {
   "key": "fresno-convention-center",
+  "promoteSource": "fresnoconventioncenter",
   "label": "Fresno Convention Center",
   "enabled": true,
   "strategy": "listing_then_detail",
@@ -8,5 +9,6 @@
   "listingDiscovery": "plain",
   "detailMode": "plain_html",
   "detailUrlCap": 30,
-  "ingestLane": "direct"
+  "ingestLane": "direct",
+  "minEventsWarn": 2
 }

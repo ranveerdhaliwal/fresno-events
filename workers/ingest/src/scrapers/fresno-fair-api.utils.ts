@@ -1,4 +1,4 @@
-import type { NormalizedEvent } from "@fresno-events/shared";
+import { resolveVenueLocationFields, type NormalizedEvent } from "@fresno-events/shared";
 import { z } from "zod";
 
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
@@ -17,7 +17,12 @@ const FairItemSchema = z.object({
   Time: z.number().optional(),
   TimeIsSpecified: z.boolean().optional(),
   TimeDisplay: z.string().optional(),
+  EventTimeRangeString: z.string().optional(),
   DetailURL: z.string().optional(),
+  ImageOrVideoThumbnailWithPath: z.string().optional(),
+  ShortDescription: z.string().optional(),
+  LongDescription: z.string().optional(),
+  ExternalLink: z.string().nullable().optional(),
   Locations: z.array(FairLocationSchema).optional()
 });
 
@@ -40,6 +45,9 @@ const FairResponseSchema = z.object({
 
 export const FRESNO_FAIR_API_URL =
   "https://www.fresnofair.com/services/eventsservice.asmx/GetEventDaysByList";
+
+/** Fairgrounds mailing address when the API omits `AddressLine1`. */
+export const FRESNO_FAIR_DEFAULT_VENUE_ADDRESS = "1121 S. Chance Avenue, Fresno, CA 93702";
 
 export function buildFresnoFairDateList(year: number, month: number, dayCount: number): string {
   const dates: string[] = [];
@@ -111,9 +119,106 @@ export function fairTimeToClock(time: number | undefined): string | null {
   return null;
 }
 
-function pacificInstantFromFairDay(dateYmd: string, fairTime: number | undefined): string | null {
-  const clock = fairTimeToClock(fairTime) ?? "19:00";
-  return instantFromPacificLocal(dateYmd, clock);
+const AM_PM = String.raw`a\.?\s*m\.?|p\.?\s*m\.?`;
+
+function clockFromAmPm(hour12: number, minute: number, ampm: string): string {
+  const normalized = ampm.toLowerCase().replace(/\./g, "").replace(/\s+/g, "");
+  let hour = hour12 % 12;
+  if (normalized.startsWith("p")) {
+    hour += 12;
+  }
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+/** Parse fair CMS copy like "10 a.m. – 1 p.m." or "10:00 AM - 1:00 PM". */
+export function parseFairTimeRangeFromText(
+  text: string
+): { startClock: string; endClock?: string } | null {
+  const normalized = text.replace(/[\u2013\u2014]/g, "-");
+
+  const rangeMatch = normalized.match(
+    new RegExp(
+      String.raw`(\d{1,2})(?::(\d{2}))?\s*(${AM_PM})\s*-\s*(\d{1,2})(?::(\d{2}))?\s*(${AM_PM})`,
+      "i"
+    )
+  );
+  if (rangeMatch) {
+    return {
+      startClock: clockFromAmPm(Number(rangeMatch[1]), Number(rangeMatch[2] ?? 0), rangeMatch[3]!),
+      endClock: clockFromAmPm(Number(rangeMatch[4]), Number(rangeMatch[5] ?? 0), rangeMatch[6]!)
+    };
+  }
+
+  const gatesOpen = normalized.match(
+    new RegExp(String.raw`gates open at\s+(\d{1,2})(?::(\d{2}))?\s*(${AM_PM})`, "i")
+  );
+  if (gatesOpen) {
+    return {
+      startClock: clockFromAmPm(Number(gatesOpen[1]), Number(gatesOpen[2] ?? 0), gatesOpen[3]!)
+    };
+  }
+
+  return null;
+}
+
+function fairScheduleText(item: z.infer<typeof FairItemSchema>): string {
+  return [
+    item.EventTimeRangeString,
+    item.TimeDisplay,
+    item.ShortDescription,
+    item.LongDescription ? stripHtmlToText(item.LongDescription) : undefined
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(" ");
+}
+
+export function resolveFairEventSchedule(
+  item: z.infer<typeof FairItemSchema>,
+  dateYmd: string
+): { startTs: string; endTs?: string } | null {
+  if (item.TimeIsSpecified !== false && item.Time != null && item.Time > 0) {
+    const clock = fairTimeToClock(item.Time);
+    if (!clock) {
+      return null;
+    }
+    const startTs = instantFromPacificLocal(dateYmd, clock);
+    return startTs ? { startTs } : null;
+  }
+
+  const parsed = parseFairTimeRangeFromText(fairScheduleText(item));
+  if (!parsed) {
+    return null;
+  }
+
+  const startTs = instantFromPacificLocal(dateYmd, parsed.startClock);
+  if (!startTs) {
+    return null;
+  }
+
+  const endTs = parsed.endClock ? instantFromPacificLocal(dateYmd, parsed.endClock) : undefined;
+  return { startTs, ...(endTs ? { endTs } : {}) };
+}
+
+function stripHtmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fairDescriptionText(item: z.infer<typeof FairItemSchema>): string | undefined {
+  const short = item.ShortDescription?.trim();
+  const long = item.LongDescription?.trim() ? stripHtmlToText(item.LongDescription) : undefined;
+
+  if (long && (!short || long.length > short.length + 50)) {
+    return long;
+  }
+  if (short) {
+    return short;
+  }
+  return long;
 }
 
 export function fresnoFairResponseToEvents(
@@ -148,22 +253,35 @@ export function fresnoFairResponseToEvents(
         }
         seen.add(key);
 
-        const startTs = pacificInstantFromFairDay(itemDate, item.Time);
-        if (!startTs) {
+        const schedule = resolveFairEventSchedule(item, itemDate);
+        if (!schedule) {
           continue;
         }
+        const { startTs, endTs } = schedule;
         const location = item.Locations?.[0];
-        const venueAddress = location?.AddressLine1?.trim();
+        const { venueAddress, venueCity } = resolveVenueLocationFields(
+          location?.AddressLine1?.trim() || FRESNO_FAIR_DEFAULT_VENUE_ADDRESS,
+          "Fresno",
+          "CA"
+        );
+
+        const descriptionText = fairDescriptionText(item);
+        const imageUrl = item.ImageOrVideoThumbnailWithPath?.trim();
+        const ticketUrl = item.ExternalLink?.trim();
 
         events.push({
           source: "scrape:www.fresnofair.com",
           sourceEventId: `venue:big-fresno-fair:${item.EventID}:${itemDate}`,
           title: item.Name.trim(),
           venueName: "Big Fresno Fair",
-          venueCity: "Fresno",
+          venueCity: venueCity ?? "Fresno",
           startTs,
+          ...(endTs ? { endTs } : {}),
           category: "festival",
           externalUrl: item.DetailURL ?? opts.listingUrl,
+          ...(descriptionText ? { descriptionText } : {}),
+          ...(imageUrl?.startsWith("http") ? { imageUrl } : {}),
+          ...(ticketUrl?.startsWith("http") ? { ticketUrl } : {}),
           ...(venueAddress ? { venueAddress } : {}),
           ...(location?.Latitude != null ? { venueLat: location.Latitude } : {}),
           ...(location?.Longitude != null ? { venueLng: location.Longitude } : {}),

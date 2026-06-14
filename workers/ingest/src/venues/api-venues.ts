@@ -2,11 +2,10 @@
 export const API_VENUE_KEYS = [
   "visit-fresno-county",
   "downtown-fresno",
-  "milb-grizzlies"
+  "milb-grizzlies",
+  "save-mart",
+  "big-fresno-fair",
+  "gobulldogs"
 ] as const;
 
 export type ApiVenueKey = (typeof API_VENUE_KEYS)[number];
-
-export function apiVenueFilterCsv(): string {
-  return API_VENUE_KEYS.join(",");
-}

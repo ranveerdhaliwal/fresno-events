@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import configJson from "./venue.config.json";
 import { getPacificDateTimeParts } from "@/lib/pacific-instant.utils";
+import type { VenueConfig } from "@/venues/venue.types";
 
 import { parseFulton55ListingHtml, parseWfeaStartTs } from "./fulton-listing.utils";
 
-const config = configJson;
+const config = configJson as VenueConfig;
 
 const SAMPLE_HTML = `
 <section class="wfea-venue venue">

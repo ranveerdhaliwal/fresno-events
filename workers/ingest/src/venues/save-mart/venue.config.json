@@ -1,5 +1,6 @@
 {
   "key": "save-mart",
+  "promoteSource": "savemart",
   "label": "Save Mart Center",
   "enabled": true,
   "strategy": "api",
@@ -8,5 +9,7 @@
   "sourceHostname": "www.savemartcenter.com",
   "eventSource": "scrape:www.savemartcenter.com",
   "ingestLane": "direct",
-  "detailMode": "api_embedded"
+  "detailMode": "plain_html",
+  "detailUrlCap": 40,
+  "minEventsWarn": 3
 }

@@ -1,10 +1,12 @@
 {
   "key": "visit-fresno-county",
+  "promoteSource": "visitfresnocounty",
   "label": "Visit Fresno County (CMS REST)",
   "enabled": true,
   "strategy": "api",
   "listingUrl": "https://www.visitfresnocounty.org/events/calendar-of-events/",
   "eventSource": "api:visitfresnocounty",
   "detailMode": "api_embedded",
-  "listingDiscovery": "plain"
+  "listingDiscovery": "plain",
+  "minEventsWarn": 40
 }

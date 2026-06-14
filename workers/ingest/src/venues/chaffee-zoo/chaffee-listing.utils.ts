@@ -1,8 +1,11 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 import { load } from "cheerio";
+import type { Element } from "domhandler";
 
 import { withDefaultImageUrl } from "@/lib/default-image.utils";
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
+import { warnIfSelectorEmpty } from "@/venues/_shared/selector-observability.utils";
+import { applyChaffeeVenueLocation } from "@/venues/chaffee-zoo/chaffee-venue-location.utils";
 import type { VenueConfig } from "@/venues/venue.types";
 
 export const CHAFFEE_ZOO_DEFAULT_IMAGE_URL =
@@ -113,6 +116,50 @@ function parseTitle(heading: string): string {
   return withoutDate.trim();
 }
 
+const TICKET_BOILERPLATE = /^(get tickets|tickets will be available soon)\.?$/i;
+
+function collectParagraphsAfterHeading($: ReturnType<typeof load>, el: Element): string[] {
+  const paragraphs: string[] = [];
+  let sibling = $(el).next();
+  while (sibling.length && !sibling.is("h3")) {
+    if (sibling.is("p") || sibling.is("div")) {
+      const text = sibling.text().replace(/\s+/g, " ").trim();
+      if (text) {
+        paragraphs.push(text);
+      }
+    }
+    sibling = sibling.next();
+  }
+  return paragraphs;
+}
+
+/** Skip schedule lines and ticket CTAs — prose blocks become descriptionText. */
+function isScheduleOrBoilerplateLine(text: string): boolean {
+  const line = text.trim();
+  if (!line || TICKET_BOILERPLATE.test(line)) {
+    return true;
+  }
+  const hasMonth =
+    /(January|February|March|April|May|June|July|August|September|October|November|December)/i.test(line);
+  const hasClock = /\b\d{1,2}(?::\d{2})?\s*(?:AM|PM)\b/i.test(line);
+  if (hasMonth && hasClock && line.length < 120) {
+    return true;
+  }
+  if (/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i.test(line) && hasClock && line.length < 120) {
+    return true;
+  }
+  return false;
+}
+
+function extractChaffeeDescription(paragraphs: string[]): string | undefined {
+  const prose = paragraphs.map((p) => p.replace(/\s+/g, " ").trim()).filter((p) => !isScheduleOrBoilerplateLine(p));
+  const joined = prose.join("\n\n").trim();
+  if (joined.length < 40) {
+    return undefined;
+  }
+  return joined;
+}
+
 /** SSR listing at https://fcz.org/events/ */
 export function parseChaffeeListingHtml(html: string, config: VenueConfig, now: Date): NormalizedEvent[] {
   const $ = load(html);
@@ -121,18 +168,17 @@ export function parseChaffeeListingHtml(html: string, config: VenueConfig, now: 
   const events: NormalizedEvent[] = [];
   const seen = new Set<string>();
 
-  $("h3").each((_, el) => {
+  const $headings = $("h3");
+  warnIfSelectorEmpty({ venueKey: config.key, selector: "h3", matched: $headings.length });
+
+  $headings.each((_, el) => {
     const heading = $(el).text().trim();
     if (!heading || SKIP_HEADING.test(heading)) {
       return;
     }
 
-    const body = $(el)
-      .nextAll("p, div")
-      .first()
-      .text()
-      .replace(/\s+/g, " ")
-      .trim();
+    const paragraphs = collectParagraphsAfterHeading($, el);
+    const body = paragraphs.join(" ");
     const title = parseTitle(heading);
     if (!title) {
       return;
@@ -142,6 +188,8 @@ export function parseChaffeeListingHtml(html: string, config: VenueConfig, now: 
     if (!when) {
       return;
     }
+
+    const descriptionText = extractChaffeeDescription(paragraphs);
 
     const slug = slugify(title);
     if (seen.has(slug)) {
@@ -158,23 +206,24 @@ export function parseChaffeeListingHtml(html: string, config: VenueConfig, now: 
         ?.trim() ?? config.listingUrl;
 
     events.push(
-      withDefaultImageUrl(
-        {
-          source: `scrape:${host}`,
-          sourceEventId: `venue:${config.key}:${slug}`,
-          title,
-          // Short listing blurbs should not skip post-ingest LLM (see hasSufficientReviewData).
-          ...(body.length >= 120 ? { descriptionText: body } : {}),
-          venueName: config.label,
-          venueCity: "Fresno",
-          startTs: when.startTs,
-          ...(when.endTs ? { endTs: when.endTs } : {}),
-          category: "family",
-          externalUrl: config.listingUrl,
-          ...(ticketHref.startsWith("http") ? { ticketUrl: ticketHref } : {})
-        },
-        CHAFFEE_ZOO_DEFAULT_IMAGE_URL,
-        { showInCommunityList: true, listVenueLogoPadding: 2 }
+      applyChaffeeVenueLocation(
+        withDefaultImageUrl(
+          {
+            source: `scrape:${host}`,
+            sourceEventId: `venue:${config.key}:${slug}`,
+            title,
+            ...(descriptionText ? { descriptionText } : {}),
+            venueName: config.label,
+            venueCity: "Fresno",
+            startTs: when.startTs,
+            ...(when.endTs ? { endTs: when.endTs } : {}),
+            category: "family",
+            externalUrl: config.listingUrl,
+            ...(ticketHref.startsWith("http") ? { ticketUrl: ticketHref } : {})
+          },
+          CHAFFEE_ZOO_DEFAULT_IMAGE_URL,
+          { showInCommunityList: true, listVenueLogoPadding: 2 }
+        )
       )
     );
   });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canonicalOccurrenceTitle,
+  computeDateOnlyOccurrenceKey,
   computeOccurrenceFingerprints,
   computeOccurrenceKey,
   computeUrlKey,
@@ -22,6 +23,52 @@ describe("occurrence fingerprints", () => {
     expect(normalizeVenue("Save Mart Center at Fresno State - SMG")).toBe("save-mart-center");
     expect(normalizeVenue("Paul Paul Theatre")).toBe("big-fresno-fair");
     expect(normalizeVenue("Big Fresno Fair")).toBe("big-fresno-fair");
+  });
+
+  it("canonicalOccurrenceTitle aligns and vs & in co-headliner titles", () => {
+    const downtown = normalizeTitle("Los Lobos and Los Lonely Boys - The Brotherhood Tour");
+    const tm = normalizeTitle("Los Lobos & Los Lonely Boys: The Brotherhood Tour");
+    expect(canonicalOccurrenceTitle(downtown)).toBe("los lobos los lonely boys the brotherhood tour");
+    expect(canonicalOccurrenceTitle(tm)).toBe("los lobos los lonely boys the brotherhood tour");
+  });
+
+  it("matches Los Lobos downtown all-day listing vs Ticketmaster timed show", async () => {
+    const downtownFp = await computeOccurrenceFingerprints({
+      title: "Los Lobos and Los Lonely Boys - The Brotherhood Tour",
+      startTs: "2026-08-02T12:00:00.000Z",
+      venueName: "Warnors Center for the Performing Arts",
+      ticketUrl: undefined,
+      externalUrl: undefined
+    });
+    const tmFp = await computeOccurrenceFingerprints({
+      title: "Los Lobos & Los Lonely Boys: The Brotherhood Tour",
+      startTs: "2026-08-03T02:30:00.000Z",
+      venueName: "Warnors Theatre",
+      ticketUrl:
+        "https://www.ticketmaster.com/los-lobos-los-lonely-boys-the-fresno-california-08-02-2026/event/1C006481F7F3F0B3",
+      externalUrl: undefined
+    });
+
+    expect(downtownFp.dateOnlyOccurrenceKey).toBeTruthy();
+    expect(tmFp.dateOnlyOccurrenceKey).toBe(downtownFp.dateOnlyOccurrenceKey);
+    expect(
+      downtownFp.occurrenceKeysForLookup.some((key) => tmFp.occurrenceKeysForLookup.includes(key))
+    ).toBe(true);
+  });
+
+  it("keeps timed shows on different Pacific dates separate via date-only keys", async () => {
+    const nightOne = await computeDateOnlyOccurrenceKey(
+      "Shared Band Name",
+      "2026-06-01T02:00:00.000Z",
+      "Tower Theatre"
+    );
+    const nightTwo = await computeDateOnlyOccurrenceKey(
+      "Shared Band Name",
+      "2026-06-02T02:00:00.000Z",
+      "Tower Theatre"
+    );
+    expect(nightOne).toBeTruthy();
+    expect(nightOne).not.toBe(nightTwo);
   });
 
   it("canonicalOccurrenceTitle aligns Gabriel Iglesias fair vs Ticketmaster", () => {

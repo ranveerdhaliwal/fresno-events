@@ -24,6 +24,11 @@ describe("parseConventionListingHtml", () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.title).toBe("ZZ Top");
     expect(events[0]?.venueName).toBe("Saroyan Theatre");
+    expect(events[0]?.venueAddress).toBe("730 M St");
+    expect(events[0]?.venueCity).toBe("Fresno");
+    expect(events[0]?.venueLat).toBe(36.7347);
+    expect(events[0]?.venueLng).toBe(-119.7847);
+    expect(events[0]?.category).toBe("music");
     expect(events[0]?.externalUrl).toBe("https://events.fresnoconventioncenter.com/zz-top");
     expect(events[0]?.sourceEventId).toBe("venue:fresno-convention-center:zz-top");
   });

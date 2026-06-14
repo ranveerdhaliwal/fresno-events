@@ -1,5 +1,6 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 
+import { sleep } from "@/lib/sleep";
 import { resolveCandidateDetailFields } from "@/candidates/detail-status.utils";
 import type { IngestEnv } from "@/env";
 import { getSupabaseConfig, supabaseFetch } from "@/sources";
@@ -8,6 +9,11 @@ import {
   parseVisitFresnoDetailPage,
   type VisitFresnoDetailFields
 } from "@/scrapers/visit-fresno-detail.utils";
+import {
+  mergeFresnoFairDetail,
+  parseFresnoFairDetailPage,
+  type FresnoFairDetailFields
+} from "@/scrapers/fresno-fair-detail.utils";
 
 const DEFAULT_USER_AGENT = "fresno-events-ingest/1.0";
 const DETAIL_DELAY_MS = 800;
@@ -38,13 +44,12 @@ export interface DetailBackfillOptions {
   userAgent?: string;
 }
 
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
-function parseDetailForSource(source: string, html: string): VisitFresnoDetailFields | null {
+function parseDetailForSource(source: string, html: string): VisitFresnoDetailFields | FresnoFairDetailFields | null {
   if (source === "api:visitfresnocounty") {
     return parseVisitFresnoDetailPage(html);
+  }
+  if (source === "scrape:www.fresnofair.com") {
+    return parseFresnoFairDetailPage(html);
   }
   return null;
 }
@@ -201,7 +206,9 @@ export async function runDetailBackfill(
         let merged =
           source === "api:visitfresnocounty"
             ? finalizeVisitFresnoDetailMerge(row.normalized_event, parsed)
-            : { ...row.normalized_event, ...parsed };
+            : source === "scrape:www.fresnofair.com"
+              ? mergeFresnoFairDetail(row.normalized_event, parsed)
+              : { ...row.normalized_event, ...parsed };
 
         if (source === "api:visitfresnocounty" && !merged.seriesListingRecId?.trim()) {
           const recid = listingRecIdFromVisitFresnoUrl(url);

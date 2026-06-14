@@ -1,10 +1,12 @@
 {
   "key": "downtown-fresno",
+  "promoteSource": "downtownfresno",
   "label": "Downtown Fresno",
   "enabled": true,
   "strategy": "api",
   "listingUrl": "https://www.downtownfresno.org",
   "eventSource": "api:downtownfresno",
   "detailMode": "plain_html",
-  "listingDiscovery": "plain"
+  "listingDiscovery": "plain",
+  "minEventsWarn": 5
 }

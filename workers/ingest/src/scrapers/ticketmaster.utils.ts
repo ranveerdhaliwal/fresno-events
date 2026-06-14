@@ -1,5 +1,6 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
 
+import { sleep } from "@/lib/sleep";
 import {
   chooseImage,
   isString,
@@ -153,8 +154,4 @@ export async function fetchAllTicketmasterEvents(
   }
 
   return { events: all, pagesVisited };
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

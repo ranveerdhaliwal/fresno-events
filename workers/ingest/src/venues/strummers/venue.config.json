@@ -1,8 +1,11 @@
 {
   "key": "strummers",
+  "promoteSource": "strummers",
   "label": "Strummers",
   "enabled": true,
   "strategy": "html_parse",
   "listingUrl": "https://www.strummersclub.com/shows",
-  "sourceHostname": "www.strummersclub.com"
+  "sourceHostname": "www.strummersclub.com",
+  "listingDiscovery": "br_if_empty",
+  "minEventsWarn": 2
 }

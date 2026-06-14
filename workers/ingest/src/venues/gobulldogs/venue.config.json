@@ -1,5 +1,6 @@
 {
   "key": "gobulldogs",
+  "promoteSource": "gobulldogs",
   "label": "Fresno State Athletics",
   "enabled": true,
   "strategy": "api",

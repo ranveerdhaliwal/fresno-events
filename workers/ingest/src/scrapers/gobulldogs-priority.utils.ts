@@ -18,7 +18,7 @@ export function isGobulldogsFinalEvent(event: NormalizedEvent): boolean {
   if (event.tags?.includes("final")) {
     return true;
   }
-  const blob = `${event.title} ${event.descriptionText ?? ""} ${event.description ?? ""}`;
+  const blob = `${event.title} ${event.descriptionText ?? ""}`;
   return FINAL_PATTERN.test(blob);
 }
 

@@ -1,30 +1,17 @@
-import type { EventCategory, NormalizedEvent, ScrapeError } from "@fresno-events/shared";
+import { eventCategories, type EventCategory, type NormalizedEvent, type ScrapeError } from "@fresno-events/shared";
 
 import type { AiDiscoveryItem } from "@/ai";
+import { sleep } from "@/lib/sleep";
 import { extractEventsFromMarkdown, type ExtractorVariant } from "@/ai/extractor";
 import type { IngestEnv } from "@/env";
-import { renderUrlToMarkdown } from "@/browser-rendering/render-page";
+import { renderUrlToHtml, renderUrlToMarkdown } from "@/browser-rendering/render-page";
 import type { VenueConfig } from "@/venues/venue.types";
 import { parseConventionDetailPage } from "@/venues/fresno-convention-center/convention-detail.utils";
 import { parsePlainHtmlDetailPage } from "@/venues/_shared/html-detail.utils";
-import { isDetailHostBlocked, resolveDetailMode } from "@/venues/venue-profile.utils";
+import { isDetailHostBlocked, resolveDetailMode, resolveListingDiscovery } from "@/venues/venue-profile.utils";
 import { toNormalizedEventFromDiscovery } from "@/normalized-event";
 
-const ALLOWED_CATEGORIES = new Set<EventCategory>([
-  "music",
-  "comedy",
-  "theater",
-  "sports",
-  "food_drink",
-  "festival",
-  "family",
-  "art",
-  "nightlife",
-  "community",
-  "outdoor",
-  "wellness",
-  "education"
-]);
+const ALLOWED_CATEGORIES: ReadonlySet<string> = new Set(eventCategories);
 
 export const DEFAULT_DETAIL_URL_CAP = 40;
 export const DETAIL_DELAY_MS = 1_000;
@@ -96,6 +83,8 @@ export function mergeListingWithDetail(
       : {}),
     ...(detail.venueAddress?.trim() ? { venueAddress: detail.venueAddress.trim() } : {}),
     ...(detail.venueCity?.trim() ? { venueCity: detail.venueCity.trim() } : {}),
+    ...(typeof detail.venueLat === "number" ? { venueLat: detail.venueLat } : {}),
+    ...(typeof detail.venueLng === "number" ? { venueLng: detail.venueLng } : {}),
     ...(detail.ticketUrl?.trim() ? { ticketUrl: detail.ticketUrl.trim() } : {}),
     ...(imageUrl ? { imageUrl } : {}),
     ...(typeof detail.priceMin === "number" ? { priceMin: detail.priceMin } : {}),
@@ -126,10 +115,6 @@ export function listingFromDiscoveryItem(
   return toNormalizedEventFromDiscovery(item, pageUrl, seedUrlForConfig(config), "venue-ingest", {
     ...(config.seriesId ? { seriesId: config.seriesId } : {})
   });
-}
-
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 function throwIfAborted(signal: AbortSignal | undefined) {
@@ -325,15 +310,87 @@ export async function enrichListingsWithDetails(input: EnrichDetailsInput): Prom
   };
 }
 
+const LISTING_FETCH_RETRIES = 2;
+const LISTING_RETRY_BASE_MS = 500;
+
+/**
+ * Fetch listing HTML with bounded retry + exponential backoff. Retries transient
+ * failures (network errors, 429, 5xx); 4xx and abort are thrown immediately.
+ */
 export async function fetchListingHtml(url: string, userAgent: string, signal?: AbortSignal): Promise<string> {
-  const response = await fetch(url, {
-    headers: { "User-Agent": userAgent, Accept: "text/html" },
-    ...(signal ? { signal } : {})
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} fetching ${url}`);
+  let lastError: Error = new Error(`Failed fetching ${url}`);
+
+  for (let attempt = 0; attempt <= LISTING_FETCH_RETRIES; attempt += 1) {
+    throwIfAborted(signal);
+    let retryable = false;
+    try {
+      const response = await fetch(url, {
+        headers: { "User-Agent": userAgent, Accept: "text/html" },
+        ...(signal ? { signal } : {})
+      });
+      if (response.ok) {
+        return await response.text();
+      }
+      lastError = new Error(`HTTP ${response.status} fetching ${url}`);
+      retryable = response.status === 429 || response.status >= 500;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw error;
+      }
+      lastError = error instanceof Error ? error : new Error(`Failed fetching ${url}`);
+      retryable = true;
+    }
+
+    if (!retryable || attempt === LISTING_FETCH_RETRIES) {
+      throw lastError;
+    }
+    await sleep(LISTING_RETRY_BASE_MS * 2 ** attempt);
   }
-  return response.text();
+
+  throw lastError;
+}
+
+/**
+ * Fetch + parse a listing, falling back to Browser Rendering when the direct SSR
+ * fetch parses to zero events and the venue opts in via `listingDiscovery: br_if_empty`.
+ * Defensive: only triggers when the cheap path returns nothing, so a site that quietly
+ * moves to client-side rendering doesn't silently drop to zero events.
+ */
+export async function fetchAndParseListingHtml(
+  env: IngestEnv,
+  config: VenueConfig,
+  parse: (html: string) => NormalizedEvent[],
+  opts: { userAgent: string; signal?: AbortSignal }
+): Promise<NormalizedEvent[]> {
+  const html = await fetchListingHtml(config.listingUrl, opts.userAgent, opts.signal);
+  const direct = parse(html);
+  if (direct.length > 0 || resolveListingDiscovery(config) !== "br_if_empty") {
+    return direct;
+  }
+
+  const rendered = await renderUrlToHtml(env, config.listingUrl, opts.signal ? { signal: opts.signal } : {});
+  if ("error" in rendered) {
+    console.log(
+      JSON.stringify({
+        event: "venue_ingest",
+        venue_key: config.key,
+        step: "listing_br_fallback_failed",
+        error: rendered.error
+      })
+    );
+    return direct;
+  }
+
+  const fromBr = parse(rendered.html);
+  console.log(
+    JSON.stringify({
+      event: "venue_ingest",
+      venue_key: config.key,
+      step: "listing_br_fallback",
+      events_found: fromBr.length
+    })
+  );
+  return fromBr;
 }
 
 export function absoluteUrl(href: string, base: string): string | null {

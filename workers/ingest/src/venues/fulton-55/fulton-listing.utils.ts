@@ -2,6 +2,7 @@ import type { NormalizedEvent } from "@fresno-events/shared";
 import { load } from "cheerio";
 
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
+import { warnIfSelectorEmpty } from "@/venues/_shared/selector-observability.utils";
 import type { VenueConfig } from "@/venues/venue.types";
 
 function sourceHost(config: VenueConfig): string {
@@ -36,7 +37,10 @@ export function parseFulton55ListingHtml(html: string, config: VenueConfig): Nor
   const host = sourceHost(config);
   const byKey = new Map<string, NormalizedEvent>();
 
-  $("article.wfea-venue__event").each((_, articleEl) => {
+  const $articles = $("article.wfea-venue__event");
+  warnIfSelectorEmpty({ venueKey: config.key, selector: "article.wfea-venue__event", matched: $articles.length });
+
+  $articles.each((_, articleEl) => {
     const article = $(articleEl);
     const titleLink = article.find("h2.wfea-venue__title a").first();
     const title = titleLink.text().trim();

@@ -23,6 +23,22 @@ describe("canonicalDetailPageUrl", () => {
       "https://www.strummersclub.com/shows/2026/6/6/agent-orange"
     );
   });
+
+  it("uses Venunite public page when venunite_slug tag is present", () => {
+    const venunite: NormalizedEvent = {
+      source: "venunite",
+      sourceEventId: "eb:123",
+      title: "BarrelHouse Anniversary Party",
+      venueName: "BarrelHouse",
+      startTs: "2026-06-07T02:00:00.000Z",
+      category: "community",
+      externalUrl: "https://www.eventbrite.com/e/barrelhouse-anniversary-party-tickets-1990516589703",
+      tags: ["venunite", "venunite_slug:barrelhouse-anniversary-party"]
+    };
+    expect(canonicalDetailPageUrl(venunite)).toBe(
+      "https://venunite.com/events/barrelhouse-anniversary-party"
+    );
+  });
 });
 
 describe("resolveCandidateDetailFields", () => {

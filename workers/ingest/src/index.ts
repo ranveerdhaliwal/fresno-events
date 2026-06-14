@@ -46,7 +46,6 @@ export default {
       const venueParam = url.searchParams.get("venue") ?? undefined;
       const force = url.searchParams.get("force") === "true";
       const dryRun = url.searchParams.get("dry_run") === "true";
-      const resumeJobs = url.searchParams.get("resume_jobs") === "true";
       const skipEnrichment = url.searchParams.get("no_enrich") === "true" || url.searchParams.get("skip_enrichment") === "true";
       const venueFilter = venueParam
         ? venueParam
@@ -57,23 +56,9 @@ export default {
       const isVenueTrigger = (venueFilter?.length ?? 0) > 0;
       const sources = sourcesParam ?? (venueFilter?.length ? "venue-ingest" : undefined);
 
-      if (dryRun && resumeJobs) {
-        return jsonResponse(
-          {
-            ok: false,
-            error: {
-              code: "invalid_flags",
-              message: "dry_run and resume_jobs cannot be used together."
-            }
-          },
-          400
-        );
-      }
-
       const summaries = await runIngest(env, {
         force,
         dryRun,
-        resumeJobs,
         skipEnrichment: true,
         signal: req.signal,
         ...(sources ? { sources } : {}),
@@ -83,8 +68,7 @@ export default {
         console.log(JSON.stringify({ event: "ingest_run", trigger: "manual", ...compactRunSummaryForLog(summary) }));
       }
 
-      // `--venue` implies venue-scoped persist + enrichment inside venue-ingest.
-      // Do NOT run global backlog enrichment unless explicitly requested (promote-all / enrich-all).
+      // Venue sources run scoped enrichment inside venue-ingest; API scrapers get global backlog enrichment.
       if (!dryRun && !skipEnrichment && !isVenueTrigger) {
         ctx.waitUntil(runPostIngestEnrichment(env));
       }

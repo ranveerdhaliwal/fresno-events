@@ -93,4 +93,48 @@ describe("content-fingerprint.utils", () => {
     const c = await contentFingerprint({ ...baseEvent, title: "Different title" });
     expect(c).not.toBe(a);
   });
+
+  it("contentFingerprint changes when imageUrl is backfilled (fair poster promote)", async () => {
+    const withoutImage = await contentFingerprint({
+      source: "scrape:www.fresnofair.com",
+      sourceEventId: "venue:big-fresno-fair:3714:2026-10-07",
+      title: "Kansas With Starship feat. Mickey Thomas",
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-08T02:00:00.000Z",
+      category: "festival"
+    });
+    const withImage = await contentFingerprint({
+      source: "scrape:www.fresnofair.com",
+      sourceEventId: "venue:big-fresno-fair:3714:2026-10-07",
+      title: "Kansas With Starship feat. Mickey Thomas",
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-08T02:00:00.000Z",
+      category: "festival",
+      imageUrl: "https://cdn.saffire.com/images.ashx?i=Kansas_OnScreen.jpg"
+    });
+    expect(withImage).not.toBe(withoutImage);
+  });
+
+  it("contentFingerprint changes when price fields are backfilled", async () => {
+    const withoutPrice = await contentFingerprint({
+      source: "scrape:www.fresnofair.com",
+      sourceEventId: "venue:big-fresno-fair:3714:2026-10-07",
+      title: "Kansas With Starship feat. Mickey Thomas",
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-08T02:00:00.000Z",
+      category: "festival"
+    });
+    const withPrice = await contentFingerprint({
+      source: "scrape:www.fresnofair.com",
+      sourceEventId: "venue:big-fresno-fair:3714:2026-10-07",
+      title: "Kansas With Starship feat. Mickey Thomas",
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-08T02:00:00.000Z",
+      category: "festival",
+      priceMin: 45,
+      priceMax: 65,
+      priceNotes: "In-Person: $45/$50/$57/$65 · Online: $51/$56/$63.50/$71.50"
+    });
+    expect(withPrice).not.toBe(withoutPrice);
+  });
 });

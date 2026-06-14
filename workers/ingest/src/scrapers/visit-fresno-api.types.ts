@@ -4,6 +4,11 @@ const MediaRawSchema = z.object({
   mediaurl: z.string().url().optional()
 });
 
+const VisitFresnoGeoPointSchema = z.object({
+  type: z.string().optional(),
+  coordinates: z.array(z.number()).min(2).optional()
+});
+
 const VisitFresnoDocSchema = z.object({
   _id: z.string(),
   recid: z.union([z.string(), z.number()]).transform(String),
@@ -25,7 +30,10 @@ const VisitFresnoDocSchema = z.object({
   times: z.string().optional(),
   recurrence: z.string().optional(),
   hostname: z.string().optional(),
-  recurType: z.union([z.string(), z.number()]).optional()
+  recurType: z.union([z.string(), z.number()]).optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  loc: VisitFresnoGeoPointSchema.optional()
 });
 
 const VisitFresnoDocsPageSchema = z.object({

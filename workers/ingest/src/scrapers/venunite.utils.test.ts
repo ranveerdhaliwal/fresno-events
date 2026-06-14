@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { VenuniteEvent } from "./venunite.types";
-import { mapVenuniteCategory, mapVenuniteEvents, resolveSourceEventId, shouldSkipModule } from "./venunite.utils";
+import {
+  mapVenuniteCategory,
+  mapVenuniteEvents,
+  resolveSourceEventId,
+  shouldSkipModule,
+  shouldSkipVenue
+} from "./venunite.utils";
 
 const baseEvent: VenuniteEvent = {
   id: 1919350,
@@ -41,6 +47,22 @@ describe("venunite.utils", () => {
     const grizzlies = { ...baseEvent, sourceModule: "fresno_grizzlies", id: 1 };
     const events = mapVenuniteEvents([baseEvent, grizzlies]);
     expect(events).toHaveLength(1);
+  });
+
+  it("skips LDS church venue events", () => {
+    const ward = {
+      ...baseEvent,
+      id: 1736431,
+      title: "Ward Youth Activity",
+      venue: {
+        name: "The Church of Jesus Christ of Latter-day Saints",
+        slug: "the-church-of-jesus-christ-of-latter-day-saints-fresno-ca",
+        city: "Fresno",
+        state: "CA"
+      }
+    };
+    expect(shouldSkipVenue(ward)).toBe(true);
+    expect(mapVenuniteEvents([baseEvent, ward])).toHaveLength(1);
   });
 
   it("maps categories", () => {

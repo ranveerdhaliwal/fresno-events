@@ -1,6 +1,6 @@
 import type { NormalizedEvent, ScrapeResult } from "@fresno-events/shared";
 
-import { persistScrapeResult, type PersistenceResult } from "@/candidates";
+import { persistScrapeResult, type PersistenceResult, type PersistAuditSummary } from "@/candidates";
 import type { IngestEnv } from "@/env";
 import { runPostIngestEnrichment } from "@/runner";
 import type { EnrichmentSummary } from "@/enrichment";
@@ -10,6 +10,7 @@ export interface PersistAndEnrichVenueResult {
   persistence: PersistenceResult;
   sourceFilter: string;
   enrichment: EnrichmentSummary | null;
+  audit: PersistAuditSummary | null;
   /** Events after series metadata (same array persisted). */
   events: NormalizedEvent[];
 }
@@ -28,6 +29,7 @@ export async function persistAndEnrichVenueEvents(
       persistence: { persisted: false, reason: "No events to persist for venue." },
       sourceFilter,
       enrichment: null,
+      audit: null,
       events: []
     };
   }
@@ -76,5 +78,11 @@ export async function persistAndEnrichVenueEvents(
     })
   );
 
-  return { persistence, sourceFilter, enrichment, events: eventsWithSeries };
+  return {
+    persistence,
+    sourceFilter,
+    enrichment,
+    audit: persistence.persisted ? (persistence.audit ?? null) : null,
+    events: eventsWithSeries
+  };
 }

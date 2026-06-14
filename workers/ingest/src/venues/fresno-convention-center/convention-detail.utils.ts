@@ -2,6 +2,7 @@ import type { AiDiscoveryItem } from "@/ai";
 import { load } from "cheerio";
 
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
+import { resolveConventionVenueLocation } from "@/venues/fresno-convention-center/convention-venue-location.utils";
 
 const MONTH: Record<string, number> = {
   january: 1,
@@ -146,6 +147,8 @@ export function parseConventionDetailPage(html: string, pageUrl: string): AiDisc
       .map((el) => $(el).text().replace(/\s+/g, " ").trim())
       .find((line) => /theatre|theater|hall|arena|center/i.test(line) && !/\d{4}/.test(line)) ?? "Fresno Convention Center";
 
+  const venueLocation = resolveConventionVenueLocation(venueName);
+
   const ogDescription = $('meta[property="og:description"]').attr("content")?.trim();
   const descriptionText = pickDescription($, ogDescription);
   const imageUrl = $('meta[property="og:image"]').attr("content")?.trim();
@@ -154,9 +157,10 @@ export function parseConventionDetailPage(html: string, pageUrl: string): AiDisc
   return {
     title,
     venueName,
-    venueCity: "Fresno",
+    venueCity: venueLocation.venueCity ?? "Fresno",
     startTs,
     externalUrl: pageUrl.replace(/\/+$/, ""),
+    ...venueLocation,
     ...(descriptionText ? { descriptionText } : {}),
     ...(imageUrl ? { imageUrl } : {}),
     ...(ticketUrl ? { ticketUrl } : {})

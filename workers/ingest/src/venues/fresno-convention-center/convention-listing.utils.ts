@@ -3,6 +3,9 @@ import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
+import { warnIfSelectorEmpty } from "@/venues/_shared/selector-observability.utils";
+import { resolveConventionVenueLocation } from "@/venues/fresno-convention-center/convention-venue-location.utils";
+import { inferConventionCategory } from "@/venues/fresno-convention-center/convention-category.utils";
 import type { VenueConfig } from "@/venues/venue.types";
 
 function slugify(value: string): string {
@@ -133,6 +136,7 @@ function parseParagraphBlock(
   }
 
   const venueName = venueLine.replace(/^@\s*/, "").trim() || config.label;
+  const venueLocation = resolveConventionVenueLocation(venueName);
   const pathSlug = detailUrl
     ? (new URL(detailUrl).pathname.split("/").filter(Boolean).pop() ?? slugify(`${title}-${dateYmd}`))
     : slugify(`${title}-${dateYmd}`);
@@ -142,10 +146,11 @@ function parseParagraphBlock(
     sourceEventId: `venue:${config.key}:${pathSlug}`,
     title,
     venueName,
-    venueCity: "Fresno",
+    venueCity: venueLocation.venueCity ?? "Fresno",
     startTs,
-    category: "community",
+    category: inferConventionCategory(title),
     externalUrl: detailUrl ?? config.listingUrl,
+    ...venueLocation,
     ...(listingImageUrl ? { imageUrl: listingImageUrl } : {})
   };
 }
@@ -158,7 +163,10 @@ export function parseConventionListingHtml(html: string, config: VenueConfig, no
   const events: NormalizedEvent[] = [];
   const seen = new Set<string>();
 
-  $('div[class*="cparagraph-"]').each((_, block) => {
+  const $blocks = $('div[class*="cparagraph-"]');
+  warnIfSelectorEmpty({ venueKey: config.key, selector: 'div[class*="cparagraph-"]', matched: $blocks.length });
+
+  $blocks.each((_, block) => {
     const lines = $(block)
       .find("p")
       .toArray()

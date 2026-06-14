@@ -1,5 +1,7 @@
 import type { ScrapeContext, ScrapeError, ScrapeResult } from "@fresno-events/shared";
 
+import type { PersistAuditSummary } from "@/candidates/persist-audit.utils";
+import { mergePersistAuditSummaries } from "@/candidates/persist-analysis.utils";
 import { persistAndEnrichVenueEvents } from "@/candidates/persist-and-enrich-venue";
 import type { EnrichmentSummary } from "@/enrichment";
 import type { IngestEnv } from "@/env";
@@ -12,6 +14,8 @@ import type { VenueConfig } from "@/venues/venue.types";
 
 /** Max URLs in preflight JSON (full list still in venue_ingest_runs.debug). */
 const PREFLIGHT_LINK_CAP = 2000;
+
+type VenueIngestScrapeResult = ScrapeResult & { persistPreview?: PersistAuditSummary };
 
 function capPreflightLinks(urls: string[]): string[] {
   return [...new Set(urls.filter((u) => u.startsWith("http")))].slice(0, PREFLIGHT_LINK_CAP);
@@ -113,6 +117,7 @@ export function createVenueIngestRunner(env: IngestEnv) {
     const seedMetrics: NonNullable<ScrapeResult["seedMetrics"]> = [];
     let pagesVisited = 0;
     let venuePersistPerVenue = false;
+    const venuePersistAudits: PersistAuditSummary[] = [];
 
     console.log(
       JSON.stringify({
@@ -165,9 +170,13 @@ export function createVenueIngestRunner(env: IngestEnv) {
       let venueRunId: string | null = null;
       try {
         console.log(
+          `[ingest] ══ ${config.label} (${config.key})${dryRun ? " · dry-run" : ""} ══`
+        );
+        console.log(
           JSON.stringify({
             event: "venue_ingest_venue_start",
             venue_key: config.key,
+            venue_label: config.label,
             strategy: config.strategy,
             dry_run: dryRun
           })
@@ -197,6 +206,9 @@ export function createVenueIngestRunner(env: IngestEnv) {
             eventsForAggregate = persistResult.events;
             venueEnrichment = persistResult.enrichment;
             venuePersistPerVenue = true;
+            if (persistResult.audit) {
+              venuePersistAudits.push(persistResult.audit);
+            }
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             errors.push({
@@ -268,6 +280,22 @@ export function createVenueIngestRunner(env: IngestEnv) {
             status
           })
         );
+
+        // Silent-breakage guard: a non-seasonal venue dropping below its floor (e.g. a
+        // changed selector) is a soft warning, surfaced per-venue so single-venue runs
+        // catch it too. `reportCount` already accounts for LLM venues that plan detail
+        // URLs in dry-run instead of emitting events.
+        if (config.minEventsWarn !== undefined && reportCount < config.minEventsWarn && !dryRunPlan) {
+          console.log(
+            JSON.stringify({
+              event: "venue_ingest_low_event_count",
+              venue_key: config.key,
+              dry_run: dryRun,
+              events_found: reportCount,
+              min_events_warn: config.minEventsWarn
+            })
+          );
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         errors.push({
@@ -291,7 +319,7 @@ export function createVenueIngestRunner(env: IngestEnv) {
       }
     }
 
-    const scrapeResult = result(
+    const scrapeResult: VenueIngestScrapeResult = result(
       ctx,
       allEvents,
       errors,
@@ -300,6 +328,9 @@ export function createVenueIngestRunner(env: IngestEnv) {
       seedMetrics,
       venuePersistPerVenue
     );
+    if (venuePersistAudits.length > 0) {
+      scrapeResult.persistPreview = mergePersistAuditSummaries(venuePersistAudits);
+    }
 
     if (dryRun) {
       try {

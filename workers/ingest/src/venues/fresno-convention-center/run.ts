@@ -1,7 +1,6 @@
 import type { NormalizedEvent, ScrapeError } from "@fresno-events/shared";
 
 import type { IngestEnv } from "@/env";
-import { discoverConventionCenterDetailUrls } from "@/venues/_shared/link-discover.utils";
 import {
   enrichListingsWithDetails,
   fetchListingHtml,
@@ -11,9 +10,19 @@ import {
 import type { VenueConfig, VenueRunContext, VenueRunResult } from "@/venues/venue.types";
 
 import { parseConventionListingHtml } from "./convention-listing.utils";
+import { applyConventionVenueLocation } from "./convention-venue-location.utils";
+import { inferConventionCategory } from "./convention-category.utils";
 import configJson from "./venue.config.json";
 
 const config = configJson as VenueConfig;
+
+function finalizeConventionEvent(event: NormalizedEvent): NormalizedEvent {
+  const withVenue = applyConventionVenueLocation(event);
+  return {
+    ...withVenue,
+    category: inferConventionCategory(withVenue.title)
+  };
+}
 
 function stubListing(url: string, venueConfig: VenueConfig, scrapeSource: string): NormalizedEvent {
   const slug = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "event";
@@ -58,13 +67,13 @@ export async function run(env: IngestEnv, ctx: VenueRunContext): Promise<VenueRu
     }
   }
 
-  const discovered = discoverConventionCenterDetailUrls(html, config.listingUrl, config);
   const detailCap = resolveDetailCap(config);
-  const detailUrls = discovered.slice(0, detailCap);
+  // Only fetch listing cards — ignore stray internal links (old show pages still in site HTML).
+  const detailUrls = [...parsedByUrl.keys()].slice(0, detailCap);
 
   if (ctx.dryRun) {
     return {
-      events: [...parsedByUrl.values()],
+      events: [...parsedByUrl.values()].map(finalizeConventionEvent),
       errors,
       listingUrlsFound: 1,
       detailUrlsVisited: 0,
@@ -73,7 +82,7 @@ export async function run(env: IngestEnv, ctx: VenueRunContext): Promise<VenueRu
         listingUrls: [config.listingUrl],
         fetchUrls: [config.listingUrl],
         detailUrls,
-        detailUrlsPlanned: discovered.length,
+        detailUrlsPlanned: detailUrls.length,
         note: "dry-run — detail pages fetched on promote"
       }
     };
@@ -99,7 +108,7 @@ export async function run(env: IngestEnv, ctx: VenueRunContext): Promise<VenueRu
   });
 
   return {
-    events: enriched.events,
+    events: enriched.events.map(finalizeConventionEvent),
     errors: [...errors, ...enriched.errors],
     listingUrlsFound: 1,
     detailUrlsVisited: enriched.detailUrlsVisited,
@@ -108,7 +117,7 @@ export async function run(env: IngestEnv, ctx: VenueRunContext): Promise<VenueRu
       listingUrls: [config.listingUrl],
       fetchUrls: [config.listingUrl, ...detailUrls],
       detailUrls,
-      detailUrlsPlanned: discovered.length,
+      detailUrlsPlanned: detailUrls.length,
       llmCalls: enriched.llmCalls
     }
   };

@@ -22,16 +22,40 @@ describe("venue-priority.utils", () => {
     expect(resolveVenueSuggestedPriority(milbEvent({ venueName: "Valley Strong Ballpark" }))).toBe(3);
   });
 
-  it("does not match unrelated sources", () => {
+  it("returns null for unknown source + unknown venue", () => {
     expect(
       resolveVenueSuggestedPriority({
         source: "api:visitfresnocounty",
         sourceEventId: "x",
         title: "Concert",
-        venueName: "Chukchansi Park",
+        venueName: "Mystery Room",
         startTs: "2026-06-06T01:50:00.000Z"
       })
     ).toBeNull();
+  });
+
+  it("applies venue-name defaults regardless of source (Save Mart Center → P2)", () => {
+    expect(
+      resolveVenueSuggestedPriority({
+        source: "ticketmaster",
+        sourceEventId: "x",
+        title: "Some Touring Band",
+        venueName: "Save Mart Center",
+        startTs: "2026-06-06T01:50:00.000Z"
+      })
+    ).toBe(2);
+  });
+
+  it("demotes recurring listings even at a known venue (farmers market → P5)", () => {
+    expect(
+      resolveVenueSuggestedPriority({
+        source: "scrape:www.savemartcenter.com",
+        sourceEventId: "x",
+        title: "Saturday Farmers Market",
+        venueName: "Save Mart Center",
+        startTs: "2026-06-06T01:50:00.000Z"
+      })
+    ).toBe(5);
   });
 
   it("overrides AI priority and appends venue note", () => {

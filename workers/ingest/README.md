@@ -2,16 +2,19 @@
 
 ```bash
 pnpm ingest:dev
-pnpm ingest:preflight-direct    # API + html_parse
-pnpm ingest:preflight-browser   # Browser Rendering crawlers
-pnpm ingest:preflight-all       # both lanes
-pnpm ingest:promote-direct
-pnpm ingest:promote-browser
+pnpm ingest:preflight-all
 pnpm ingest:promote-all
+pnpm ingest:preflight --source=strummers
+pnpm ingest:promote --source=ticketmaster
 ```
 
-| Registry key | Role |
-|--------------|------|
-| `venue-ingest` | All repo venues (direct + browser lanes) — [docs/VENUE_INGEST.md](../../docs/VENUE_INGEST.md) |
-| `ticketmaster`, `venunite`, etc. | Third-party APIs — [docs/TICKETING_SOURCES.md](../../docs/TICKETING_SOURCES.md) |
-| `ai-discovery` | Manual civic URL discovery |
+## Sources
+
+| `--source=` | Role |
+| --- | --- |
+| `pnpm ingest:promote-all` | All 12 venue modules — [docs/VENUE_INGEST.md](../../docs/VENUE_INGEST.md) |
+| `ticketmaster` | Ticketmaster Discovery API — [docs/TICKETING_SOURCES.md](../../docs/TICKETING_SOURCES.md) |
+| `venunite` | VenuNite Fresno aggregator — [docs/TICKETING_SOURCES.md](../../docs/TICKETING_SOURCES.md) |
+| venue key or `api:…` / `scrape:…` | One venue module (same names as `event_candidates.source` in admin) |
+
+New venues: add a module under `src/venues/<key>/` (explicit `venue.config.json` + `run.ts`). No generic AI URL discovery.

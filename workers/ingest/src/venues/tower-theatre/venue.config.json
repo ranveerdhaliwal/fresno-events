@@ -1,5 +1,6 @@
 {
   "key": "tower-theatre",
+  "promoteSource": "towertheatre",
   "label": "Tower Theatre",
   "enabled": true,
   "strategy": "listing_then_detail",
@@ -12,5 +13,6 @@
   "extractorVariant": "default",
   "listingDiscovery": "plain",
   "detailMode": "plain_html",
-  "ingestLane": "direct"
+  "ingestLane": "direct",
+  "minEventsWarn": 3
 }

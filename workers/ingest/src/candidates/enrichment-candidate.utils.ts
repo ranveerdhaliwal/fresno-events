@@ -17,6 +17,13 @@ export interface EnrichmentCandidateRow {
 
 const AI_REVIEW_PREFIX = "[ai]";
 
+/**
+ * Confidence assigned when a candidate has enough structured data to review without the LLM.
+ * Higher than the pre-enrichment placeholder (see defaultConfidenceScore) so trusted API/scrape
+ * sources don't sit at the misleading 0.70 default after skipping enrichment.
+ */
+export const SUFFICIENT_WITHOUT_LLM_CONFIDENCE = 0.95;
+
 /** PostgREST status filter for enrichment batch fetches (includes pending_review backlog). */
 export const ENRICHMENT_QUEUE_STATUSES =
   "in.(awaiting_enrichment,pending_review,needs_changes)" as const;
@@ -49,11 +56,12 @@ export function candidateNeedsEnrichment(row: EnrichmentCandidateRow): boolean {
   if (isBlockedByPendingDetail(row)) {
     return false;
   }
-  if (row.status === "needs_changes") {
-    return true;
-  }
   if (hasAiEnrichmentNotes(row.review_notes)) {
     return false;
+  }
+  if (row.status === "needs_changes") {
+    // Re-enrich once per source change; promote clears review_notes when content_fingerprint changes.
+    return true;
   }
   if (ticketmasterRequiresAiEnrichment(row)) {
     return true;
@@ -64,9 +72,17 @@ export function candidateNeedsEnrichment(row: EnrichmentCandidateRow): boolean {
   return true;
 }
 
-/** Only new rows get promoted to pending_review when skipping LLM for sufficient data. */
-export function shouldPromoteSufficientWithoutLlm(row: EnrichmentCandidateRow): boolean {
-  return row.status === "awaiting_enrichment" && !hasAiEnrichmentNotes(row.review_notes);
+/**
+ * A sufficient-data row that skipped the LLM should still get a real confidence score.
+ * Applies to new (awaiting_enrichment) rows and to pending_review rows whose confidence was
+ * reset to the placeholder on a content re-scrape. Rows already enriched ([ai] notes) or already
+ * carrying the sufficient score are left untouched to avoid re-write churn each run.
+ */
+export function needsSufficientConfidenceBackfill(row: EnrichmentCandidateRow): boolean {
+  if (hasAiEnrichmentNotes(row.review_notes)) {
+    return false;
+  }
+  return row.confidence_score < SUFFICIENT_WITHOUT_LLM_CONFIDENCE;
 }
 
 export function isBlockedByPendingDetail(row: EnrichmentCandidateRow): boolean {

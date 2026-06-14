@@ -5,12 +5,11 @@ import { canRunScraper, planIngestRuns } from "@/planner";
 import { scrapers } from "@/registry";
 
 describe("planner", () => {
-  it("cron batch excludes manual-only sources", async () => {
+  it("cron batch includes only cron scrapers", async () => {
     const env = {
       TICKETMASTER_API_KEY: "tm-key",
       CLOUDFLARE_ACCOUNT_ID: "acc",
-      CLOUDFLARE_API_TOKEN: "tok",
-      VISIT_FRESNO_API_TOKEN: "vf"
+      CLOUDFLARE_API_TOKEN: "tok"
     } as IngestEnv;
 
     const planned = await planIngestRuns(env, { force: true });
@@ -19,20 +18,18 @@ describe("planner", () => {
     expect(keys).toContain("ticketmaster");
     expect(keys).toContain("venunite");
     expect(keys).toContain("venue-ingest");
-    expect(keys).not.toContain("seatgeek");
-    expect(keys).not.toContain("ai-discovery");
-    expect(keys).not.toContain("visit-fresno-api");
+    expect(keys).toHaveLength(3);
   });
 
-  it("--all includes manual-only when runnable", async () => {
+  it("--all matches cron scrapers (no manual-only sources registered)", async () => {
     const env = {
       TICKETMASTER_API_KEY: "tm-key",
-      SEATGEEK_CLIENT_ID: "id",
-      SEATGEEK_CLIENT_SECRET: "secret"
+      CLOUDFLARE_ACCOUNT_ID: "acc",
+      CLOUDFLARE_API_TOKEN: "tok"
     } as IngestEnv;
 
     const planned = await planIngestRuns(env, { sources: "all", force: true });
-    expect(planned.map((p) => p.key)).toContain("seatgeek");
+    expect(planned.map((p) => p.key).sort()).toEqual(["ticketmaster", "venue-ingest", "venunite"]);
   });
 
   it("venue-ingest is cron when Cloudflare BR is configured", () => {

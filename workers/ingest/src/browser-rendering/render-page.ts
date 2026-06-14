@@ -1,5 +1,6 @@
 import * as brClient from "@/browser-rendering/crawl-client";
 import { CRAWL_LIMITS, DEFAULT_REJECT_RESOURCE_TYPES } from "@/browser-rendering/crawl-defaults";
+import { sleep } from "@/lib/sleep";
 import type { BrCrawlRequestBody } from "@/browser-rendering/types";
 import type { IngestEnv } from "@/env";
 
@@ -21,10 +22,6 @@ function buildShallowCrawlBody(url: string, formats: string[]): BrCrawlRequestBo
       includeSubdomains: false
     }
   };
-}
-
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 function throwIfAborted(signal: AbortSignal | undefined) {

@@ -1,8 +1,12 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
-import type { Cheerio } from "cheerio";
+import type { CheerioAPI } from "cheerio";
 import { load } from "cheerio";
 
+/** `$(el)` selection type (cheerio doesn't re-export the underlying node type). */
+type CardSelection = ReturnType<CheerioAPI>;
+
 import { getPacificDateTimeParts, instantFromPacificLocal } from "@/lib/pacific-instant.utils";
+import { warnIfSelectorEmpty } from "@/venues/_shared/selector-observability.utils";
 import type { VenueConfig } from "@/venues/venue.types";
 
 const MONTH_ABBR: Record<string, string> = {
@@ -48,14 +52,41 @@ function inferYearFromRef(month: string, day: string, ref: Date): string {
   return refYear;
 }
 
-function parseCardDateYmd($card: Cheerio<unknown>, urlYearHint: string | null, ref: Date): string | null {
-  const monthText = $card.find(".data-categories .datatexdday").eq(1).text().trim().toLowerCase().slice(0, 3);
-  const dayNum = Number.parseInt($card.find(".data-categories .text-block-4").text().trim(), 10);
-  const month = MONTH_ABBR[monthText];
-  if (!month || !Number.isFinite(dayNum) || dayNum < 1 || dayNum > 31) {
+/** Fallback when Webflow's auto-generated date classes change: scan the card's date block text for "Mon DD". */
+function monthDayFromText(text: string): { month: string; day: string } | null {
+  const match = text.match(
+    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*(\d{1,2})\b|\b(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i
+  );
+  if (!match) {
     return null;
   }
-  const day = String(dayNum).padStart(2, "0");
+  const monthRaw = (match[1] ?? match[4] ?? "").toLowerCase().slice(0, 3);
+  const dayRaw = Number.parseInt(match[2] ?? match[3] ?? "", 10);
+  const month = MONTH_ABBR[monthRaw];
+  if (!month || !Number.isFinite(dayRaw) || dayRaw < 1 || dayRaw > 31) {
+    return null;
+  }
+  return { month, day: String(dayRaw).padStart(2, "0") };
+}
+
+function parseCardDateYmd($card: CardSelection, urlYearHint: string | null, ref: Date): string | null {
+  const monthText = $card.find(".data-categories .datatexdday").eq(1).text().trim().toLowerCase().slice(0, 3);
+  const dayNum = Number.parseInt($card.find(".data-categories .text-block-4").text().trim(), 10);
+  let month = MONTH_ABBR[monthText];
+  let day = Number.isFinite(dayNum) && dayNum >= 1 && dayNum <= 31 ? String(dayNum).padStart(2, "0") : null;
+
+  // Date classes changed — recover the date from the date block's raw text.
+  if (!month || !day) {
+    const fallback = monthDayFromText($card.find(".data-categories").text() || $card.text());
+    if (fallback) {
+      month = fallback.month;
+      day = fallback.day;
+    }
+  }
+
+  if (!month || !day) {
+    return null;
+  }
   const year = urlYearHint ?? inferYearFromRef(month, day, ref);
   return `${year}-${month}-${day}`;
 }
@@ -77,7 +108,7 @@ function slugFromTicketUrl(url: string): string {
   }
 }
 
-function imageUrlFromCard($card: Cheerio<unknown>): string | undefined {
+function imageUrlFromCard($card: CardSelection): string | undefined {
   const $img = $card.find("a.image-item img.image-grid, a.image-item img").first();
   const src = $img.attr("src")?.trim();
   if (src?.startsWith("http")) {
@@ -94,7 +125,7 @@ function imageUrlFromCard($card: Cheerio<unknown>): string | undefined {
   return candidates[candidates.length - 1];
 }
 
-function ticketUrlFromCard($card: Cheerio<unknown>): string | null {
+function ticketUrlFromCard($card: CardSelection): string | null {
   const candidates = [
     $card.find("a.image-item").attr("href"),
     $card.find("a.heading-blog-post").attr("href")
@@ -119,7 +150,15 @@ export function parseRainbowListingHtml(
   const seen = new Set<string>();
   const events: NormalizedEvent[] = [];
 
-  $("div.collection-item.w-dyn-item, div[role='listitem'].collection-item").each((_, el) => {
+  const primarySelector = "div.collection-item.w-dyn-item, div[role='listitem'].collection-item";
+  let $cards = $(primarySelector);
+  if ($cards.length === 0) {
+    // Webflow collection markup changed — fall back to the generic dynamic-item class.
+    $cards = $(".w-dyn-item, [role='listitem']");
+  }
+  warnIfSelectorEmpty({ venueKey: config.key, selector: primarySelector, matched: $cards.length });
+
+  $cards.each((_, el) => {
     const $card = $(el);
     const ticketUrl = ticketUrlFromCard($card);
     if (!ticketUrl || seen.has(ticketUrl)) {

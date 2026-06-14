@@ -1,7 +1,9 @@
-import type { EventCategory, NormalizedEvent } from "@fresno-events/shared";
+import { eventCategories, resolveVenueLocationFields, type EventCategory, type NormalizedEvent } from "@fresno-events/shared";
+import type { CheerioAPI } from "cheerio";
 import { load } from "cheerio";
 
 import type { AiDiscoveryItem } from "@/ai";
+import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 
 const BBQ_ENDPOINT = "https://xapi.citylightstudio.net/_bbq/_bbq_results.php";
 const EVENT_BASE = "https://www.downtownfresno.org";
@@ -37,21 +39,7 @@ export function buildDowntownFresnoUrl(bbqparam: string): string {
   return url.toString();
 }
 
-const ALLOWED_CATEGORIES = new Set<EventCategory>([
-  "music",
-  "comedy",
-  "theater",
-  "sports",
-  "food_drink",
-  "festival",
-  "family",
-  "art",
-  "nightlife",
-  "community",
-  "outdoor",
-  "wellness",
-  "education"
-]);
+const ALLOWED_CATEGORIES: ReadonlySet<string> = new Set(eventCategories);
 
 /** Prefer detail-page LLM fields; keep listing identity (sourceEventId, externalUrl). */
 export function mergeListingWithDetail(
@@ -113,15 +101,159 @@ function parseMonthDay(month: string, day: string, now: Date): string | null {
   return new Date(Date.UTC(year, monthIndex, Number(day))).toISOString().slice(0, 10);
 }
 
-function parseTimeOnDate(dateIso: string, secondary: string): string | null {
-  const match = secondary.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
-  if (!match) {
-    return new Date(`${dateIso}T12:00:00Z`).toISOString();
+/** `T12:00:00Z` (noon UTC) is the documented Downtown all-day sentinel (see pacific-instant.utils). */
+function downtownAllDaySentinel(dateIso: string): string {
+  return new Date(`${dateIso}T12:00:00Z`).toISOString();
+}
+
+/** BBQ `lnk-secondary` values: `7pm / Warnors`, `10am - 3pm`, or venue-only `Fulton 55`. */
+const DOWNTOWN_TIME_ONLY_RE =
+  /^\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*-\s*\d{1,2}(?::\d{2})?\s*(?:am|pm))?$/i;
+
+export function looksLikeDowntownTimeOnly(text: string): boolean {
+  return DOWNTOWN_TIME_ONLY_RE.test(text.trim());
+}
+
+export function parseDowntownSecondary(secondary: string): { timePart: string; venuePart: string | null } {
+  const normalized = secondary.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return { timePart: "", venuePart: null };
   }
 
-  const meridiem = match[3];
-  if (!meridiem) {
-    return new Date(`${dateIso}T12:00:00Z`).toISOString();
+  const slashIdx = normalized.indexOf("/");
+  if (slashIdx >= 0) {
+    return {
+      timePart: normalized.slice(0, slashIdx).trim(),
+      venuePart: normalized.slice(slashIdx + 1).trim() || null
+    };
+  }
+
+  if (looksLikeDowntownTimeOnly(normalized)) {
+    return { timePart: normalized, venuePart: null };
+  }
+
+  return { timePart: "", venuePart: normalized };
+}
+
+function isPlausibleVenueName(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length > 80) {
+    return false;
+  }
+  if (/[.!?]\s/.test(trimmed)) {
+    return false;
+  }
+  if (/\btakes place\b/i.test(trimmed) || /\bat the\b/i.test(trimmed)) {
+    return false;
+  }
+  return true;
+}
+
+function parseDowntownDetailLocation($: CheerioAPI): { venueName: string | null; venueAddress: string | null } {
+  const locationHeading = $("h2.on-detail").filter(
+    (_, el) => $(el).text().trim().toLowerCase() === "location"
+  );
+  if (locationHeading.length === 0) {
+    return { venueName: null, venueAddress: null };
+  }
+
+  const paragraph = locationHeading.first().next(".awesome-box").find(".awesome-box-link p").first();
+  if (paragraph.length === 0) {
+    return { venueName: null, venueAddress: null };
+  }
+
+  const anchorName = paragraph.find("a").first().text().replace(/\s+/g, " ").trim();
+  const html = paragraph.html() ?? "";
+  const lines = html
+    .split(/<br\s*\/?>/i)
+    .map((fragment) => load(`<span>${fragment}</span>`)("span").text().replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return { venueName: null, venueAddress: null };
+  }
+
+  if (anchorName) {
+    const addressLine = lines.find((line) => line !== anchorName) ?? null;
+    return {
+      venueName: isPlausibleVenueName(anchorName) ? anchorName : null,
+      venueAddress: addressLine
+    };
+  }
+
+  const firstLine = lines[0] ?? "";
+  const dashSplit = firstLine.match(/^(.+?)\s*[–—-]\s*(.+,\s*[A-Za-z]{2}(?:\s+\d{5}(?:-\d{4})?)?)\s*$/);
+  if (dashSplit) {
+    const venueName = dashSplit[1].trim();
+    return {
+      venueName: isPlausibleVenueName(venueName) ? venueName : null,
+      venueAddress: dashSplit[2].trim()
+    };
+  }
+
+  return {
+    venueName: isPlausibleVenueName(firstLine) ? firstLine : null,
+    venueAddress: lines[1] ?? null
+  };
+}
+
+function isGenericDowntownMetaDescription(text: string, title: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return true;
+  }
+  if (/ \| Downtown Fresno$/i.test(normalized)) {
+    return true;
+  }
+  const titleKey = title.replace(/\s+/g, " ").trim().toLowerCase();
+  if (titleKey && normalized.toLowerCase() === `${titleKey} | downtown fresno`) {
+    return true;
+  }
+  return false;
+}
+
+/** Prefer the on-page Details paragraph over generic `Title | Downtown Fresno` meta tags. */
+export function parseDowntownDetailDescription($: CheerioAPI, title: string): string | null {
+  const detailsHeading = $("h2.on-detail").filter(
+    (_, el) => $(el).text().trim().toLowerCase() === "details"
+  );
+  if (detailsHeading.length > 0) {
+    const paragraph = detailsHeading.first().next("p");
+    const text = paragraph.text().replace(/\s+/g, " ").trim();
+    if (text) {
+      return text.slice(0, 4000);
+    }
+  }
+
+  const metaDescription =
+    $('meta[property="og:description"]').attr("content")?.trim() ||
+    $('meta[name="description"]').attr("content")?.trim() ||
+    null;
+  if (metaDescription && !isGenericDowntownMetaDescription(metaDescription, title)) {
+    return metaDescription.slice(0, 4000);
+  }
+
+  const entryText = $(".entry-content").first().text().replace(/\s+/g, " ").trim();
+  if (entryText && !isGenericDowntownMetaDescription(entryText, title)) {
+    return entryText.slice(0, 4000);
+  }
+
+  return null;
+}
+
+function parseDowntownDetailDateIso(dateText: string, ref: Date): string | null {
+  const match = dateText.match(/\b([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})\b/);
+  if (!match) {
+    return null;
+  }
+  return parseMonthDay(match[1], match[2], ref);
+}
+
+function parseTimeOnDate(dateIso: string, timePart: string): string | null {
+  const match = timePart.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+  const meridiem = match?.[3];
+  if (!match || !meridiem) {
+    return downtownAllDaySentinel(dateIso);
   }
 
   let hour = Number(match[1]);
@@ -130,7 +262,9 @@ function parseTimeOnDate(dateIso: string, secondary: string): string | null {
   if (meridiemLower === "pm" && hour < 12) hour += 12;
   if (meridiemLower === "am" && hour === 12) hour = 0;
 
-  return new Date(`${dateIso}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00Z`).toISOString();
+  // The listing time is a Pacific wall-clock value, not UTC — anchor it to America/Los_Angeles.
+  const hhmm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  return instantFromPacificLocal(dateIso, hhmm) ?? downtownAllDaySentinel(dateIso);
 }
 
 export function parseDowntownFresnoHtml(html: string, now: Date): NormalizedEvent[] {
@@ -166,13 +300,14 @@ export function parseDowntownFresnoHtml(html: string, now: Date): NormalizedEven
     for (const item of row.items) {
       const externalUrl = item.href.startsWith("http") ? item.href : `${EVENT_BASE}${item.href}`;
       const sourceEventId = externalUrl.replace(/\/+$/, "");
-      const startTs = parseTimeOnDate(dateIso, item.secondary);
+      const { timePart, venuePart } = parseDowntownSecondary(item.secondary);
+      const startTs = parseTimeOnDate(dateIso, timePart);
 
       events.push({
         source: "api:downtownfresno",
         sourceEventId,
         title: item.title,
-        venueName: item.secondary.split("/").pop()?.trim() || "Downtown Fresno",
+        venueName: venuePart || "Downtown Fresno",
         venueCity: "Fresno",
         startTs: startTs ?? new Date(`${dateIso}T12:00:00Z`).toISOString(),
         externalUrl,
@@ -195,24 +330,107 @@ export function isDowntownDetailUrl(url: string): boolean {
   }
 }
 
-export function parseDowntownDetailHtml(html: string, listing: NormalizedEvent): NormalizedEvent {
-  const $ = load(html);
-  const descriptionText =
-    $('meta[property="og:description"]').attr("content")?.trim() ||
-    $('meta[name="description"]').attr("content")?.trim() ||
-    $(".entry-content").first().text().trim().slice(0, 4000) ||
-    undefined;
-  const imageUrl = $('meta[property="og:image"]').attr("content")?.trim();
+function absoluteDowntownUrl(src: string): string {
+  if (src.startsWith("http://") || src.startsWith("https://")) {
+    return src;
+  }
+  return new URL(src, EVENT_BASE).toString();
+}
 
-  if (!descriptionText && !imageUrl) {
+function isDowntownEventImageUrl(src: string): boolean {
+  try {
+    const url = new URL(src, EVENT_BASE);
+    const path = url.pathname.toLowerCase();
+    if (path.includes("favicon") || path.includes("apple-touch")) {
+      return false;
+    }
+    if (url.hostname.includes("img.ctykit.com")) {
+      return true;
+    }
+    return /\.(jpe?g|png|webp|gif)(?:$|\?)/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
+/** CityLight detail pages use carousel heroes; og:image is usually absent. */
+export function resolveDowntownDetailImage($: CheerioAPI): string | null {
+  const ogImage = $('meta[property="og:image"]').attr("content")?.trim();
+  if (ogImage && isDowntownEventImageUrl(ogImage)) {
+    return absoluteDowntownUrl(ogImage);
+  }
+
+  const carouselSelectors = [
+    ".carousel-item.active img[src]",
+    ".carousel img[src]",
+    ".entry-content img[src]"
+  ];
+  for (const selector of carouselSelectors) {
+    const src = $(selector).first().attr("src")?.trim();
+    if (src && isDowntownEventImageUrl(src)) {
+      return absoluteDowntownUrl(src);
+    }
+  }
+
+  return null;
+}
+
+export function parseDowntownDetailTicketUrl($: CheerioAPI): string | null {
+  const href =
+    $("a.btn-brand-pill[href]")
+      .filter((_, el) => $(el).text().trim().toLowerCase().includes("visit website"))
+      .first()
+      .attr("href")
+      ?.trim() ??
+    $('a[href*="ticket"], a:contains("Visit Website"), a:contains("Buy Tickets")')
+      .first()
+      .attr("href")
+      ?.trim();
+
+  if (!href || !href.startsWith("http")) {
+    return null;
+  }
+
+  return href;
+}
+
+export function parseDowntownDetailHtml(html: string, listing: NormalizedEvent, now = new Date()): NormalizedEvent {
+  const $ = load(html);
+  const descriptionText = parseDowntownDetailDescription($, listing.title) ?? undefined;
+  const imageUrl = resolveDowntownDetailImage($);
+  const location = parseDowntownDetailLocation($);
+  const ticketUrl = parseDowntownDetailTicketUrl($);
+  const detailDate = $(".dldate").first().text().trim();
+  const detailTime = $(".dltime").first().text().trim();
+  const dateIso = detailDate ? parseDowntownDetailDateIso(detailDate, now) : null;
+  const startTs =
+    dateIso && detailTime
+      ? parseTimeOnDate(dateIso, detailTime.split("-")[0]?.trim() ?? detailTime)
+      : null;
+
+  const patch: Partial<NormalizedEvent> = {
+    ...(descriptionText ? { descriptionText } : {}),
+    ...(imageUrl ? { imageUrl } : {}),
+    ...(ticketUrl ? { ticketUrl } : {}),
+    ...(location.venueName ? { venueName: location.venueName } : {}),
+    ...(startTs ? { startTs } : {})
+  };
+
+  if (location.venueAddress) {
+    const { venueAddress, venueCity } = resolveVenueLocationFields(location.venueAddress, listing.venueCity, "CA");
+    if (venueAddress) {
+      patch.venueAddress = venueAddress;
+    }
+    if (venueCity) {
+      patch.venueCity = venueCity;
+    }
+  }
+
+  if (Object.keys(patch).length === 0) {
     return listing;
   }
 
-  return {
-    ...listing,
-    ...(descriptionText ? { descriptionText } : {}),
-    ...(imageUrl ? { imageUrl } : {})
-  };
+  return { ...listing, ...patch };
 }
 
 export async function enrichDowntownEventsWithPlainDetail(
@@ -241,7 +459,7 @@ export async function enrichDowntownEventsWithPlainDetail(
         continue;
       }
       const html = await response.text();
-      out.push(parseDowntownDetailHtml(html, listing));
+      out.push(parseDowntownDetailHtml(html, listing, new Date()));
     } catch {
       out.push(listing);
     }

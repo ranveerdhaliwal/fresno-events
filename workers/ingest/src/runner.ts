@@ -69,7 +69,6 @@ export interface RunOptions {
   sources?: string;
   force?: boolean;
   dryRun?: boolean;
-  resumeJobs?: boolean;
   /** Venue keys for venue-ingest (e.g. tower-theatre, save-mart). */
   venueFilter?: string[];
   /** When true, skip post-ingest AI enrichment (caller may run it via `waitUntil`). */
@@ -131,9 +130,6 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
   const runCtx: RunOneContext = { now, userAgent, supabase };
   if (options.dryRun) {
     runCtx.dryRun = true;
-  }
-  if (options.resumeJobs) {
-    runCtx.resumeJobs = true;
   }
   if (options.signal) {
     runCtx.signal = options.signal;
@@ -295,7 +291,6 @@ interface RunOneContext {
   userAgent: string;
   supabase: ReturnType<typeof getSupabaseConfig>;
   dryRun?: boolean;
-  resumeJobs?: boolean;
   venueFilter?: string[];
   signal?: AbortSignal;
 }
@@ -303,9 +298,6 @@ interface RunOneContext {
 function resolveCoordinatorMode(ctx: RunOneContext): CoordinatorMode {
   if (ctx.dryRun) {
     return "dry-run";
-  }
-  if (ctx.resumeJobs) {
-    return "resume-jobs";
   }
   return "real";
 }
@@ -341,8 +333,7 @@ async function runOne(
       runId,
       sourceIndex: batch.sourceIndex,
       sourceTotal: batch.sourceTotal,
-      dry_run: ctx.dryRun ?? false,
-      resume_jobs: ctx.resumeJobs ?? false
+      dry_run: ctx.dryRun ?? false
     })
   );
 
@@ -498,9 +489,30 @@ async function runOne(
   }
 
   const enrichmentPerVenue = result.metrics.venuePersistPerVenue === true;
-  const persistence: PersistenceResult = enrichmentPerVenue
-    ? { persisted: true, candidates: result.events.length }
-    : await persistScrapeResult(env, result);
+  const venuePersistPreview = (result as ScrapeResult & { persistPreview?: PersistAuditSummary }).persistPreview;
+
+  let persistence: PersistenceResult;
+  let persistPreview: PersistAuditSummary | undefined;
+
+  if (enrichmentPerVenue) {
+    persistence = {
+      persisted: true,
+      candidates: result.events.length,
+      ...(venuePersistPreview ? { audit: venuePersistPreview } : {})
+    };
+    persistPreview = venuePersistPreview;
+  } else {
+    persistence = await persistScrapeResult(env, result);
+    if (persistence.persisted && persistence.audit) {
+      persistPreview = persistence.audit;
+    }
+  }
+
+  if (persistPreview) {
+    console.log(
+      `[ingest] promote persist: +${persistPreview.new} new, ~${persistPreview.changed} changed, =${persistPreview.unchanged} unchanged`
+    );
+  }
   console.log(
     JSON.stringify({
       event: "ingest_source_end",
@@ -531,6 +543,7 @@ async function runOne(
       message: err.message
     })),
     ...(result.seedMetrics?.length ? { seed_metrics: mapSeedMetrics(result) } : {}),
+    ...(persistPreview ? { persist_preview: persistPreview } : {}),
     ...batchDedupeFields
   };
 }

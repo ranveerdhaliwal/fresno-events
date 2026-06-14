@@ -1,6 +1,6 @@
 export type CrawlProvider = "ticketsauce" | "listing_page" | "festival" | "headline_only";
 
-/** Input for crawl target resolution (formerly seed_urls rows). */
+/** Input for crawl target resolution (venue browser-rendering profiles). */
 export interface CrawlSeedInput {
   url: string;
   crawl_hints: Record<string, unknown>;

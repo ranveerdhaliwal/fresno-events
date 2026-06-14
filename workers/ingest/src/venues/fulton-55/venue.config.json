@@ -1,9 +1,12 @@
 {
   "key": "fulton-55",
+  "promoteSource": "fulton55",
   "label": "Fulton 55",
   "enabled": true,
   "strategy": "html_parse",
   "listingUrl": "https://fulton55.com/",
   "sourceHostname": "fulton55.com",
-  "blockedDetailHosts": ["eventbrite.com", "www.eventbrite.com"]
+  "blockedDetailHosts": ["eventbrite.com", "www.eventbrite.com"],
+  "listingDiscovery": "br_if_empty",
+  "minEventsWarn": 2
 }

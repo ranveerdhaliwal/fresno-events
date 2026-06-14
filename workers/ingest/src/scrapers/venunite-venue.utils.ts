@@ -1,6 +1,6 @@
 import type { VenuniteEvent, VenuniteVenueDetail } from "./venunite.types";
 import { VenuniteVenueDetailSchema } from "./venunite.types";
-import { shouldSkipModule, sleep } from "./venunite.utils";
+import { shouldSkipModule, shouldSkipVenue, sleep } from "./venunite.utils";
 
 const VENUNITE_VENUE_API = "https://venunite.com/api/venues";
 
@@ -17,7 +17,7 @@ export function collectVenuniteVenueIds(
 ): number[] {
   const ids = new Set<number>();
   for (const event of events) {
-    if (shouldSkipModule(event.sourceModule, skipModules)) {
+    if (shouldSkipModule(event.sourceModule, skipModules) || shouldSkipVenue(event)) {
       continue;
     }
     if (event.venueId != null) {

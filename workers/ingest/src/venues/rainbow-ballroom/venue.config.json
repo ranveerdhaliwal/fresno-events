@@ -1,5 +1,6 @@
 {
   "key": "rainbow-ballroom",
+  "promoteSource": "rainbowballroom",
   "label": "Rainbow Ballroom",
   "enabled": true,
   "strategy": "html_parse",
@@ -16,5 +17,7 @@
   ],
   "sourceHostname": "www.rainbowballroom.com",
   "ingestLane": "direct",
-  "detailMode": "none"
+  "detailMode": "none",
+  "listingDiscovery": "br_if_empty",
+  "minEventsWarn": 2
 }

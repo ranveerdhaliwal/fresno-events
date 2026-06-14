@@ -7,10 +7,6 @@ export interface IngestEnv {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   ADMIN_REVIEW_TOKEN?: string;
   TICKETMASTER_API_KEY?: string;
-  SEATGEEK_CLIENT_ID?: string;
-  SEATGEEK_CLIENT_SECRET?: string;
-  EVENTBRITE_API_KEY?: string;
-  BANDSINTOWN_APP_ID?: string;
   ANTHROPIC_API_KEY?: string;
   /** Gemini Developer API (AI Studio). Not exposed to the web app. */
   GEMINI_API_KEY?: string;

@@ -8,7 +8,8 @@ import {
   hasAiEnrichmentNotes,
   hasSufficientReviewData,
   isBlockedByPendingDetail,
-  shouldPromoteSufficientWithoutLlm,
+  needsSufficientConfidenceBackfill,
+  SUFFICIENT_WITHOUT_LLM_CONFIDENCE,
   summarizeEnrichmentDelta,
   ticketmasterRequiresAiEnrichment
 } from "./enrichment-candidate.utils";
@@ -68,7 +69,18 @@ describe("enrichment-candidate.utils", () => {
     ).toBe(true);
   });
 
-  it("candidateNeedsEnrichment always runs for needs_changes", () => {
+  it("candidateNeedsEnrichment runs for needs_changes until AI notes are written", () => {
+    expect(
+      candidateNeedsEnrichment({
+        id: "4",
+        status: "needs_changes",
+        normalized_event: { ...base, descriptionText: "Full write-up" },
+        confidence_score: 0.9,
+        review_notes: null,
+        suggested_priority: 2,
+        matched_event_id: "e1"
+      })
+    ).toBe(true);
     expect(
       candidateNeedsEnrichment({
         id: "4",
@@ -79,7 +91,7 @@ describe("enrichment-candidate.utils", () => {
         suggested_priority: 2,
         matched_event_id: "e1"
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("ticketmasterRequiresAiEnrichment even when payload is otherwise sufficient", () => {
@@ -142,7 +154,7 @@ describe("enrichment-candidate.utils", () => {
     ).toBe(true);
   });
 
-  it("shouldPromoteSufficientWithoutLlm only for awaiting_enrichment without ai notes", () => {
+  it("needsSufficientConfidenceBackfill bumps placeholder confidence for new and re-scraped rows", () => {
     const awaiting = {
       id: "1",
       status: "awaiting_enrichment" as const,
@@ -152,17 +164,32 @@ describe("enrichment-candidate.utils", () => {
       suggested_priority: null
     };
 
-    expect(shouldPromoteSufficientWithoutLlm(awaiting)).toBe(true);
+    // New row still at the placeholder default → backfill.
+    expect(needsSufficientConfidenceBackfill(awaiting)).toBe(true);
+
+    // pending_review row reset to placeholder on a content re-scrape → backfill (the bug fix).
     expect(
-      shouldPromoteSufficientWithoutLlm({
+      needsSufficientConfidenceBackfill({
         ...awaiting,
         status: "pending_review",
+        review_notes: null
+      })
+    ).toBe(true);
+
+    // Already carries the sufficient score → leave it (no per-run churn).
+    expect(
+      needsSufficientConfidenceBackfill({
+        ...awaiting,
+        confidence_score: SUFFICIENT_WITHOUT_LLM_CONFIDENCE,
         review_notes: "[ingest] skipped LLM"
       })
     ).toBe(false);
+
+    // Already LLM-enriched → never overwrite.
     expect(
-      shouldPromoteSufficientWithoutLlm({
+      needsSufficientConfidenceBackfill({
         ...awaiting,
+        confidence_score: 0.7,
         review_notes: "[ai] done"
       })
     ).toBe(false);
@@ -209,6 +236,66 @@ describe("enrichment-candidate.utils", () => {
 
     expect(delta.status_change).toBe("pending_review → rejected");
     expect(delta.db_fields).toContain("status");
+  });
+
+  it("fair promote regression: enriched needs_changes rows do not re-queue LLM", () => {
+    const enrichedNeedsChanges = {
+      id: "fair-40",
+      status: "needs_changes" as const,
+      normalized_event: {
+        source: "scrape:www.fresnofair.com" as const,
+        sourceEventId: "venue:big-fresno-fair:58:2026-10-07",
+        title: "4.0 & Above Program",
+        venueName: "Big Fresno Fair",
+        startTs: "2026-10-07T18:30:00.000Z",
+        category: "education" as const,
+        descriptionText: "Student achievement program at the fair."
+      },
+      confidence_score: 1,
+      review_notes: "[ai] Official event at Big Fresno Fair celebrating student achievements.",
+      suggested_priority: 4,
+      matched_event_id: "published-1"
+    };
+
+    const queue = [
+      enrichedNeedsChanges,
+      {
+        id: "fair-new",
+        status: "awaiting_enrichment" as const,
+        normalized_event: {
+          source: "scrape:www.fresnofair.com" as const,
+          sourceEventId: "venue:big-fresno-fair:9999:2026-10-20",
+          title: "Brand New Fair Row",
+          venueName: "Big Fresno Fair",
+          startTs: "2026-10-20T18:30:00.000Z",
+          category: "festival" as const
+        },
+        confidence_score: 0.7,
+        review_notes: null,
+        suggested_priority: null
+      }
+    ];
+
+    expect(queue.filter(candidateNeedsEnrichment)).toEqual([queue[1]]);
+    expect(candidateNeedsEnrichment(enrichedNeedsChanges)).toBe(false);
+  });
+
+  it("needs_changes re-queues LLM after promote clears review_notes on content change", () => {
+    expect(
+      candidateNeedsEnrichment({
+        id: "fair-40",
+        status: "needs_changes",
+        normalized_event: {
+          ...base,
+          source: "scrape:www.fresnofair.com",
+          descriptionText: "Updated fair copy after image backfill."
+        },
+        confidence_score: 0.9,
+        review_notes: null,
+        suggested_priority: 4,
+        matched_event_id: "published-1"
+      })
+    ).toBe(true);
   });
 
   it("formatEnrichmentDoneLine fits on one readable line", () => {

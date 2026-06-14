@@ -1,7 +1,11 @@
 import type { NormalizedEvent, ScrapeContext, ScrapeError, ScrapeResult } from "@fresno-events/shared";
 
+import {
+  collectVenuniteEventSlugs,
+  loadVenuniteEventDetails
+} from "./venunite-detail.utils";
 import { collectVenuniteVenueIds, loadVenuniteVenueDetails } from "./venunite-venue.utils";
-import type { VenuniteVenueDetail } from "./venunite.types";
+import type { VenuniteEventDetail, VenuniteVenueDetail } from "./venunite.types";
 import {
   buildVenunitePageUrl,
   mapVenuniteEvents,
@@ -10,12 +14,17 @@ import {
   venuniteConfig
 } from "./venunite.utils";
 
+const log = (payload: Record<string, unknown>) =>
+  console.log(JSON.stringify({ event: "venunite_ingest", ...payload }));
+
 export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
   const started = performance.now();
   const errors: ScrapeError[] = [];
   const allEvents: NormalizedEvent[] = [];
   const venueCache = new Map<number, VenuniteVenueDetail>();
+  const eventDetailCache = new Map<string, VenuniteEventDetail>();
   let pagesVisited = 0;
+  let eventDetailsFetched = 0;
   let totalPages = 1;
 
   try {
@@ -55,7 +64,37 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
         delayMs: venuniteConfig.venueDetailDelayMs
       });
 
-      allEvents.push(...mapVenuniteEvents(payload.events, venuniteConfig.skipModules, venueCache));
+      const slugs = collectVenuniteEventSlugs(payload.events, venuniteConfig.skipModules);
+      if (slugs.length > 0) {
+        log({
+          step: "event_detail_start",
+          page,
+          slug_count: slugs.length,
+          dry_run: ctx.coordinatorMode === "dry-run"
+        });
+        const fetched = await loadVenuniteEventDetails(slugs, eventDetailCache, {
+          userAgent: ctx.userAgent,
+          ...(ctx.signal ? { signal: ctx.signal } : {}),
+          delayMs: venuniteConfig.eventDetailDelayMs
+        }, errors);
+        eventDetailsFetched += fetched;
+        log({
+          step: "event_detail_end",
+          page,
+          fetched,
+          cache_size: eventDetailCache.size,
+          dry_run: ctx.coordinatorMode === "dry-run"
+        });
+      }
+
+      allEvents.push(
+        ...mapVenuniteEvents(
+          payload.events,
+          venuniteConfig.skipModules,
+          venueCache,
+          eventDetailCache
+        )
+      );
 
       if (page < totalPages) {
         await sleep(venuniteConfig.pageDelayMs);
@@ -79,6 +118,7 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
     errors,
     metrics: {
       pagesVisited,
+      eventDetailsFetched,
       durationMs: Math.round(performance.now() - started)
     }
   };

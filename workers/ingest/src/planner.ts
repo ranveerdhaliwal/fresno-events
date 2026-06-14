@@ -1,6 +1,5 @@
 import type { IngestEnv } from "@/env";
 import { fetchIngestRunStatsBySource, fetchLastRunStartedAt } from "@/ingest-runs";
-import { getJsonPromptBackend } from "@/llm/registry";
 import { findScraper, scrapers, type RegisteredScraper } from "@/registry";
 import { getSupabaseConfig, type SupabaseConfig } from "@/sources";
 
@@ -17,7 +16,7 @@ export interface PlanOptions {
 }
 
 /**
- * Decide which scrapers to run. All source definitions live in registry.ts (+ civic-urls.ts).
+ * Decide which scrapers to run. All source definitions live in registry.ts.
  * Cadence uses ingest_runs history, not event_sources.
  */
 export async function planIngestRuns(env: IngestEnv, options: PlanOptions = {}): Promise<PlanItem[]> {
@@ -129,10 +128,6 @@ export function canRunScraper(env: IngestEnv, scraper: RegisteredScraper): boole
     if (typeof value !== "string" || !value.trim()) {
       return false;
     }
-  }
-
-  if (scraper.key === "ai-discovery" && !getJsonPromptBackend(env, "discovery")) {
-    return false;
   }
 
   return true;

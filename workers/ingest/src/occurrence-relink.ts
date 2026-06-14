@@ -2,11 +2,13 @@ import type { NormalizedEvent } from "@fresno-events/shared";
 
 import {
   computeRelinkPatches,
+  summarizeRelinkLinkGroups,
   type RelinkCandidateRow,
   type RelinkPatch,
   type RelinkPlanSummary,
   type RelinkPublishedEvent
 } from "@/candidates/occurrence-relink.utils";
+import { harmonizeLinkedOccurrencePricingBatch } from "@/candidates/linked-price-harmonize.utils";
 import type { IngestEnv } from "@/env";
 import { getSupabaseConfig, supabaseFetch, supabaseHeaders, type SupabaseConfig } from "@/sources";
 
@@ -167,19 +169,25 @@ export async function runOccurrenceRelink(
     const before = rowById.get(patch.id);
     return before ? patchChanged(before, patch) : false;
   });
+  const changedIds = new Set(changedPatches.map((patch) => patch.id));
+  const linkSummary = summarizeRelinkLinkGroups(rows, patches, changedIds, {
+    crossSourceDedupe,
+    maxExamples: 10
+  });
+  const summaryWithLinks = { ...summary, ...linkSummary };
 
   console.log(
     JSON.stringify({
       event: "ingest_occurrence_relink_plan",
       dry_run: dryRun,
       cross_source_dedupe: crossSourceDedupe,
-      ...summary,
+      ...summaryWithLinks,
       changed: changedPatches.length
     })
   );
   console.log(
     formatRelinkSummaryMessage({
-      ...summary,
+      ...summaryWithLinks,
       dry_run: dryRun,
       changed: changedPatches.length,
       applied: 0,
@@ -190,7 +198,7 @@ export async function runOccurrenceRelink(
 
   if (dryRun) {
     return {
-      ...summary,
+      ...summaryWithLinks,
       dry_run: true,
       changed: changedPatches.length,
       applied: 0,
@@ -201,6 +209,7 @@ export async function runOccurrenceRelink(
 
   let applied = 0;
   let errors = 0;
+  const occurrenceIdsPriced = new Set<string>();
 
   for (let offset = 0; offset < changedPatches.length; offset += PATCH_BATCH_SIZE) {
     const batch = changedPatches.slice(offset, offset + PATCH_BATCH_SIZE);
@@ -209,6 +218,7 @@ export async function runOccurrenceRelink(
         try {
           await applyPatch(supabase, patch);
           applied += 1;
+          occurrenceIdsPriced.add(patch.occurrence_id);
         } catch (error) {
           errors += 1;
           console.log(
@@ -223,8 +233,19 @@ export async function runOccurrenceRelink(
     );
   }
 
+  const priceHarmonize = await harmonizeLinkedOccurrencePricingBatch(supabase, [...occurrenceIdsPriced]);
+  if (priceHarmonize.rowsUpdated > 0) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_occurrence_relink_price_harmonize",
+        occurrences: priceHarmonize.occurrences,
+        rows_updated: priceHarmonize.rowsUpdated
+      })
+    );
+  }
+
   const result: OccurrenceRelinkSummary = {
-    ...summary,
+    ...summaryWithLinks,
     dry_run: false,
     changed: changedPatches.length,
     applied,
