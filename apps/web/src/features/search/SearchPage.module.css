@@ -1,7 +1,38 @@
 .page {
-  max-width: 720px;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: 24px 20px 48px;
+  padding: 24px 32px 48px;
+}
+
+.script {
+  font-family: var(--font-script);
+  color: var(--coral);
+  margin-right: 6px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.listCol {
+  min-width: 0;
+}
+
+.venueList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.venueLink {
+  display: block;
+  padding: 8px 0;
+  color: var(--coral);
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .title {

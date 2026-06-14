@@ -12,6 +12,11 @@ describe("event-view-model", () => {
     expect(formatPrice({ ...first.event, isFree: true, priceMin: 0, priceMax: 0 })).toBe("Free");
   });
 
+  it("returns empty string when price is unknown", () => {
+    const { priceMin: _min, priceMax: _max, isFree: _free, ...rest } = first.event;
+    expect(formatPrice({ ...rest, isFree: false })).toBe("");
+  });
+
   it("derives tagline from description", () => {
     const tagline = deriveTagline(first.event);
     expect(tagline.length).toBeGreaterThan(0);

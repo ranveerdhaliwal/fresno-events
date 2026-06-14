@@ -1,6 +1,11 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { ApiResponse, EventListResponse } from "@fresno-events/shared";
+
+import { EventRow } from "@/components/EventRow";
+import { PageChrome } from "@/components/PageChrome";
+import { toEventRowViewModel } from "@/lib/event-view-model";
 
 import { EventMap } from "./EventMap";
 import styles from "./EventMap.module.css";
@@ -36,23 +41,41 @@ async function fetchMapEvents(): Promise<EventListResponse> {
 }
 
 export function EventMapPage() {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ["event-map"],
     queryFn: fetchMapEvents,
     staleTime: 1000 * 60
   });
 
+  const rows = useMemo(() => (query.data?.items ?? []).map((item) => toEventRowViewModel(item)), [query.data]);
+
   return (
-    <div>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Event map</h1>
-        <p className={styles.meta}>Internal dev tool — direct URL only.</p>
-      </header>
-      {query.isLoading ? <p className={styles.meta}>Loading events…</p> : null}
-      {query.error ? <p className={styles.meta}>{query.error.message}</p> : null}
-      {query.data ? (
-        <EventMap items={query.data.items} omittedNoCoords={query.data.meta?.omittedNoCoords ?? 0} />
-      ) : null}
-    </div>
+    <PageChrome mobileNav={{ variant: "day", title: "MAP" }}>
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>Map</h1>
+          <p className={styles.meta}>{rows.length} pinned events</p>
+        </header>
+        {query.isLoading ? <p className={styles.meta}>Loading events…</p> : null}
+        {query.error ? <p className={styles.meta}>{query.error.message}</p> : null}
+        {query.data ? (
+          <div className={styles.layout}>
+            <aside className={styles.sidebar}>
+              {rows.map((row) => (
+                <EventRow
+                  key={row.id}
+                  event={row}
+                  isSelected={selectedId === row.id}
+                  onSelect={() => setSelectedId(row.id)}
+                  showImage={false}
+                />
+              ))}
+            </aside>
+            <EventMap items={query.data.items} omittedNoCoords={query.data.meta?.omittedNoCoords ?? 0} />
+          </div>
+        ) : null}
+      </div>
+    </PageChrome>
   );
 }

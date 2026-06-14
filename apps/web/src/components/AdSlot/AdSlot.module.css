@@ -119,8 +119,25 @@
   color: var(--text-secondary-on-card);
 }
 
+.live {
+  min-height: 90px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wide.live,
+.banner.live {
+  margin: 22px 32px;
+}
+
 @media (max-width: 600px) {
   .wide {
+    margin: 16px;
+  }
+
+  .wide.live {
     margin: 16px;
   }
 }

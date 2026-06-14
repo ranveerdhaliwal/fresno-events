@@ -1,0 +1,91 @@
+.footer {
+  margin-top: 48px;
+  padding: 28px 32px 32px;
+  border-top: 1.5px dashed var(--border-on-page);
+  background: color-mix(in srgb, var(--surface-inset) 70%, transparent);
+}
+
+.inner {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1.4fr 1fr 1fr;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.tagline {
+  margin: 0;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--text-on-page) 75%, transparent);
+}
+
+.script {
+  margin: 10px 0 0;
+  font-family: var(--font-script);
+  font-size: 22px;
+  color: var(--coral);
+  transform: rotate(-2deg);
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: start;
+}
+
+.link {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-on-page);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--mustard);
+}
+
+.social {
+  align-self: start;
+}
+
+.socialLabel {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-on-page) 60%, transparent);
+}
+
+.socialPlaceholder {
+  margin: 0;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--text-on-page) 65%, transparent);
+}
+
+.copy {
+  max-width: var(--page-max);
+  margin: 20px auto 0;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--text-on-page) 55%, transparent);
+}
+
+@media (max-width: 768px) {
+  .footer {
+    padding: 24px 16px 28px;
+  }
+
+  .inner {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}

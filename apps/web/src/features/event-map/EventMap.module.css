@@ -96,3 +96,22 @@
   margin: 0;
   font-family: var(--font-display);
 }
+
+.page {
+  min-height: 100vh;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  min-height: calc(100vh - 120px);
+}
+
+.sidebar {
+  overflow: auto;
+  padding: 12px;
+  border-right: 2px solid var(--border-default);
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}

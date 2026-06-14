@@ -1,4 +1,14 @@
-import type { ApiResponse, EventDetailResponse, EventListItem, EventListResponse, HomepageCurationResponse } from "@fresno-events/shared";
+import {
+  resolvePacificDateWindow,
+  type ApiResponse,
+  type CalendarMonthResponse,
+  type EventDetailResponse,
+  type EventListItem,
+  type EventListResponse,
+  type EventSectionsResponse,
+  type HomepageCurationResponse,
+  type VenueDetailResponse
+} from "@fresno-events/shared";
 
 import { getMockEventBySlug, getMockEventList } from "@/services/events.mock";
 import type { EventDetailResult, EventListResult, HomepageCurationResult } from "@/services/events.types";
@@ -12,9 +22,14 @@ export async function listDayEvents(isoDate: string, signal?: AbortSignal): Prom
 export const eventsService = {
   listTodayEvents,
   listWeekEvents,
+  listWeekThroughSunday,
   listDayEvents,
+  listSeriesEvents,
   getEventDetail,
-  getHomepageCuration
+  getHomepageCuration,
+  getEventSections,
+  getCalendarMonth,
+  getVenueDetail
 };
 
 export async function listTodayEvents(signal?: AbortSignal): Promise<EventListResult> {
@@ -32,6 +47,120 @@ export async function listWeekEvents(options: {
     limit: 50,
     ...(options.signal ? { signal: options.signal } : {})
   });
+}
+
+export async function listWeekThroughSunday(signal?: AbortSignal): Promise<EventListResult> {
+  const window = resolvePacificDateWindow("thisWeek");
+  return listEvents({
+    from: window.from,
+    until: window.until,
+    limit: 100,
+    ...(signal ? { signal } : {})
+  });
+}
+
+export async function listSeriesEvents(seriesId: string, signal?: AbortSignal): Promise<EventListResult> {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    return createMockResult({});
+  }
+
+  try {
+    const url = new URL("/events", apiUrl);
+    url.searchParams.set("series_id", seriesId);
+    url.searchParams.set("limit", "50");
+    const response = await fetch(url, createRequestInit(signal));
+    if (!response.ok) {
+      throw new Error(`Events API responded with ${response.status}`);
+    }
+    const payload = (await response.json()) as ApiResponse<EventListResponse>;
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+    return {
+      items: payload.data.items,
+      nextCursor: payload.data.nextCursor,
+      source: "api",
+      generatedAt: payload.data.generatedAt
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+    return createMockResult({});
+  }
+}
+
+export async function getEventSections(signal?: AbortSignal): Promise<EventSectionsResponse & { source: "api" | "mock" }> {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    return createMockSectionsResult(signal);
+  }
+
+  try {
+    const response = await fetch(new URL("/events/sections", apiUrl), createRequestInit(signal));
+    if (!response.ok) {
+      throw new Error(`Sections API responded with ${response.status}`);
+    }
+    const payload = (await response.json()) as ApiResponse<EventSectionsResponse>;
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+    return { ...payload.data, source: "api" };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+    return createMockSectionsResult(signal);
+  }
+}
+
+export async function getCalendarMonth(
+  year: number,
+  month: number,
+  signal?: AbortSignal
+): Promise<CalendarMonthResponse & { source: "api" | "mock" }> {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    return createMockCalendarResult(year, month);
+  }
+
+  try {
+    const url = new URL("/events/calendar", apiUrl);
+    url.searchParams.set("year", String(year));
+    url.searchParams.set("month", String(month));
+    const response = await fetch(url, createRequestInit(signal));
+    if (!response.ok) {
+      throw new Error(`Calendar API responded with ${response.status}`);
+    }
+    const payload = (await response.json()) as ApiResponse<CalendarMonthResponse>;
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+    return { ...payload.data, source: "api" };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+    return createMockCalendarResult(year, month);
+  }
+}
+
+export async function getVenueDetail(slug: string, signal?: AbortSignal) {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    throw new Error("Venue detail requires API");
+  }
+
+  const response = await fetch(new URL(`/venues/${slug}`, apiUrl), createRequestInit(signal));
+  if (!response.ok) {
+    throw new Error(`Venue API responded with ${response.status}`);
+  }
+  const payload = (await response.json()) as ApiResponse<VenueDetailResponse>;
+  if (!payload.ok) {
+    throw new Error(payload.error.message);
+  }
+  return payload.data;
 }
 
 export async function getEventDetail(slug: string, signal?: AbortSignal): Promise<EventDetailResult> {
@@ -189,13 +318,8 @@ function createMockResult(options: { from?: Date; until?: Date } = {}): EventLis
 }
 
 async function createMockHomepageResult(signal?: AbortSignal): Promise<HomepageCurationResult> {
-  const list = await listTodayEvents(signal);
+  const list = await listWeekThroughSunday(signal);
   const featured = list.items.slice(0, 5).map((item, index) => ({
-    position: index + 1,
-    source: "auto" as const,
-    item
-  }));
-  const popular = list.items.slice(0, 5).map((item, index) => ({
     position: index + 1,
     source: "auto" as const,
     item
@@ -203,8 +327,58 @@ async function createMockHomepageResult(signal?: AbortSignal): Promise<HomepageC
 
   return {
     featured,
-    popular,
+    biggestMonth: list.items.slice(0, 10),
     generatedAt: list.generatedAt,
+    source: "mock"
+  };
+}
+
+async function createMockSectionsResult(signal?: AbortSignal) {
+  const list = await listWeekThroughSunday(signal);
+  const bucket = {
+    preview: list.items.slice(0, 8),
+    total: list.items.length,
+    hidden: Math.max(0, list.items.length - 8),
+    fromIso: resolvePacificDateWindow("today").fromIso,
+    untilIso: resolvePacificDateWindow("today").untilIso
+  };
+  const weekBucket = {
+    preview: list.items.slice(0, 10),
+    total: list.items.length,
+    hidden: Math.max(0, list.items.length - 10),
+    fromIso: resolvePacificDateWindow("thisWeek").fromIso,
+    untilIso: resolvePacificDateWindow("thisWeek").untilIso
+  };
+  const weekendBucket = {
+    preview: list.items.slice(2, 10),
+    total: Math.max(0, list.items.length - 2),
+    hidden: 0,
+    fromIso: resolvePacificDateWindow("thisWeekend").fromIso,
+    untilIso: resolvePacificDateWindow("thisWeekend").untilIso
+  };
+
+  return {
+    today: bucket,
+    week: weekBucket,
+    weekend: weekendBucket,
+    generatedAt: new Date().toISOString(),
+    source: "mock" as const
+  };
+}
+
+function createMockCalendarResult(year: number, month: number): CalendarMonthResponse & { source: "mock" } {
+  const days = Array.from({ length: 35 }, (_, index) => {
+    const day = index + 1;
+    const isoDate = `${year}-${String(month).padStart(2, "0")}-${String(Math.min(day, 28)).padStart(2, "0")}`;
+    return { isoDate, total: 0, preview: [], hidden: 0 };
+  });
+
+  return {
+    year,
+    month,
+    days,
+    weeks: [],
+    generatedAt: new Date().toISOString(),
     source: "mock"
   };
 }

@@ -1,5 +1,6 @@
-import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, redirect, useSearch } from "@tanstack/react-router";
 
+import { RootLayout } from "@/components/RootLayout";
 import { EventMapPage } from "@/features/event-map/EventMapPage";
 import { SearchPage } from "@/features/search/SearchPage";
 import { PlaceholderPage } from "@/components/PlaceholderPage";
@@ -8,14 +9,18 @@ import { AdminEventsPage } from "@/pages/AdminEventsPage";
 import { AdminHomepagePage } from "@/pages/AdminHomepagePage";
 import { AdminEventEditorPage } from "@/pages/AdminEventEditorPage";
 import { AdminReviewPage } from "@/pages/AdminReviewPage";
+import { CalendarPage } from "@/pages/CalendarPage/CalendarPage";
 import { DayPage } from "@/pages/DayPage";
 import { EventDetailPage } from "@/pages/EventDetailPage";
 import { HomePage } from "@/pages/HomePage";
+import { PrivacyPage } from "@/pages/PrivacyPage";
+import { SeriesPage } from "@/pages/SeriesPage/SeriesPage";
+import { VenuePage } from "@/pages/VenuePage/VenuePage";
 import { queryClient } from "@/lib/query-client";
-import { toIsoDateLocal } from "@/lib/event-time";
+import { pacificTodayIso } from "@fresno-events/shared";
 
 const rootRoute = createRootRoute({
-  component: () => <Outlet />
+  component: RootLayout
 });
 
 const indexRoute = createRoute({
@@ -27,8 +32,19 @@ const indexRoute = createRoute({
 const calendarRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/calendar",
-  beforeLoad: () => {
-    throw redirect({ to: "/day/$date", params: { date: toIsoDateLocal(new Date()) } });
+  validateSearch: (search: Record<string, unknown>) => {
+    const today = pacificTodayIso();
+    const [defaultYear, defaultMonth] = today.split("-").map(Number);
+    const year = Number(search.year);
+    const month = Number(search.month);
+    return {
+      year: Number.isInteger(year) && year > 2000 ? year : defaultYear!,
+      month: Number.isInteger(month) && month >= 1 && month <= 12 ? month : defaultMonth!
+    };
+  },
+  component: function CalendarRoute() {
+    const { year, month } = useSearch({ from: "/calendar" });
+    return <CalendarPage year={year} month={month} />;
   }
 });
 
@@ -41,13 +57,9 @@ const dayRoute = createRoute({
 const exploreRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/explore",
-  component: () => (
-    <PlaceholderPage
-      eyebrow="Explore"
-      title="Filters with personality, not clutter."
-      description="Date range, neighborhood, category, price, free-only, venue, and sort controls will live behind a mobile-first filter sheet."
-    />
-  )
+  beforeLoad: () => {
+    throw redirect({ to: "/search", search: { q: "" } });
+  }
 });
 
 const mapRoute = createRoute({
@@ -62,16 +74,16 @@ const eventRoute = createRoute({
   component: EventDetailPage
 });
 
+const seriesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/series/$seriesId",
+  component: SeriesPage
+});
+
 const venueRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/venue/$slug",
-  component: () => (
-    <PlaceholderPage
-      eyebrow="Venue"
-      title="Every venue gets a proper stage."
-      description="Venue pages will include upcoming events, location details, hero imagery, and related places."
-    />
-  )
+  component: VenuePage
 });
 
 const artistRoute = createRoute({
@@ -119,6 +131,12 @@ const settingsRoute = createRoute({
   )
 });
 
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/privacy",
+  component: PrivacyPage
+});
+
 const adminLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
@@ -156,11 +174,13 @@ const routeTree = rootRoute.addChildren([
   exploreRoute,
   mapRoute,
   eventRoute,
+  seriesRoute,
   venueRoute,
   artistRoute,
   searchRoute,
   savedRoute,
   settingsRoute,
+  privacyRoute,
   adminLayoutRoute.addChildren([adminIndexRoute, adminEventsListRoute, adminHomepageRoute, adminEventEditorRoute])
 ]);
 

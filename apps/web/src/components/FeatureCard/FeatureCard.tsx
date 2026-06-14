@@ -34,7 +34,9 @@ export function FeatureCard({ card, variant = "small" }: FeatureCardProps) {
         </div>
         {variant === "hero" && card.description ? <p className={styles.desc}>{card.description}</p> : null}
         <div className={styles.priceRow}>
-          <span className={cn(styles.price, card.isFree && styles.free)}>{card.priceLabel}</span>
+          {card.priceLabel ? (
+            <span className={cn(styles.price, card.isFree && styles.free)}>{card.priceLabel}</span>
+          ) : null}
           <span className={styles.source}>via What Up Fresno</span>
         </div>
       </div>

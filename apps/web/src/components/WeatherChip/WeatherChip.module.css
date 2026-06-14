@@ -1,17 +1,10 @@
 .chip {
+  display: inline-flex;
+  align-items: center;
   background: var(--surface-card);
   border: var(--border-card);
   border-radius: 999px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  padding: 6px 12px;
   box-shadow: var(--shadow-xs);
-  margin-left: auto;
-  color: var(--text-primary);
-}
-
-@media (max-width: 600px) {
-  .chip {
-    margin-left: 0;
-  }
+  white-space: nowrap;
 }

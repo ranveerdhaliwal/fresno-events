@@ -64,6 +64,35 @@
   font-weight: 600;
 }
 
+.tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tab,
+.tabActive {
+  border: var(--border-card);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  background: var(--surface-card);
+}
+
+.tabActive {
+  background: var(--ink);
+  color: var(--mustard);
+}
+
+.chips {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 600px) {
   .section {
     padding: 20px 16px 24px;

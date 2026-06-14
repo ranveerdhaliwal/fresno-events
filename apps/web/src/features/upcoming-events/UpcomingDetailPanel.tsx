@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { Heart } from "lucide-react";
 
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import type { EventRowViewModel } from "@/lib/event-view-model";
@@ -31,9 +30,6 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
           {event.flagLabel ? <span className={styles.badge}>{event.flagLabel}</span> : null}
           <span className={styles.badgeCat}>{event.categoryLabel}</span>
         </div>
-        <button type="button" className={styles.saveBtn} aria-label="Save event">
-          <Heart size={18} />
-        </button>
       </div>
       <div className={styles.body}>
         <h3 className={styles.title}>
@@ -41,7 +37,16 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
             {event.title}
           </Link>
         </h3>
-        <p className={styles.tagline}>{event.tagline}</p>
+        {event.descriptionSnippet ? <p className={styles.description}>{event.descriptionSnippet}</p> : null}
+        {event.tags.length > 0 ? (
+          <div className={styles.tags}>
+            {event.tags.map((tag) => (
+              <span key={tag} className={styles.tag}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <dl className={styles.facts}>
           <div>
             <dt>When</dt>
@@ -52,21 +57,21 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
           <div>
             <dt>Where</dt>
             <dd>
-              {event.venueName} · {event.neighborhood}
+              {event.venueName}
+              {event.venueAddress ? ` · ${event.venueAddress}` : event.neighborhood ? ` · ${event.neighborhood}` : null}
             </dd>
           </div>
-          <div>
-            <dt>Price</dt>
-            <dd>{event.priceLabel}</dd>
-          </div>
+          {event.priceLabel ? (
+            <div>
+              <dt>Price</dt>
+              <dd>{event.priceLabel}</dd>
+            </div>
+          ) : null}
         </dl>
         <div className={styles.actions}>
-          <Link to="/event/$slug" params={{ slug: event.slug }} className={styles.rsvp}>
-            RSVP / DETAILS
+          <Link to="/event/$slug" params={{ slug: event.slug }} className={styles.detailsLink}>
+            VIEW DETAILS
           </Link>
-          <button type="button" className={styles.save}>
-            SAVE
-          </button>
         </div>
       </div>
     </div>

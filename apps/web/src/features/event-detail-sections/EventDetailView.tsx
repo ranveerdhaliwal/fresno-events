@@ -1,15 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import { ExternalLink, Heart, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 
 import { AdSlot } from "@/components/AdSlot";
 import { EventRow } from "@/components/EventRow";
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import { SecHead } from "@/components/SecHead";
 import { SeeAllDayCta } from "@/components/SeeAllDayCta";
-import { FooterStamp } from "@/components/FooterStamp";
-import { StickyCtaBar } from "@/components/StickyCtaBar";
 import { ContextStrip } from "@/components/ContextStrip";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
+import { EventShareCard } from "@/components/EventShareCard";
 import { VenueMiniMap } from "@/components/VenueMiniMap";
 import { deriveTagline, formatPrice, toEventRowViewModel } from "@/lib/event-view-model";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
@@ -28,7 +27,6 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
   const imageUrl = resolveMediaUrl(heroImage?.cdnUrl ?? null);
   const tagline = deriveTagline(event);
   const dayIso = toIsoDateLocal(new Date(event.startTs));
-  const whatToKnow = event.tags.length > 0 ? event.tags : null;
 
   const relatedRows = detail.relatedEvents.map((item) => toEventRowViewModel(item));
   const seriesRows = (detail.seriesEvents ?? []).map((item) => toEventRowViewModel(item));
@@ -39,6 +37,9 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
     ...(venue.lng != null ? { lng: venue.lng } : {})
   });
   const hasCoords = venue.lat != null && venue.lng != null;
+  const priceLabel = formatPrice(event);
+  const originalUrl = event.externalUrl ?? event.ticketUrl ?? null;
+  const shareUrl = typeof globalThis.location !== "undefined" ? globalThis.location.href : "";
 
   return (
     <article className={styles.article} data-testid="event-detail-view">
@@ -70,18 +71,13 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               {event.seriesName ? <p className={styles.seriesSubtitle}>{event.seriesName}</p> : null}
               <p className={styles.tagline}>{tagline}</p>
             </div>
-            <div className={styles.heroActions}>
-              {event.ticketUrl ? (
+            {event.ticketUrl ? (
+              <div className={styles.heroActions}>
                 <a href={event.ticketUrl} target="_blank" rel="noreferrer" className={styles.primaryBtn}>
-                  RSVP / TICKETS <ExternalLink size={14} />
+                  TICKETS <ExternalLink size={14} />
                 </a>
-              ) : (
-                <span className={styles.primaryBtn}>RSVP</span>
-              )}
-              <button type="button" className={styles.saveBtn}>
-                <Heart size={16} /> SAVE
-              </button>
-            </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -96,18 +92,23 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
         </div>
         <div className={styles.fact}>
           <span className={styles.lab}>Where</span>
-          <span className={styles.val}>{venue.name}</span>
+          <span className={styles.val}>
+            {venue.slug ? (
+              <Link to="/venue/$slug" params={{ slug: venue.slug }} className={styles.venueLink}>
+                {venue.name}
+              </Link>
+            ) : (
+              venue.name
+            )}
+          </span>
           <span className={styles.sub}>{venue.neighborhood ?? venue.city}</span>
         </div>
-        <div className={styles.fact}>
-          <span className={styles.lab}>Price</span>
-          <span className={`${styles.val} ${event.isFree ? styles.olive : styles.coral}`}>{formatPrice(event)}</span>
-        </div>
-        <div className={styles.fact}>
-          <span className={styles.lab}>Crowd</span>
-          <span className={styles.val}>All ages</span>
-          <span className={styles.sub}>Family-friendly vibe</span>
-        </div>
+        {priceLabel ? (
+          <div className={styles.fact}>
+            <span className={styles.lab}>Price</span>
+            <span className={`${styles.val} ${event.isFree ? styles.olive : styles.coral}`}>{priceLabel}</span>
+          </div>
+        ) : null}
       </div>
 
       <div className={styles.content}>
@@ -135,7 +136,15 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
           <section className={styles.sec}>
             <SecHead number="03" script="find it" title="LOCATION & PARKING" />
             {hasCoords ? (
-              <VenueMiniMap lat={venue.lat!} lng={venue.lng!} category={event.category} />
+              <VenueMiniMap
+                lat={venue.lat!}
+                lng={venue.lng!}
+                category={event.category}
+                title={event.title}
+                tags={event.tags}
+                subcategories={event.subcategories}
+                {...(event.mapPinEmoji != null ? { mapPinEmoji: event.mapPinEmoji } : {})}
+              />
             ) : null}
             <p className={styles.addressLine}>{formatVenueAddressLine(venue) || venue.name}</p>
             {mapsUrl ? (
@@ -143,43 +152,46 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
                 Open in Google Maps →
               </a>
             ) : null}
-            {venue.website ? (
-              <a href={venue.website} target="_blank" rel="noreferrer" className={styles.mapLink}>
-                Open venue website →
-              </a>
-            ) : null}
           </section>
 
-          {whatToKnow ? (
-            <section className={styles.sec}>
-              <SecHead number="04" script="good to know" title="WHAT TO KNOW" />
-              <ul>
-                {whatToKnow.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
           <section className={styles.sec}>
-            <SecHead number="05" script="source" title="ORIGINAL SOURCE" />
+            <SecHead number="04" script="the" title="ORIGINAL LINK" />
             <div className={styles.sourceBox}>
-              <span className={styles.sourceTag}>{event.source}</span>
-              <p>{event.externalUrl ? <a href={event.externalUrl}>{event.externalUrl}</a> : "Ingested via What Up Fresno"}</p>
+              {originalUrl ? (
+                <a href={originalUrl} target="_blank" rel="noreferrer" className={styles.sourceLink}>
+                  View original listing <ExternalLink size={14} aria-hidden />
+                </a>
+              ) : (
+                <p className={styles.sourceMissing}>No external listing link on file yet.</p>
+              )}
+              {venue.website ? (
+                <a href={venue.website} target="_blank" rel="noreferrer" className={styles.sourceLink}>
+                  Venue website <ExternalLink size={14} aria-hidden />
+                </a>
+              ) : null}
             </div>
           </section>
 
           {seriesRows.length > 0 ? (
             <section className={styles.sec}>
               <SecHead
-                number="06"
+                number="05"
                 script="same series"
                 title="MORE IN THIS SERIES"
                 count={seriesRows.length}
               />
+              {event.seriesId ? (
+                <Link
+                  to="/series/$seriesId"
+                  params={{ seriesId: event.seriesId }}
+                  className={styles.seriesAllLink}
+                >
+                  See all dates →
+                </Link>
+              ) : null}
               <div className={styles.relatedList}>
                 {seriesRows.map((row) => (
-                  <EventRow key={row.id} event={row} slug={row.slug} />
+                  <EventRow key={row.id} event={row} slug={row.slug} adminAction={<AdminEditLink eventId={row.id} />} />
                 ))}
               </div>
             </section>
@@ -187,14 +199,14 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
 
           <section className={styles.sec}>
             <SecHead
-              number={seriesRows.length > 0 ? "07" : "06"}
+              number={seriesRows.length > 0 ? "06" : "05"}
               script="same day"
               title="OTHER EVENTS THIS DAY"
               count={relatedRows.length}
             />
             <div className={styles.relatedList}>
               {relatedRows.map((row) => (
-                <EventRow key={row.id} event={row} slug={row.slug} />
+                <EventRow key={row.id} event={row} slug={row.slug} adminAction={<AdminEditLink eventId={row.id} />} />
               ))}
             </div>
             <SeeAllDayCta date={dayIso} count={relatedRows.length + 1} />
@@ -203,17 +215,20 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
 
         <aside className={styles.sideCol}>
           <div className={styles.sideCard}>
-            <h3>ORGANIZER</h3>
+            <h3>VENUE</h3>
             <div className={styles.organizer}>
               <div className={styles.avatar} style={{ background: gradientForPalette(paletteKey) }} />
               <div>
-                <p className={styles.orgName}>{venue.name}</p>
+                {venue.slug ? (
+                  <Link to="/venue/$slug" params={{ slug: venue.slug }} className={styles.orgName}>
+                    {venue.name}
+                  </Link>
+                ) : (
+                  <p className={styles.orgName}>{venue.name}</p>
+                )}
                 <p className={styles.orgMeta}>{venue.neighborhood ?? venue.city}</p>
+                <p className={styles.orgAddress}>{formatVenueAddressLine(venue)}</p>
               </div>
-            </div>
-            <div className={styles.shareRow}>
-              <button type="button">FOLLOW</button>
-              <button type="button">CONTACT</button>
             </div>
           </div>
           <div className={styles.sideCard}>
@@ -224,17 +239,10 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               ))}
             </div>
           </div>
-          <div className={`${styles.sideCard} ${styles.postcard}`}>
-            <h3>POSTCARD</h3>
-            <p className={styles.postcardScript}>greetings from the central valley</p>
-            <p>Share this event with friends across Fresno.</p>
-          </div>
+          <EventShareCard title={event.title} url={shareUrl} />
           <AdSlot variant="side" />
         </aside>
       </div>
-
-      <FooterStamp />
-      <StickyCtaBar ticketUrl={event.ticketUrl ?? null} />
     </article>
   );
 }

@@ -8,6 +8,28 @@
   font-weight: 600;
 }
 
+.sectionBlock {
+  margin-bottom: 24px;
+}
+
+.empty {
+  padding: 20px 16px;
+  margin: 0;
+  text-align: center;
+  color: var(--text-label);
+  font-weight: 600;
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
+}
+
+.viewAll {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--coral);
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .toolbar {
   display: flex;
   align-items: baseline;

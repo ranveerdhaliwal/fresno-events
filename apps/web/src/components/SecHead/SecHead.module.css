@@ -16,6 +16,31 @@
   text-transform: uppercase;
 }
 
+.lead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.groupSelectAll {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  vertical-align: middle;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.groupSelectAll input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--mustard);
+  cursor: pointer;
+}
+
 .script {
   font-family: var(--font-script);
   font-size: 18px;

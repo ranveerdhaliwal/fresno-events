@@ -135,21 +135,3 @@ export function formatPacificDateLong(dateYmd: string): string {
   });
 }
 
-export function formatPacificRelative(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return iso;
-  }
-  if (isAllDayPacificStart(iso)) {
-    const { date } = getPacificDateTimeParts(d);
-    return formatPacificDateLong(date);
-  }
-  return d.toLocaleString("en-US", {
-    timeZone: PACIFIC,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-}

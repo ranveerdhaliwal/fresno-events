@@ -1,0 +1,1 @@
+export { DetailLoading } from "./DetailLoading";

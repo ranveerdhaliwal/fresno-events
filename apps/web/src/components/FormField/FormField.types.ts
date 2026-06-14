@@ -12,4 +12,6 @@ export type FormFieldProps = {
   link?: FormFieldLink;
   fullWidth?: boolean;
   className?: string;
+  /** Emphasize fields that differ from a published baseline (admin review). */
+  highlightChanged?: boolean;
 };

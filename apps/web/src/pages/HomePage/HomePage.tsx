@@ -1,8 +1,8 @@
-import { BottomTabBar } from "@/components/BottomTabBar";
-import { MobileNav } from "@/components/MobileNav";
 import { RainbowStripe } from "@/components/RainbowStripe";
 import { TopNav } from "@/components/TopNav";
+import { MobileNav } from "@/components/MobileNav";
 import { AdSlot } from "@/components/AdSlot";
+import { SiteFooter } from "@/components/SiteFooter";
 import { FeaturedEvents } from "@/features/featured-events/FeaturedEvents";
 import { TodayStrip } from "@/features/today-strip/TodayStrip";
 import { UpcomingEvents } from "@/features/upcoming-events/UpcomingEvents";
@@ -27,8 +27,7 @@ export function HomePage() {
           <UpcomingEvents />
         </section>
       </main>
-
-      <BottomTabBar />
+      <SiteFooter />
     </div>
   );
 }

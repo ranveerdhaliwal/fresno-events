@@ -1,49 +1,84 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
-import { CtaRow } from "@/components/CtaRow";
 import { EventCard } from "@/components/EventCard";
 import { EventRow } from "@/components/EventRow";
-import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
 import { WeekBlockHeader } from "@/components/WeekBlockHeader";
+import { calendarSearchCurrent } from "@/lib/calendar-search.utils";
 import { toEventRowViewModel } from "@/lib/event-view-model";
-import { formatEventDate } from "@/lib/event-time";
+import { toIsoDateLocal } from "@/lib/event-time";
+import type { EventSectionBucket } from "@fresno-events/shared";
 
-import { useTodayEvents } from "@/features/featured-events/useTodayEvents";
+import { useEventSections } from "./useEventSections";
 import { UpcomingDetailPanel } from "./UpcomingDetailPanel";
 import styles from "./UpcomingEvents.module.css";
 
-const FILTERS = ["All", "Tonight", "Free", "Music", "Family", "Downtown"] as const;
+const FILTERS = ["All", "Today", "This weekend"] as const;
+type SectionFilter = (typeof FILTERS)[number];
+
+function SectionBlock({
+  label,
+  bucket,
+  selectedId,
+  onSelect
+}: {
+  label: string;
+  bucket: EventSectionBucket;
+  selectedId: string | null;
+  onSelect: (id: string, slug: string) => void;
+}) {
+  const rows = bucket.preview.map((item) => toEventRowViewModel(item));
+  const selected = rows.find((row) => row.id === selectedId) ?? rows[0] ?? null;
+
+  return (
+    <section className={styles.sectionBlock}>
+      <WeekBlockHeader label={label} dateRange={`${bucket.fromIso} – ${bucket.untilIso}`} />
+      {rows.length === 0 ? (
+        <p className={styles.empty}>No events yet</p>
+      ) : (
+        <div className={styles.list}>
+          {rows.map((row) => (
+            <div key={row.id} className={styles.rowWrap}>
+              <EventRow event={row} isSelected={selected?.id === row.id} onSelect={() => onSelect(row.id, row.slug)} />
+              <EventCard event={row} />
+            </div>
+          ))}
+        </div>
+      )}
+      {bucket.hidden > 0 ? (
+        label === "TODAY" ? (
+          <Link to="/day/$date" params={{ date: bucket.fromIso }} className={styles.viewAll}>
+            {bucket.hidden} more events · View all →
+          </Link>
+        ) : (
+          <Link to="/calendar" search={calendarSearchCurrent()} className={styles.viewAll}>
+            {bucket.hidden} more events · View all →
+          </Link>
+        )
+      ) : null}
+    </section>
+  );
+}
 
 function isMobileViewport() {
   return typeof window !== "undefined" && window.matchMedia("(max-width: 600px)").matches;
 }
 
 export function UpcomingEvents() {
-  const { data, isLoading } = useTodayEvents();
+  const { data, isLoading } = useEventSections();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>("All");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [filter, setFilter] = useState<SectionFilter>("All");
+  const todayIso = toIsoDateLocal(new Date());
 
-  const rows = useMemo(() => {
+  const allRows = useMemo(() => {
     if (!data) return [];
-    let mapped = data.items.map((item) => toEventRowViewModel(item));
-    if (filter === "Tonight") {
-      mapped = mapped.filter((row) => row.featuredBadge === "tonight");
-    } else if (filter === "Free") {
-      mapped = mapped.filter((row) => row.isFree);
-    } else if (filter === "Music") {
-      mapped = mapped.filter((row) => row.categoryLabel.toLowerCase().includes("music"));
-    } else if (filter === "Family") {
-      mapped = mapped.filter((row) => row.categoryLabel.toLowerCase().includes("family"));
-    } else if (filter === "Downtown") {
-      mapped = mapped.filter((row) => row.neighborhood.toLowerCase().includes("downtown"));
-    }
-    return mapped;
-  }, [data, filter]);
+    return [...data.today.preview, ...data.week.preview, ...data.weekend.preview].map((item) =>
+      toEventRowViewModel(item)
+    );
+  }, [data]);
 
-  const selected = rows.find((row) => row.id === selectedId) ?? rows[0] ?? null;
+  const selected = allRows.find((row) => row.id === selectedId) ?? allRows[0] ?? null;
 
   const handleSelect = (id: string, slug: string) => {
     if (isMobileViewport()) {
@@ -53,17 +88,11 @@ export function UpcomingEvents() {
     setSelectedId(id);
   };
 
-  const nextWeekLabel = useMemo(() => {
-    const start = new Date();
-    start.setDate(start.getDate() + 7);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 6);
-    const fmt = (d: Date) =>
-      new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "America/Los_Angeles" }).format(d);
-    return `${fmt(start).toUpperCase()} – ${fmt(end).toUpperCase()}`;
-  }, []);
+  const showToday = filter === "All" || filter === "Today";
+  const showWeek = filter === "All";
+  const showWeekend = filter === "All" || filter === "This weekend";
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return <div className={styles.loading}>Loading upcoming events…</div>;
   }
 
@@ -73,8 +102,6 @@ export function UpcomingEvents() {
         <h2>
           <span className={styles.script}>upcoming</span> EVENTS
         </h2>
-        <span className={styles.sub}>{rows.length} on the radar</span>
-        <ViewToggle value={viewMode} onChange={setViewMode} />
       </div>
 
       <div className={styles.chips}>
@@ -92,23 +119,15 @@ export function UpcomingEvents() {
 
       <div className={styles.split}>
         <div className={styles.listCol}>
-          <WeekBlockHeader label="THIS WEEK" dateRange={formatEventDate(new Date())} />
-          <div className={styles.list}>
-            {rows.map((row) => (
-              <div key={row.id} className={styles.rowWrap}>
-                <EventRow
-                  event={row}
-                  isSelected={selected?.id === row.id}
-                  onSelect={() => handleSelect(row.id, row.slug)}
-                />
-                <EventCard event={row} />
-              </div>
-            ))}
-          </div>
-          <WeekBlockHeader label="NEXT WEEK" dateRange={nextWeekLabel} />
-          <div className={styles.ctaWrap}>
-            <CtaRow />
-          </div>
+          {showToday ? (
+            <SectionBlock label="TODAY" bucket={data.today} selectedId={selectedId} onSelect={handleSelect} />
+          ) : null}
+          {showWeek ? (
+            <SectionBlock label="THIS WEEK" bucket={data.week} selectedId={selectedId} onSelect={handleSelect} />
+          ) : null}
+          {showWeekend ? (
+            <SectionBlock label="THIS WEEKEND" bucket={data.weekend} selectedId={selectedId} onSelect={handleSelect} />
+          ) : null}
         </div>
         <div className={styles.detailCol}>
           <UpcomingDetailPanel event={selected} />

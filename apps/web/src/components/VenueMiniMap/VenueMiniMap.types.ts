@@ -1,8 +1,7 @@
-import type { EventCategory } from "@fresno-events/shared";
+import type { MapPinEmojiInput } from "@fresno-events/shared";
 
-export interface VenueMiniMapProps {
+export interface VenueMiniMapProps extends MapPinEmojiInput {
   lat: number;
   lng: number;
-  category?: EventCategory;
   height?: number;
 }

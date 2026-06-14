@@ -1,0 +1,55 @@
+.card {
+  background: var(--surface-card);
+  border: var(--border-card);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+}
+
+.card h3 {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 2px;
+  margin: 0 0 10px;
+}
+
+.script {
+  font-family: var(--font-script);
+  color: var(--coral);
+  font-size: 22px;
+  margin: 0 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 2px solid var(--border-default);
+  background: var(--mustard);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 8px 12px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--coral);
+}
+
+.btn:hover {
+  transform: translate(-1px, -1px);
+}

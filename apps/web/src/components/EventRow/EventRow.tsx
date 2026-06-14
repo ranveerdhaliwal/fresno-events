@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
 import { PlaceholderImage } from "@/components/PlaceholderImage";
-import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { cn } from "@/lib/cn";
 
 import type { EventRowProps } from "./EventRow.types";
@@ -14,23 +13,29 @@ export function EventRow({
   onSelect,
   slug,
   showImage = true,
+  showP5ListImage = false,
   priceSubLabel,
   priorityLabel,
-  forceVisible = false
+  forceVisible = false,
+  adminAction
 }: EventRowProps) {
   const showRowImage =
-    showImage && (event.priority < 5 || event.showVenueLogoInList === true);
+    showImage &&
+    (event.priority < 5 || event.showVenueLogoInList === true || showP5ListImage);
+  const p5ListLayout =
+    event.priority === 5 && showP5ListImage && event.showVenueLogoInList !== true;
 
   const className = cn(
     styles.row,
     forceVisible && styles.forceVisible,
     event.priority === 0 && styles.p0,
     event.priority === 1 && styles.p1,
+    event.priority === 1 && event.showVenueLogoInList && styles.p1VenueLogo,
     event.priority === 2 && styles.p2,
-    event.priority === 3 && styles.p3,
     event.priority === 4 && styles.p4,
     event.priority === 5 && styles.p5,
     event.priority === 5 && event.showVenueLogoInList && styles.p5WithLogo,
+    p5ListLayout && styles.p5ShowImage,
     isSelected && styles.selected,
     isLive && styles.live
   );
@@ -43,6 +48,11 @@ export function EventRow({
           {event.flagLabel}
         </span>
       ) : null}
+      <div className={styles.rowDate}>
+        <span className={styles.day}>{event.dayShort}</span>
+        <span className={styles.num}>{event.dayNum}</span>
+        <span className={styles.month}>{event.monthShort}</span>
+      </div>
       {showRowImage ? (
         <div className={styles.rowImg}>
           <PlaceholderImage
@@ -50,15 +60,12 @@ export function EventRow({
             label={event.categoryLabel}
             imageUrl={event.imageUrl}
             imageFit={event.showVenueLogoInList ? "contain" : "cover"}
-            imagePadding={event.listVenueLogoPadding}
+            {...(event.listVenueLogoPadding !== undefined
+              ? { imagePadding: event.listVenueLogoPadding }
+              : {})}
           />
         </div>
       ) : null}
-      <div className={styles.rowDate}>
-        <span className={styles.day}>{event.dayShort}</span>
-        <span className={styles.num}>{event.dayNum}</span>
-        <span className={styles.month}>{event.monthShort}</span>
-      </div>
       <div className={styles.rowBody}>
         <h4>{event.title}</h4>
         <div className={styles.rowMeta}>
@@ -68,13 +75,14 @@ export function EventRow({
         <span className={styles.rowCat}>{event.categoryLabel}</span>
       </div>
       <div className={cn(styles.rowPrice, event.isFree && styles.priceFree)}>
-        {priorityLabel ? <small className={styles.rowPriority}>{priorityLabel}</small> : null}
-        {event.priceLabel}
-        {priceSubLabel ? (
-          <small>{priceSubLabel}</small>
-        ) : event.priority <= 1 ? (
-          <small>RSVP</small>
+        {adminAction ? (
+          <div className={styles.rowAdminEdit}>
+            {adminAction}
+          </div>
         ) : null}
+        {priorityLabel ? <small className={styles.rowPriority}>{priorityLabel}</small> : null}
+        {event.priceLabel ? <span>{event.priceLabel}</span> : null}
+        {priceSubLabel ? <small>{priceSubLabel}</small> : null}
       </div>
     </>
   );
@@ -90,7 +98,6 @@ export function EventRow({
         >
           {content}
         </Link>
-        <AdminEditLink eventId={event.id} className={styles.adminEdit} />
       </div>
     );
   }
@@ -100,7 +107,6 @@ export function EventRow({
       <button type="button" className={className} onClick={onSelect} data-testid={`event-row-${event.slug}`}>
         {content}
       </button>
-      <AdminEditLink eventId={event.id} className={styles.adminEdit} />
     </div>
   );
 }

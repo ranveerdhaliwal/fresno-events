@@ -23,7 +23,9 @@ export function EventCard({ event }: EventCardProps) {
         </p>
         <div className={styles.bottom}>
           <span className={styles.cat}>{event.categoryLabel}</span>
-          <span className={cn(styles.price, event.isFree && styles.free)}>{event.priceLabel}</span>
+          {event.priceLabel ? (
+            <span className={cn(styles.price, event.isFree && styles.free)}>{event.priceLabel}</span>
+          ) : null}
         </div>
       </div>
     </Link>

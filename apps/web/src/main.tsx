@@ -3,8 +3,8 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { ComingSoonPage } from "@/components/coming-soon-page";
 import { AdminModeProvider } from "@/features/admin-mode/AdminModeProvider";
+import { bootstrapGoogleAnalytics, getGaMeasurementId } from "@/lib/google-analytics/google-analytics.utils";
 import { queryClient } from "@/lib/query-client";
 import { applyInitialTheme } from "@/lib/theme/setTheme";
 import { router } from "@/router";
@@ -17,20 +17,19 @@ if (!rootElement) {
   throw new Error("Root element #root was not found.");
 }
 
-const showComingSoon = import.meta.env.VITE_COMING_SOON === "true";
-
 applyInitialTheme("dim");
+
+const gaMeasurementId = getGaMeasurementId();
+if (gaMeasurementId) {
+  void bootstrapGoogleAnalytics(gaMeasurementId);
+}
 
 createRoot(rootElement).render(
   <StrictMode>
-    {showComingSoon ? (
-      <ComingSoonPage />
-    ) : (
-      <QueryClientProvider client={queryClient}>
-        <AdminModeProvider>
-          <RouterProvider router={router} />
-        </AdminModeProvider>
-      </QueryClientProvider>
-    )}
+    <QueryClientProvider client={queryClient}>
+      <AdminModeProvider>
+        <RouterProvider router={router} />
+      </AdminModeProvider>
+    </QueryClientProvider>
   </StrictMode>
 );

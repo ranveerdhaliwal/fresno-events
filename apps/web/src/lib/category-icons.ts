@@ -4,7 +4,7 @@ const CATEGORY_EMOJI: Record<EventCategory, string> = {
   music: "🎵",
   comedy: "😂",
   theater: "🎭",
-  sports: "⚽",
+  sports: "⚾",
   food_drink: "🍽️",
   festival: "🎪",
   family: "👨‍👩‍👧",

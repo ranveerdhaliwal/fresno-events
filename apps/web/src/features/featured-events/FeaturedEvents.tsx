@@ -1,36 +1,20 @@
-import { useMemo, useState } from "react";
-
 import { AdSlot } from "@/components/AdSlot";
-import { DayPicker } from "@/components/DayPicker";
 import { FeatureCard } from "@/components/FeatureCard";
 import { PopularList } from "@/components/PopularList";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
-import type { FeaturedBadge } from "@/lib/event-view-model";
 
-import { filterFeaturedCards, useHomepageCuration } from "./useHomepageCuration";
+import { useHomepageCuration } from "./useHomepageCuration";
 import styles from "./FeaturedEvents.module.css";
-
-const TABS: { id: "all" | FeaturedBadge; label: string }[] = [
-  { id: "all", label: "TODAY" },
-  { id: "tonight", label: "THIS WEEK" },
-  { id: "weekend", label: "THIS WEEKEND" }
-];
 
 export function FeaturedEvents() {
   const { viewModel, isLoading } = useHomepageCuration();
-  const [tab, setTab] = useState<"all" | FeaturedBadge>("all");
-
-  const cards = useMemo(() => {
-    if (!viewModel) return [];
-    return filterFeaturedCards(viewModel.featuredCards, tab);
-  }, [viewModel, tab]);
-
-  const popular = viewModel?.popularEvents ?? [];
 
   if (isLoading) {
     return <div className={styles.loading}>Loading featured events…</div>;
   }
 
+  const cards = viewModel?.featuredCards ?? [];
+  const biggestMonth = viewModel?.biggestMonth ?? [];
   const heroes = cards.slice(0, 2);
   const small = cards.slice(2, 5);
 
@@ -40,31 +24,6 @@ export function FeaturedEvents() {
         <h2>
           <span className={styles.script}>what&apos;s</span> HAPPENING
         </h2>
-        <div className={styles.tabsDesktop}>
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={tab === item.id ? styles.tabActive : styles.tab}
-              onClick={() => setTab(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.tabsMobile}>
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={tab === item.id ? styles.pillActive : styles.pill}
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
       </div>
 
       <div className={styles.layout}>
@@ -87,8 +46,12 @@ export function FeaturedEvents() {
           </div>
         </div>
         <aside className={styles.side}>
-          <PopularList events={popular} count={popular.length} renderAdminEdit={(eventId) => <AdminEditLink eventId={eventId} />} />
-          <DayPicker />
+          <PopularList
+            title="BIGGEST EVENTS THIS MONTH"
+            events={biggestMonth}
+            count={biggestMonth.length}
+            renderAdminEdit={(eventId) => <AdminEditLink eventId={eventId} />}
+          />
           <AdSlot variant="card" />
         </aside>
       </div>

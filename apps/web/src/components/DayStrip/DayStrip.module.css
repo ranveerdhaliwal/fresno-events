@@ -7,12 +7,26 @@
   scrollbar-width: none;
 }
 
+.stripFill {
+  display: grid;
+  grid-template-columns: repeat(var(--day-slot-count, 7), minmax(0, 1fr)) minmax(68px, 0.85fr);
+  overflow: visible;
+  padding: 4px 0 16px;
+  margin-bottom: 0;
+  width: 100%;
+}
+
 .strip::-webkit-scrollbar {
   display: none;
 }
 
+.stripFill .tile {
+  flex: unset;
+}
+
 .tile {
   flex: 0 0 72px;
+  min-width: 0;
   border: var(--border-card-on-page);
   background: var(--surface-card);
   text-align: center;
@@ -26,6 +40,11 @@
 .tile:hover {
   transform: translate(-1px, -1px);
   box-shadow: 6px 6px 0 rgba(232, 217, 184, 0.45);
+}
+
+.selected {
+  outline: 3px solid var(--mustard);
+  outline-offset: -3px;
 }
 
 .today {
@@ -90,4 +109,11 @@
   font-size: 9px;
   letter-spacing: 1.5px;
   line-height: 1.05;
+}
+
+.pickDateFixed {
+  flex: 0 0 auto;
+  min-width: 68px;
+  width: auto;
+  text-decoration: none;
 }

@@ -43,3 +43,16 @@
 .link:hover {
   color: var(--ink);
 }
+
+.highlightChanged {
+  padding: 10px 12px;
+  border: 1.5px solid color-mix(in srgb, var(--mustard) 55%, var(--ink));
+  background: color-mix(in srgb, var(--mustard) 18%, var(--surface-card));
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.highlightChanged .label::after {
+  content: " · changed";
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--ink) 70%, var(--mustard));
+}

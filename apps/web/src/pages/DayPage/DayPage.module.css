@@ -78,6 +78,7 @@
   display: grid;
   grid-template-columns: 1.35fr 1fr;
   gap: 20px;
+  min-height: 220px;
   margin-bottom: 22px;
 }
 

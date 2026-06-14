@@ -13,7 +13,7 @@ export function EventDetailPage() {
   const { data, isLoading, isError, refetch } = useEventDetail(slug);
 
   return (
-    <PageChrome mobileNav={{ variant: "event" }} showBottomTabs>
+    <PageChrome mobileNav={{ variant: "event" }}>
       {isLoading ? <EventDetailLoading /> : null}
       {isError || !data ? !isLoading ? <EventDetailError onRetry={() => void refetch()} /> : null : null}
       {data ? <EventDetailView data={data} /> : null}

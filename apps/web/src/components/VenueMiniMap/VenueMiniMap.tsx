@@ -1,24 +1,53 @@
 import L from "leaflet";
 import { useMemo } from "react";
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 
-import { getCategoryEmoji } from "@/lib/category-icons";
+import { resolveMapPinEmoji } from "@fresno-events/shared";
 import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from "@/lib/map-config";
 
 import type { VenueMiniMapProps } from "./VenueMiniMap.types";
 import styles from "./VenueMiniMap.module.css";
 
-export function VenueMiniMap({ lat, lng, category, height = 200 }: VenueMiniMapProps) {
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+export function VenueMiniMap({
+  lat,
+  lng,
+  height = 200,
+  category,
+  title,
+  tags,
+  subcategories,
+  mapPinEmoji
+}: VenueMiniMapProps) {
   const icon = useMemo(() => {
-    const emoji = getCategoryEmoji(category);
+    const emoji = resolveMapPinEmoji({
+      ...(category !== undefined ? { category } : {}),
+      ...(title !== undefined ? { title } : {}),
+      ...(tags !== undefined ? { tags } : {}),
+      ...(subcategories !== undefined ? { subcategories } : {}),
+      ...(mapPinEmoji !== undefined ? { mapPinEmoji } : {})
+    });
+    if (!emoji) {
+      return L.icon({
+        iconUrl: markerIcon,
+        iconRetinaUrl: markerIcon2x,
+        shadowUrl: markerShadow,
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      });
+    }
     return L.divIcon({
       className: "",
       html: `<span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;font-size:22px;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.25))">${emoji}</span>`,
       iconSize: [32, 32],
       iconAnchor: [16, 32]
     });
-  }, [category]);
+  }, [category, title, tags, subcategories, mapPinEmoji]);
 
   return (
     <div className={styles.map} style={{ height }}>

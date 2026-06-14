@@ -29,6 +29,11 @@ export interface EventRowViewModel {
   isFree: boolean;
   isLive: boolean;
   featuredBadge: FeaturedBadge;
+  descriptionSnippet: string;
+  venueAddress: string;
+  tags: string[];
+  ticketUrl: string | null;
+  externalUrl: string | null;
 }
 
 export interface FeatureCardViewModel {

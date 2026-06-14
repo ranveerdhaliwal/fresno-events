@@ -1,0 +1,19 @@
+.wrap {
+  padding: 24px 32px 48px;
+}
+
+.wrap h1 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+
+.sub {
+  color: var(--text-label);
+  margin: 0 0 20px;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}

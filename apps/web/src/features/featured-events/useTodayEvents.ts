@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { eventsKeys } from "@/services/events.queryKeys";
-import { listTodayEvents } from "@/features/events/api";
+import { listTodayEvents } from "@/services/events.service";
 
 export function useTodayEvents() {
   return useQuery({

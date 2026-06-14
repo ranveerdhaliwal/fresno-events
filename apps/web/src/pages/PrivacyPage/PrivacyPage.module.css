@@ -1,0 +1,44 @@
+.article {
+  padding: 24px 32px 8px;
+  max-width: 720px;
+}
+
+.article h1 {
+  font-family: var(--font-display);
+  font-size: 32px;
+  margin: 0 0 8px;
+}
+
+.updated {
+  margin: 0 0 24px;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--text-on-page) 65%, transparent);
+}
+
+.article h2 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  margin: 28px 0 8px;
+}
+
+.article p,
+.article li {
+  font-size: 15px;
+  line-height: 1.65;
+  color: color-mix(in srgb, var(--text-on-page) 88%, transparent);
+}
+
+.article ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.article a {
+  color: var(--coral);
+}
+
+@media (max-width: 600px) {
+  .article {
+    padding: 16px 16px 8px;
+  }
+}

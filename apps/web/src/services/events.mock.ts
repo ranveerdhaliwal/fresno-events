@@ -183,7 +183,7 @@ export function getMockEventList(): EventListItem[] {
         priceMin: 0,
         priceMax: 18,
         isFree: true,
-        priority: 0
+        priority: 1
       }),
       venue: venues.warnors,
       heroImage: images.towerGlow

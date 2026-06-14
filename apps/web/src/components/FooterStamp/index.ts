@@ -1,1 +1,0 @@
-export { FooterStamp } from "./FooterStamp";

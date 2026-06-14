@@ -1,8 +1,9 @@
 import type { Event, EventListItem } from "@fresno-events/shared";
-import { clampEventPriority } from "@fresno-events/shared";
+import { clampEventPriority, daysFromIsoThroughSunday } from "@fresno-events/shared";
 
 import { formatEventDate, formatMonthLong, formatShortTime, isTonight, isWeekend, toIsoDateLocal } from "@/lib/event-time";
 import { resolveMediaUrl } from "@/lib/media-url";
+import { formatVenueAddressLine } from "@/lib/venue-display.utils";
 import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
 
 export type {
@@ -58,7 +59,20 @@ export function formatPrice(event: Event): string {
   if (typeof event.priceMin === "number") {
     return `From $${event.priceMin}`;
   }
-  return "Details soon";
+  return "";
+}
+
+export function deriveDescriptionSnippet(event: Event, maxChars = 200): string {
+  const text = (event.descriptionText ?? "").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.length <= maxChars) {
+    return text;
+  }
+  const slice = text.slice(0, maxChars);
+  const lastSpace = slice.lastIndexOf(" ");
+  return `${(lastSpace > 40 ? slice.slice(0, lastSpace) : slice).trim()}…`;
 }
 
 export function deriveTagline(event: Event): string {
@@ -83,7 +97,6 @@ export function deriveFeaturedBadge(event: Event, now = new Date()): FeaturedBad
 
 export function deriveFlagLabel(event: Event, now = new Date()): string | null {
   if (event.priority === 0) return "PROMOTED";
-  if (event.priority === 1) return "HUGE";
   if (isTonight(event.startTs, now)) return "TONIGHT";
   if (event.priority <= 2) return "BIG";
   return null;
@@ -119,7 +132,12 @@ export function toEventRowViewModel(item: EventListItem, now = new Date()): Even
     imageUrl: resolveMediaUrl(heroImage?.cdnUrl ?? null),
     isFree: Boolean(event.isFree),
     isLive: false,
-    featuredBadge: deriveFeaturedBadge(event, now)
+    featuredBadge: deriveFeaturedBadge(event, now),
+    descriptionSnippet: deriveDescriptionSnippet(event),
+    venueAddress: formatVenueAddressLine(venue),
+    tags: event.tags ?? [],
+    ticketUrl: event.ticketUrl ?? null,
+    externalUrl: event.externalUrl ?? null
   };
 }
 
@@ -184,4 +202,23 @@ export function buildDayStripTiles(anchor: Date, eventCounts: Map<string, number
   }
 
   return tiles;
+}
+
+export function buildDayStripTilesThroughSunday(anchor: Date, eventCounts: Map<string, number>): DayStripTile[] {
+  const todayIso = toIsoDateLocal(anchor);
+  const isoDates = daysFromIsoThroughSunday(todayIso);
+
+  return isoDates.map((iso) => {
+    const date = new Date(`${iso}T12:00:00-07:00`);
+    return {
+      isoDate: iso,
+      dow: new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Los_Angeles" })
+        .format(date)
+        .toUpperCase(),
+      dayNum: new Intl.DateTimeFormat("en-US", { day: "numeric", timeZone: "America/Los_Angeles" }).format(date),
+      count: eventCounts.get(iso) ?? 0,
+      isToday: iso === todayIso,
+      isWeekend: isWeekend(date)
+    };
+  });
 }

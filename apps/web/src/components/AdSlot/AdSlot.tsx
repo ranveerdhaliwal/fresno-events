@@ -1,5 +1,10 @@
+import { useRouterState } from "@tanstack/react-router";
+
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import { cn } from "@/lib/cn";
+
+import { AdSenseUnit } from "./AdSenseUnit";
+import { getAdSenseSlotId, isAdSenseLive, shouldShowLiveAds } from "./AdSlot.utils";
 
 import styles from "./AdSlot.module.css";
 
@@ -10,6 +15,16 @@ export interface AdSlotProps {
 }
 
 export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const clientId = import.meta.env.VITE_ADSENSE_CLIENT_ID?.trim();
+
+  if (clientId && isAdSenseLive(variant) && shouldShowLiveAds(pathname)) {
+    const slotId = getAdSenseSlotId(variant);
+    if (slotId) {
+      return <AdSenseUnit clientId={clientId} slotId={slotId} variant={variant} />;
+    }
+  }
+
   if (variant === "card") {
     return (
       <div className={styles.card} data-testid="ad-slot-card">
@@ -36,7 +51,10 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
   }
 
   return (
-    <div className={cn(styles.banner, variant === "banner-wide" && styles.wide, variant === "banner-stacked" && styles.stacked)} data-testid="ad-slot">
+    <div
+      className={cn(styles.banner, variant === "banner-wide" && styles.wide, variant === "banner-stacked" && styles.stacked)}
+      data-testid="ad-slot"
+    >
       <span className={styles.tag}>AD</span>
       <div className={styles.body}>
         <h4>Reach Fresno locals</h4>
