@@ -233,7 +233,7 @@ insert into public.events (
     'seed:tower-art-hop-afterglow',
     0.96,
     now(),
-    0
+    1
   ),
   (
     'f1000000-0000-4000-8000-000000000002',
