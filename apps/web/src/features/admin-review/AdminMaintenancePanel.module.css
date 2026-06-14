@@ -8,8 +8,41 @@
   color-scheme: light;
 }
 
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.collapseToggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-top: -2px;
+  border: var(--border-card);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text-label-on-card);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+}
+
+.collapseToggle:hover {
+  background: var(--surface-chip);
+  color: var(--ink);
+}
+
 .intro {
   margin-bottom: 14px;
+  min-width: 0;
+}
+
+.header .intro {
+  margin-bottom: 0;
 }
 
 .introTitle {
@@ -26,6 +59,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  margin-top: 14px;
 }
 
 @media (max-width: 960px) {

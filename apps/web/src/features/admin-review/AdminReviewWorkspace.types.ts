@@ -1,4 +1,9 @@
-import type { EventCandidate, LinkedEventCandidate, SeriesSiblingCandidate } from "@fresno-events/shared";
+import type {
+  EventCandidate,
+  LinkedEventCandidate,
+  PublishVenuePreview,
+  SeriesSiblingCandidate
+} from "@fresno-events/shared";
 
 import type { ReviewQueueTab } from "../admin/admin-api";
 
@@ -50,6 +55,7 @@ export type CandidateDetailProps = {
   candidate: EventCandidate;
   linkedCandidates: LinkedEventCandidate[];
   seriesSiblings?: SeriesSiblingCandidate[];
+  publishVenuePreview?: PublishVenuePreview;
   displayPriority: number;
   onPriorityChange: (candidateId: string, priority: number) => void;
   onAfterDecision: (candidateId?: string) => void;

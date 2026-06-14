@@ -6,7 +6,7 @@ import { adminKeys } from "@/features/admin/admin.queryKeys";
 import { getHomepageSlots, isAdminAuthError, saveHomepageSlots, searchPublishedEvents } from "@/features/admin/admin-api";
 import { FormField } from "@/components/FormField/FormField";
 import { TextInput } from "@/components/TextInput/TextInput";
-import { ErrorBanner } from "@/features/admin-review/AdminReviewDetail.shared";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { broadcastAdminCache } from "@/features/admin-mode/admin-cache";
 import { formatPacificDateTimeLabel } from "@/lib/pacific-time";
 import { cn } from "@/lib/cn";
@@ -15,8 +15,7 @@ import type { AdminEventSearchHit, HomepageSection, HomepageSlotRow } from "@fre
 import styles from "./HomepageCurationWorkspace.module.css";
 
 const SECTIONS: Array<{ id: HomepageSection; label: string; positions: number[] }> = [
-  { id: "featured", label: "Featured grid", positions: [1, 2, 3, 4, 5] },
-  { id: "popular", label: "Popular sidebar", positions: [1, 2, 3, 4, 5] }
+  { id: "featured", label: "Featured grid (this week through Sunday)", positions: [1, 2, 3, 4, 5] }
 ];
 
 interface DraftSlot {
@@ -161,7 +160,7 @@ export function HomepageCurationWorkspace({ token, onAuthFailure }: HomepageCura
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>Homepage curation</p>
-          <h1 className={styles.title}>Pin featured & popular slots</h1>
+          <h1 className={styles.title}>Pin featured slots</h1>
           <p className={styles.subtitle}>
             Empty slots auto-fill from the event pool. Pinned events stay visible even when tabs filter the homepage.
           </p>

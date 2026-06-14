@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button/Button";
 import { DateInput } from "@/components/DateInput/DateInput";
 import { FormField } from "@/components/FormField/FormField";
@@ -12,14 +12,16 @@ import {
   ADMIN_EVENT_CATEGORIES,
   type AdminEventFormState
 } from "@/features/admin/admin-form.types";
-import { formStateToEventPatch, normalizedEventToFormState } from "@/features/admin/admin-form.utils";
+import { formStateToEventPatch, normalizedEventToFormState, applyAdminStartTimeChange } from "@/features/admin/admin-form.utils";
+import { AdminScheduleOptions } from "@/features/admin/AdminScheduleOptions";
 import { adminKeys } from "@/features/admin/admin.queryKeys";
 import { patchPublishedEvent } from "@/features/admin/admin-api";
-import { ErrorBanner } from "@/features/admin-review/AdminReviewDetail.shared";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { broadcastAdminCache } from "@/features/admin-mode/admin-cache";
 import { formatPacificDateTimeLabel } from "@/lib/pacific-time";
 import {
   EVENT_DISPLAY_PRIORITY,
+  MAP_PIN_EMOJI_PRESETS,
   type AdminPublishedEventResponse,
   type EventCategory
 } from "@fresno-events/shared";
@@ -77,6 +79,10 @@ export function PublishedEventDetail({ token, detail, onSaved }: PublishedEventD
   const ticketUrl = draft.ticketUrl.trim();
   const isBusy = saveMutation.isPending;
 
+  const handleVenueCoordsChange = useCallback((coords: { lat: string; lng: string }) => {
+    setDraft((d) => ({ ...d, venueLat: coords.lat, venueLng: coords.lng }));
+  }, []);
+
   return (
     <div className={styles.detailForm}>
       <header className={styles.detailHeader}>
@@ -126,6 +132,22 @@ export function PublishedEventDetail({ token, detail, onSaved }: PublishedEventD
         <p className={styles.updateNotice}>Changes saved to the live event.</p>
       ) : null}
 
+      <FormField label="Display priority (published event)">
+        <SelectInput
+          value={draft.priority}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            setDraft((d) => ({ ...d, priority: next }));
+          }}
+        >
+          {EVENT_DISPLAY_PRIORITY.map((tier) => (
+            <option key={tier.value} value={tier.value}>
+              {tier.value} — {tier.label} ({tier.description})
+            </option>
+          ))}
+        </SelectInput>
+      </FormField>
+
       <div className={styles.detailFormGrid}>
         <FormField label="Title" fullWidth>
           <TextInput
@@ -147,60 +169,50 @@ export function PublishedEventDetail({ token, detail, onSaved }: PublishedEventD
             ))}
           </SelectInput>
         </FormField>
-        <FormField label="Start date (Pacific)">
-          <DateInput
-            value={draft.startDate}
-            onChange={(event) => setDraft((d) => ({ ...d, startDate: event.target.value }))}
-          />
+        <FormField label="Map pin">
+          <SelectInput
+            value={draft.mapPinEmoji}
+            onChange={(event) => setDraft((d) => ({ ...d, mapPinEmoji: event.target.value }))}
+          >
+            {MAP_PIN_EMOJI_PRESETS.map((preset) => (
+              <option key={preset.label} value={preset.value}>
+                {preset.label}
+              </option>
+            ))}
+          </SelectInput>
         </FormField>
-        <FormField label="Start time (Pacific, empty = all day)">
-          <TimeInput
-            value={draft.startTime}
-            onChange={(event) => setDraft((d) => ({ ...d, startTime: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="End date (Pacific, optional)">
-          <DateInput
-            value={draft.endDate}
-            onChange={(event) => setDraft((d) => ({ ...d, endDate: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="End time (Pacific, empty = end of day)">
-          <TimeInput
-            value={draft.endTime}
-            onChange={(event) => setDraft((d) => ({ ...d, endTime: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="Venue name" fullWidth>
-          <TextInput
-            value={draft.venueName}
-            onChange={(event) => setDraft((d) => ({ ...d, venueName: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="Venue city">
-          <TextInput
-            value={draft.venueCity}
-            onChange={(event) => setDraft((d) => ({ ...d, venueCity: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="Venue address">
-          <TextInput
-            value={draft.venueAddress}
-            onChange={(event) => setDraft((d) => ({ ...d, venueAddress: event.target.value }))}
-          />
-        </FormField>
+        <div className={styles.detailFormDateTimePair}>
+          <FormField label="Start date (Pacific)">
+            <DateInput
+              value={draft.startDate}
+              onChange={(event) => setDraft((d) => ({ ...d, startDate: event.target.value }))}
+            />
+          </FormField>
+          <FormField label="Start time (Pacific)">
+            <TimeInput
+              value={draft.startTime}
+              onChange={(event) =>
+                setDraft((d) => applyAdminStartTimeChange(d, event.target.value))
+              }
+            />
+          </FormField>
+        </div>
+        <AdminScheduleOptions draft={draft} onChange={setDraft} />
+        <div className={styles.detailFormDateTimePair}>
+          <FormField label="End date (Pacific, optional)">
+            <DateInput
+              value={draft.endDate}
+              onChange={(event) => setDraft((d) => ({ ...d, endDate: event.target.value }))}
+            />
+          </FormField>
+          <FormField label="End time (Pacific, optional — empty with end date = 11:59 PM)">
+            <TimeInput
+              value={draft.endTime}
+              onChange={(event) => setDraft((d) => ({ ...d, endTime: event.target.value }))}
+            />
+          </FormField>
+        </div>
       </div>
-
-      <FormField label="Venue location" fullWidth>
-        <AdminLocationPicker
-          token={token}
-          lat={draft.venueLat}
-          lng={draft.venueLng}
-          address={draft.venueAddress}
-          city={draft.venueCity}
-          onChange={(coords) => setDraft((d) => ({ ...d, ...coords }))}
-        />
-      </FormField>
 
       <div className={styles.detailFormGrid}>
         <FormField label="Image URL" fullWidth>
@@ -261,20 +273,36 @@ export function PublishedEventDetail({ token, detail, onSaved }: PublishedEventD
         />
       </FormField>
 
-      <FormField label="Display priority (published event)">
-        <SelectInput
-          value={draft.priority}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            setDraft((d) => ({ ...d, priority: next }));
-          }}
-        >
-          {EVENT_DISPLAY_PRIORITY.map((tier) => (
-            <option key={tier.value} value={tier.value}>
-              {tier.value} — {tier.label} ({tier.description})
-            </option>
-          ))}
-        </SelectInput>
+      <div className={styles.detailFormGrid}>
+        <FormField label="Venue name" fullWidth>
+          <TextInput
+            value={draft.venueName}
+            onChange={(event) => setDraft((d) => ({ ...d, venueName: event.target.value }))}
+          />
+        </FormField>
+        <FormField label="Venue city">
+          <TextInput
+            value={draft.venueCity}
+            onChange={(event) => setDraft((d) => ({ ...d, venueCity: event.target.value }))}
+          />
+        </FormField>
+        <FormField label="Venue address">
+          <TextInput
+            value={draft.venueAddress}
+            onChange={(event) => setDraft((d) => ({ ...d, venueAddress: event.target.value }))}
+          />
+        </FormField>
+      </div>
+
+      <FormField label="Venue location" fullWidth>
+        <AdminLocationPicker
+          token={token}
+          lat={draft.venueLat}
+          lng={draft.venueLng}
+          address={draft.venueAddress}
+          city={draft.venueCity}
+          onChange={handleVenueCoordsChange}
+        />
       </FormField>
 
       <FormField label="Reviewer">

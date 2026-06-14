@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, ExternalLink, Link2, Loader2, Unlink } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { EventCandidate, SeriesSiblingCandidate } from "@fresno-events/shared";
 
@@ -58,7 +58,7 @@ function SeriesLinkRow({
   );
 }
 
-export function SeriesLinkPanel({
+export const SeriesLinkPanel = memo(function SeriesLinkPanel({
   token,
   candidate,
   seriesSiblings,
@@ -248,4 +248,4 @@ export function SeriesLinkPanel({
       </div>
     </section>
   );
-}
+});

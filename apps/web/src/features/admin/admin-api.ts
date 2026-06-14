@@ -13,11 +13,12 @@ import type {
   CandidateBulkRejectResponse,
   EventBulkPriorityResponse,
   EventCandidateListResponse,
+  EventCandidateTabCounts,
   HomepageSlotsPutBody,
   HomepageSlotsResponse,
   ReviewDecisionResponse,
   ReviewOccurrenceRelinkOpsResponse,
-  ReviewPriorityTriageOpsResponse,
+  ReviewPriorityRerankOpsResponse,
   ReviewQueueAuditResponse,
   ReviewVenueAddressBackfillOpsResponse,
   ReviewVenueGeocodeOpsResponse
@@ -30,6 +31,7 @@ import type {
   RejectBody,
   ReviewQueueTab
 } from "./admin-api.types";
+import { normalizeOccurrenceRelinkOpsResponse } from "../admin-review/admin-maintenance.utils";
 
 export type { ApproveBody, BulkApproveBody, CandidateStatusFilter, RejectBody, ReviewQueueTab } from "./admin-api.types";
 
@@ -84,7 +86,7 @@ export async function runOccurrenceRelinkOps(token: string, dryRun: boolean) {
     token,
     `/review/ops/occurrence-relink${query ? `?${query}` : ""}`,
     { method: "POST" }
-  );
+  ).then(normalizeOccurrenceRelinkOpsResponse);
 }
 
 export async function runVenueAddressBackfillOps(token: string, dryRun: boolean, source?: string) {
@@ -117,20 +119,108 @@ export async function geocodeVenueAddress(
   return adminFetch<{ lat: number; lng: number }>(token, `/review/geocode?${params}`);
 }
 
-export async function runVenueGeocodeOps(token: string, dryRun: boolean) {
-  const params = new URLSearchParams();
-  if (dryRun) {
-    params.set("dry_run", "true");
-  }
-  const query = params.toString();
-  return adminFetch<ReviewVenueGeocodeOpsResponse>(
-    token,
-    `/review/ops/venue-geocode${query ? `?${query}` : ""}`,
-    { method: "POST" }
-  );
+export interface GeocodeOpsProgress {
+  batch: number;
+  batchGeocoded: number;
+  totalGeocoded: number;
+  totalScanned: number;
 }
 
-export async function runPriorityTriageOps(token: string, dryRun: boolean, source?: string) {
+export async function runVenueGeocodeOps(
+  token: string,
+  options: { dryRun: boolean; onProgress?: (progress: GeocodeOpsProgress) => void }
+): Promise<ReviewVenueGeocodeOpsResponse> {
+  if (options.dryRun) {
+    return adminFetch<ReviewVenueGeocodeOpsResponse>(token, "/review/ops/venue-geocode?dry_run=true", {
+      method: "POST"
+    });
+  }
+
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    throw new AdminApiError("VITE_API_URL is not set; cannot reach the review API.", 0);
+  }
+
+  const response = await fetch(new URL("/review/ops/venue-geocode?stream=true", apiUrl), {
+    method: "POST",
+    headers: {
+      Accept: "application/x-ndjson",
+      "x-admin-token": token
+    }
+  });
+
+  if (!response.ok) {
+    let message = `Geocode failed (${response.status})`;
+    try {
+      const payload = (await response.json()) as ApiResponse<ReviewVenueGeocodeOpsResponse>;
+      if (!payload.ok && payload.error?.message) {
+        message = payload.error.message;
+      }
+    } catch {
+      // Keep generic message when body is not JSON.
+    }
+    throw new AdminApiError(message, response.status);
+  }
+
+  if (!response.body) {
+    throw new AdminApiError("Geocode stream returned no body.", response.status);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResult: ReviewVenueGeocodeOpsResponse | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+
+      const event = JSON.parse(trimmed) as {
+        type: string;
+        batch?: number;
+        summary?: ReviewVenueGeocodeOpsResponse["summary"];
+        total?: ReviewVenueGeocodeOpsResponse["summary"];
+      } & ReviewVenueGeocodeOpsResponse;
+
+      if (event.type === "batch" && options.onProgress && event.batch && event.summary && event.total) {
+        options.onProgress({
+          batch: event.batch,
+          batchGeocoded: event.summary.geocoded,
+          totalGeocoded: event.total.geocoded,
+          totalScanned: event.total.scanned
+        });
+      }
+
+      if (event.type === "complete") {
+        finalResult = {
+          dryRun: event.dryRun,
+          summary: event.summary,
+          message: event.message
+        };
+      }
+    }
+  }
+
+  if (!finalResult) {
+    throw new AdminApiError("Geocode stream ended without a final result.", 0);
+  }
+
+  return finalResult;
+}
+
+export async function runPriorityRerankOps(token: string, dryRun: boolean, source?: string) {
   const params = new URLSearchParams();
   if (dryRun) {
     params.set("dry_run", "true");
@@ -139,9 +229,9 @@ export async function runPriorityTriageOps(token: string, dryRun: boolean, sourc
     params.set("source", source.trim());
   }
   const query = params.toString();
-  return adminFetch<ReviewPriorityTriageOpsResponse>(
+  return adminFetch<ReviewPriorityRerankOpsResponse>(
     token,
-    `/review/ops/priority-triage${query ? `?${query}` : ""}`,
+    `/review/ops/priority-rerank${query ? `?${query}` : ""}`,
     { method: "POST" }
   );
 }
@@ -178,6 +268,10 @@ export async function listCandidates(
     offset: opts?.offset ?? 0,
     limit: all.length
   } satisfies EventCandidateListResponse;
+}
+
+export async function fetchCandidateTabCounts(token: string) {
+  return adminFetch<EventCandidateTabCounts>(token, "/review/candidates/counts");
 }
 
 export async function linkCandidatesAsSeries(token: string, id: string, otherCandidateId: string) {

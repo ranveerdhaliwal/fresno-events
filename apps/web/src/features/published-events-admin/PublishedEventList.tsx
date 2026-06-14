@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 
 import { EventRow } from "@/components/EventRow";
 import { SecHead } from "@/components/SecHead";
+import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { getEventDisplayPriorityLabel } from "@fresno-events/shared";
 import { isPageFullySelected } from "../admin-review/admin-review-selection.utils";
 import listStyles from "../admin-review/CandidateList.module.css";
@@ -104,6 +105,7 @@ export function PublishedEventList({
                     priorityLabel={`P${hit.priority} · ${getEventDisplayPriorityLabel(hit.priority)}`}
                     priceSubLabel="status"
                     forceVisible
+                    adminAction={<AdminEditLink eventId={hit.id} />}
                   />
                 </li>
               );

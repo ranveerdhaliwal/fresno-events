@@ -46,6 +46,9 @@ export function publishedEventToNormalized(
   if (heroImage?.cdnUrl) {
     normalized.imageUrl = heroImage.cdnUrl;
   }
+  if (event.mapPinEmoji != null) {
+    normalized.mapPinEmoji = event.mapPinEmoji;
+  }
 
   return normalized;
 }

@@ -1,9 +1,10 @@
+import { memo } from "react";
 import { Loader2 } from "lucide-react";
 
 import { EventRow } from "@/components/EventRow";
 import { SecHead } from "@/components/SecHead";
 import { getEventDisplayPriorityLabel } from "@fresno-events/shared";
-import { listDisplayPriority, type PriorityGroup } from "../admin/admin-priority.utils";
+import { listDisplayPriority, type CandidateListGroup } from "../admin/admin-priority.utils";
 import type { CandidateStatusFilter } from "../admin/admin-api";
 
 import { toCandidateEventRowViewModel } from "./admin-candidate.utils";
@@ -11,7 +12,7 @@ import { isPageFullySelected } from "./admin-review-selection.utils";
 import styles from "./CandidateList.module.css";
 
 export interface CandidateListProps {
-  groups: PriorityGroup[];
+  groups: CandidateListGroup[];
   activeId: string | null;
   isLoading: boolean;
   statusFilter: CandidateStatusFilter;
@@ -25,7 +26,7 @@ export interface CandidateListProps {
   searchQuery?: string;
 }
 
-export function CandidateList({
+export const CandidateList = memo(function CandidateList({
   groups,
   activeId,
   isLoading,
@@ -81,20 +82,29 @@ export function CandidateList({
         <span className={styles.count}>{items.length} rows</span>
       </div>
 
-      {groups.map((group, groupIndex) => (
-        <section key={`${group.priority}-${groupIndex}`} className={styles.group}>
-          <SecHead
-            title={searchMode ? `SEARCH · PRIORITY ${group.priority}` : `PRIORITY ${group.priority}`}
-            script={getEventDisplayPriorityLabel(group.priority).toLowerCase()}
-            count={group.items.length}
-          />
+      {groups.map((group, groupIndex) => {
+        const groupIds = group.items.map((item) => item.id);
+        const groupAllSelected = isPageFullySelected(selectedIds, groupIds);
+
+        return (
+        <section key={`${group.source || "all"}-${groupIndex}`} className={styles.group}>
+          {group.label ? (
+            <SecHead
+              title={searchMode ? `SEARCH · ${group.label}` : group.label}
+              count={group.items.length}
+              groupSelectAll={{
+                checked: groupAllSelected,
+                onChange: () => onSelectAll(groupIds)
+              }}
+            />
+          ) : null}
           <ul className={styles.rows}>
             {group.items.map((candidate) => {
               const priority = listDisplayPriority(candidate, seriesDisplayPriorities, priorityOverrides);
               const row = toCandidateEventRowViewModel(candidate, priority, {
                 showStatusInLabel: searchMode
               });
-              const showImage = priority < 5 || row.showVenueLogoInList === true;
+              const showP5ListImage = priority === 5 && row.showVenueLogoInList !== true;
 
               return (
                 <li key={candidate.id} className={styles.item}>
@@ -110,7 +120,8 @@ export function CandidateList({
                     event={row}
                     isSelected={candidate.id === activeId}
                     onSelect={() => onSelect(candidate.id)}
-                    showImage={showImage}
+                    showImage
+                    showP5ListImage={showP5ListImage}
                     priorityLabel={`P${priority} · ${getEventDisplayPriorityLabel(priority)}`}
                     priceSubLabel="confidence"
                     forceVisible
@@ -120,7 +131,8 @@ export function CandidateList({
             })}
           </ul>
         </section>
-      ))}
+        );
+      })}
     </div>
   );
-}
+});

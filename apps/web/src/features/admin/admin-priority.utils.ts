@@ -1,5 +1,7 @@
 import { EVENT_PRIORITY_DEFAULT, type EventCandidate } from "@fresno-events/shared";
 
+import { resolveCandidateListingUrl } from "@/features/admin-review/admin-candidate.utils";
+
 const PRIORITY_STORAGE_KEY = "wuf:admin_priority";
 
 export function readPriorityOverrides(): Record<string, number> {
@@ -65,10 +67,7 @@ export function seriesGroupKey(candidate: EventCandidate): string | null {
     return `series:${seriesId}`;
   }
 
-  const listingUrl =
-    candidate.detailPageUrl?.trim() ||
-    candidate.sourceUrl?.trim() ||
-    candidate.normalizedEvent.externalUrl?.trim();
+  const listingUrl = resolveCandidateListingUrl(candidate);
   if (!listingUrl) {
     return null;
   }
@@ -91,6 +90,15 @@ function isSeriesGrouped(candidate: EventCandidate, groupCounts: Map<string, num
     return Boolean(candidate.normalizedEvent.seriesName?.trim());
   }
   return (groupCounts.get(key) ?? 0) > 1;
+}
+
+/** Approved/rejected tabs: most recently reviewed first. */
+export function sortCandidatesByReviewedAt(items: EventCandidate[]): EventCandidate[] {
+  return [...items].sort((a, b) => {
+    const aTs = a.reviewedAt ?? a.updatedAt ?? a.createdAt;
+    const bTs = b.reviewedAt ?? b.updatedAt ?? b.createdAt;
+    return bTs.localeCompare(aTs);
+  });
 }
 
 export function sortCandidatesForReview(
@@ -133,6 +141,97 @@ export function sortCandidatesForReview(
 export interface PriorityGroup {
   priority: number;
   items: EventCandidate[];
+}
+
+export interface CandidateListGroup {
+  source: string;
+  label: string;
+  items: EventCandidate[];
+}
+
+/** Section header label — matches list row source styling (no api: prefix). */
+export function formatCandidateSourceGroupLabel(source: string): string {
+  return source.replace(/^api:/, "").replace(/_/g, " ");
+}
+
+/** Compare rows inside one source group: priority (asc), then start date (asc). */
+export function compareCandidatesWithinSource(
+  a: EventCandidate,
+  b: EventCandidate,
+  overrides: Record<string, number>,
+  seriesPriorities: Map<string, number>
+): number {
+  const pa = listDisplayPriority(a, seriesPriorities, overrides);
+  const pb = listDisplayPriority(b, seriesPriorities, overrides);
+  if (pa !== pb) {
+    return pa - pb;
+  }
+  const byDate = a.startTs.localeCompare(b.startTs);
+  if (byDate !== 0) {
+    return byDate;
+  }
+  if (a.confidenceScore !== b.confidenceScore) {
+    return b.confidenceScore - a.confidenceScore;
+  }
+  return a.id.localeCompare(b.id);
+}
+
+export function sortCandidatesWithinSource(
+  items: EventCandidate[],
+  overrides: Record<string, number>,
+  seriesPriorities: Map<string, number>
+): EventCandidate[] {
+  return [...items].sort((a, b) => compareCandidatesWithinSource(a, b, overrides, seriesPriorities));
+}
+
+/** Flat list order: source groups (A→Z), then priority and date within each source. */
+export function sortCandidatesForSourceGroupedReview(
+  items: EventCandidate[],
+  overrides: Record<string, number>,
+  seriesDisplayPriorities?: Map<string, number>
+): EventCandidate[] {
+  const seriesPriorities = seriesDisplayPriorities ?? buildSeriesDisplayPriorities(items, overrides);
+  const bySource = new Map<string, EventCandidate[]>();
+  for (const item of items) {
+    const bucket = bySource.get(item.source) ?? [];
+    bucket.push(item);
+    bySource.set(item.source, bucket);
+  }
+
+  const sources = [...bySource.keys()].sort((a, b) =>
+    formatCandidateSourceGroupLabel(a).localeCompare(formatCandidateSourceGroupLabel(b))
+  );
+
+  const out: EventCandidate[] = [];
+  for (const source of sources) {
+    const bucket = bySource.get(source) ?? [];
+    out.push(...sortCandidatesWithinSource(bucket, overrides, seriesPriorities));
+  }
+  return out;
+}
+
+export function groupCandidatesBySource(
+  items: EventCandidate[],
+  overrides: Record<string, number>,
+  seriesDisplayPriorities?: Map<string, number>
+): CandidateListGroup[] {
+  const seriesPriorities = seriesDisplayPriorities ?? buildSeriesDisplayPriorities(items, overrides);
+  const sorted = sortCandidatesForSourceGroupedReview(items, overrides, seriesPriorities);
+  const groups: CandidateListGroup[] = [];
+
+  for (const item of sorted) {
+    const last = groups[groups.length - 1];
+    if (last && last.source === item.source) {
+      last.items.push(item);
+    } else {
+      groups.push({
+        source: item.source,
+        label: formatCandidateSourceGroupLabel(item.source),
+        items: [item]
+      });
+    }
+  }
+  return groups;
 }
 
 /** Lowest (most prominent) priority among recurring siblings — keeps series in one list section. */

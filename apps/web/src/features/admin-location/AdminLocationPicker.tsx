@@ -1,28 +1,13 @@
-import L from "leaflet";
 import { Loader2, MapPin } from "lucide-react";
-import { useMemo, useState } from "react";
-import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+import { useState } from "react";
 
 import { Button } from "@/components/Button/Button";
-import { FRESNO_CENTER, MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from "@/lib/map-config";
+import type { PublishVenuePreview } from "@fresno-events/shared";
 
+import { AdminLocationMap } from "./AdminLocationMap";
 import type { AdminLocationPickerProps } from "./AdminLocationPicker.types";
 import styles from "./AdminLocationPicker.module.css";
 import { geocodeErrorMessage, useGeocodeVenue } from "./useGeocodeVenue";
-
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-// Vite needs explicit default marker assets.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow
-});
 
 function parseCoord(value: string): number | null {
   const parsed = Number(value);
@@ -33,13 +18,11 @@ function formatCoord(value: number): string {
   return value.toFixed(5);
 }
 
-function MapClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click(event) {
-      onPick(event.latlng.lat, event.latlng.lng);
-    }
-  });
-  return null;
+function isMeaningfulPin(lat: number | null, lng: number | null): boolean {
+  if (lat == null || lng == null) {
+    return false;
+  }
+  return !(lat === 0 && lng === 0);
 }
 
 export function AdminLocationPicker({
@@ -48,6 +31,7 @@ export function AdminLocationPicker({
   lng,
   address,
   city,
+  publishVenuePreview,
   onChange
 }: AdminLocationPickerProps) {
   const [error, setError] = useState<string | null>(null);
@@ -55,15 +39,14 @@ export function AdminLocationPicker({
 
   const latNum = parseCoord(lat);
   const lngNum = parseCoord(lng);
-  const hasPin = latNum != null && lngNum != null;
-  const center = hasPin ? { lat: latNum, lng: lngNum } : FRESNO_CENTER;
-
-  const markerKey = useMemo(() => `${lat}-${lng}`, [lat, lng]);
-
-  const handlePick = (nextLat: number, nextLng: number) => {
-    setError(null);
-    onChange({ lat: formatCoord(nextLat), lng: formatCoord(nextLng) });
-  };
+  const hasDraftPin = isMeaningfulPin(latNum, lngNum);
+  const hasPreviewPin =
+    !hasDraftPin &&
+    publishVenuePreview != null &&
+    isMeaningfulPin(publishVenuePreview.lat, publishVenuePreview.lng);
+  const hasPin = hasDraftPin || hasPreviewPin;
+  const pinLat = hasDraftPin ? latNum! : hasPreviewPin ? publishVenuePreview!.lat : null;
+  const pinLng = hasDraftPin ? lngNum! : hasPreviewPin ? publishVenuePreview!.lng : null;
 
   const handleGeocode = () => {
     setError(null);
@@ -96,38 +79,36 @@ export function AdminLocationPicker({
           )}
           Geocode from address
         </Button>
-        {hasPin ? (
+        {hasDraftPin ? (
           <span className={styles.coords}>
             {lat}, {lng}
+          </span>
+        ) : hasPreviewPin && pinLat != null && pinLng != null ? (
+          <span className={styles.coords}>
+            {formatCoord(pinLat)}, {formatCoord(pinLng)}
           </span>
         ) : (
           <span className={styles.coords}>No pin — click map or geocode</span>
         )}
       </div>
+      {hasPreviewPin ? (
+        <p className={styles.previewHint}>
+          Publish preview — pin from existing venue “{publishVenuePreview!.venueName}”. Same location
+          after approve. Click the map or geocode to override.
+        </p>
+      ) : null}
+      {!hasPin && address.trim() ? (
+        <p className={styles.previewHint}>
+          No saved venue pin yet. Approve will geocode from the address if needed.
+        </p>
+      ) : null}
       {error ? <p className={styles.error}>{error}</p> : null}
-      <div className={styles.map}>
-        <MapContainer
-          center={[center.lat, center.lng]}
-          zoom={hasPin ? 14 : 11}
-          style={{ height: "100%", width: "100%" }}
-        >
-          <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} />
-          <MapClickHandler onPick={handlePick} />
-          {hasPin ? (
-            <Marker
-              key={markerKey}
-              position={[latNum, lngNum]}
-              draggable
-              eventHandlers={{
-                dragend: (event) => {
-                  const marker = event.target;
-                  handlePick(marker.getLatLng().lat, marker.getLatLng().lng);
-                }
-              }}
-            />
-          ) : null}
-        </MapContainer>
-      </div>
+      <AdminLocationMap
+        lat={lat}
+        lng={lng}
+        {...(publishVenuePreview ? { publishVenuePreview } : {})}
+        onChange={onChange}
+      />
     </div>
   );
 }

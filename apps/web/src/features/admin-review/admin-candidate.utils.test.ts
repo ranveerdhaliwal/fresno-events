@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { EventCandidate } from "@fresno-events/shared";
 
-import { toCandidateEventRowViewModel } from "./admin-candidate.utils";
+import { toCandidateEventRowViewModel, resolveCandidateListingUrl, resolveCandidateTicketUrl } from "./admin-candidate.utils";
 
 const baseCandidate = {
   id: "cand-1",
@@ -37,7 +37,53 @@ describe("toCandidateEventRowViewModel", () => {
     const row = toCandidateEventRowViewModel(baseCandidate, 1);
     expect(row.priority).toBe(1);
     expect(row.priceLabel).toBe("87%");
-    expect(row.flagLabel).toBe("HUGE");
+    expect(row.flagLabel).toBeNull();
     expect(row.categoryLabel).toBe("visitfresnocounty");
+  });
+});
+
+describe("resolveCandidateListingUrl", () => {
+  it("prefers normalized external URL over scrape metadata", () => {
+    const candidate = {
+      ...baseCandidate,
+      sourceUrl: "https://www.fresnofair.com/",
+      normalizedEvent: {
+        ...baseCandidate.normalizedEvent,
+        externalUrl: "https://www.fresnofair.com/events/2026/kansas-starship-mickey"
+      }
+    } satisfies EventCandidate;
+
+    expect(resolveCandidateListingUrl(candidate)).toBe(
+      "https://www.fresnofair.com/events/2026/kansas-starship-mickey"
+    );
+  });
+});
+
+describe("resolveCandidateTicketUrl", () => {
+  it("returns ticket URL when different from listing URL", () => {
+    const candidate = {
+      ...baseCandidate,
+      normalizedEvent: {
+        ...baseCandidate.normalizedEvent,
+        externalUrl: "https://www.fresnofair.com/events/2026/kansas-starship-mickey",
+        ticketUrl: "https://etix.example.com/tickets/123"
+      }
+    } satisfies EventCandidate;
+
+    expect(resolveCandidateTicketUrl(candidate)).toBe("https://etix.example.com/tickets/123");
+  });
+
+  it("returns null when ticket URL matches listing URL", () => {
+    const url = "https://www.fresnofair.com/events/2026/kansas-starship-mickey";
+    const candidate = {
+      ...baseCandidate,
+      normalizedEvent: {
+        ...baseCandidate.normalizedEvent,
+        externalUrl: url,
+        ticketUrl: url
+      }
+    } satisfies EventCandidate;
+
+    expect(resolveCandidateTicketUrl(candidate)).toBeNull();
   });
 });

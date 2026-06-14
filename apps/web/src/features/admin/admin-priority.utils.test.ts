@@ -5,9 +5,14 @@ import type { EventCandidate, NormalizedEvent } from "@fresno-events/shared";
 
 import {
   buildSeriesDisplayPriorities,
+  compareCandidatesWithinSource,
   groupCandidatesByPriority,
+  groupCandidatesBySource,
   listDisplayPriority,
-  sortCandidatesForReview
+  sortCandidatesByReviewedAt,
+  sortCandidatesForReview,
+  sortCandidatesForSourceGroupedReview,
+  sortCandidatesWithinSource
 } from "./admin-priority.utils";
 
 const LISTING_URL = "https://www.visitfresnocounty.org/event/fort-washington-farmers-market/1234";
@@ -17,10 +22,12 @@ function makeCandidate(
   title: string,
   startTs: string,
   suggestedPriority: number | undefined,
-  externalUrl: string = LISTING_URL
+  externalUrl: string = LISTING_URL,
+  source: string = "api:visitfresnocounty",
+  confidenceScore = 0.7
 ): EventCandidate {
   const normalizedEvent: NormalizedEvent = {
-    source: "api:visitfresnocounty",
+    source,
     sourceEventId: id,
     title,
     venueName: "Riverview Shopping Center",
@@ -30,7 +37,7 @@ function makeCandidate(
 
   return {
     id,
-    source: "api:visitfresnocounty",
+    source,
     sourceEventId: id,
     title,
     venueName: "Riverview Shopping Center",
@@ -40,7 +47,7 @@ function makeCandidate(
     normalizedEvent,
     rawPayload: {},
     dedupeHash: id,
-    confidenceScore: 0.7,
+    confidenceScore,
     ...(suggestedPriority !== undefined ? { suggestedPriority } : {}),
     status: "pending_review",
     occurrenceId: id,
@@ -59,12 +66,12 @@ describe("series display priority", () => {
     ];
 
     const seriesPriorities = buildSeriesDisplayPriorities(items, {});
-    expect(listDisplayPriority(items[0], seriesPriorities, {})).toBe(4);
-    expect(listDisplayPriority(items[1], seriesPriorities, {})).toBe(4);
-    expect(listDisplayPriority(items[3], seriesPriorities, {})).toBe(4);
+    expect(listDisplayPriority(items[0]!, seriesPriorities, {})).toBe(4);
+    expect(listDisplayPriority(items[1]!, seriesPriorities, {})).toBe(4);
+    expect(listDisplayPriority(items[3]!, seriesPriorities, {})).toBe(4);
   });
 
-  it("keeps a recurring series in one priority section", () => {
+  it("keeps a recurring series in one priority section (legacy priority groups)", () => {
     const items = [
       makeCandidate("a", "Fort Washington Farmers Market", "2026-07-07T17:00:00.000Z", 4),
       makeCandidate("b", "Fort Washington Farmers Market", "2026-07-14T17:00:00.000Z", 5),
@@ -90,5 +97,85 @@ describe("series display priority", () => {
     expect(groups).toHaveLength(2);
     expect(groups[0]?.priority).toBe(4);
     expect(groups[1]?.priority).toBe(5);
+  });
+});
+
+describe("source grouping", () => {
+  it("groups by source and sorts by priority within each source", () => {
+    const items = [
+      makeCandidate("tm-p2", "TM P2", "2026-08-01T00:00:00.000Z", 2, "https://tm.example/a", "ticketmaster"),
+      makeCandidate("tm-p1", "TM P1", "2026-08-02T00:00:00.000Z", 1, "https://tm.example/b", "ticketmaster"),
+      makeCandidate("vf-p3", "VF P3", "2026-08-03T00:00:00.000Z", 3, LISTING_URL, "api:visitfresnocounty")
+    ];
+
+    const groups = groupCandidatesBySource(items, {});
+    expect(groups).toHaveLength(2);
+    expect(groups[0]?.source).toBe("ticketmaster");
+    expect(groups[0]?.items.map((item) => item.id)).toEqual(["tm-p1", "tm-p2"]);
+    expect(groups[1]?.source).toBe("api:visitfresnocounty");
+    expect(groups[1]?.items.map((item) => item.id)).toEqual(["vf-p3"]);
+  });
+
+  it("flat sort order matches group order for navigation", () => {
+    const items = [
+      makeCandidate("tm-p2", "TM P2", "2026-08-01T00:00:00.000Z", 2, "https://tm.example/a", "ticketmaster"),
+      makeCandidate("tm-p1", "TM P1", "2026-08-02T00:00:00.000Z", 1, "https://tm.example/b", "ticketmaster"),
+      makeCandidate("vf-p3", "VF P3", "2026-08-03T00:00:00.000Z", 3, LISTING_URL, "api:visitfresnocounty")
+    ];
+
+    const flat = sortCandidatesForSourceGroupedReview(items, {});
+    const fromGroups = groupCandidatesBySource(items, {}).flatMap((group) => group.items);
+    expect(flat.map((item) => item.id)).toEqual(fromGroups.map((item) => item.id));
+  });
+
+  it("sorts by priority then chronological date within a source", () => {
+    const items = [
+      makeCandidate("gb-aug-29", "Game Aug 29", "2026-08-29T18:00:00.000Z", 4, "https://g.example/4", "api:gobulldogs"),
+      makeCandidate("gb-aug-15", "Game Aug 15", "2026-08-15T18:00:00.000Z", 4, "https://g.example/1", "api:gobulldogs"),
+      makeCandidate("gb-aug-22", "Game Aug 22", "2026-08-22T18:00:00.000Z", 4, "https://g.example/2", "api:gobulldogs"),
+      makeCandidate("gb-p1", "Marquee", "2026-09-01T18:00:00.000Z", 1, "https://g.example/5", "api:gobulldogs")
+    ];
+
+    const sorted = sortCandidatesWithinSource(items, {}, new Map());
+    expect(sorted.map((item) => item.id)).toEqual(["gb-p1", "gb-aug-15", "gb-aug-22", "gb-aug-29"]);
+  });
+
+  it("uses date before confidence when priority matches", () => {
+    const items = [
+      makeCandidate("later", "Later", "2026-08-22T18:00:00.000Z", 4, "https://g.example/b", "api:gobulldogs", 0.99),
+      makeCandidate("earlier", "Earlier", "2026-08-15T18:00:00.000Z", 4, "https://g.example/a", "api:gobulldogs", 0.5)
+    ];
+
+    expect(compareCandidatesWithinSource(items[0]!, items[1]!, {}, new Map())).toBeGreaterThan(0);
+    expect(sortCandidatesWithinSource(items, {}, new Map()).map((item) => item.id)).toEqual([
+      "earlier",
+      "later"
+    ]);
+  });
+
+  it("orders higher-priority rows before later dates", () => {
+    const items = [
+      makeCandidate("p4-soon", "P4 soon", "2026-08-10T18:00:00.000Z", 4, "https://g.example/a", "api:gobulldogs"),
+      makeCandidate("p1-later", "P1 later", "2026-09-01T18:00:00.000Z", 1, "https://g.example/b", "api:gobulldogs")
+    ];
+
+    expect(sortCandidatesWithinSource(items, {}, new Map()).map((item) => item.id)).toEqual(["p1-later", "p4-soon"]);
+  });
+});
+
+describe("sortCandidatesByReviewedAt", () => {
+  it("orders approved rows with the most recently reviewed first", () => {
+    const older = {
+      ...makeCandidate("older", "Older Event", "2026-07-07T17:00:00.000Z", 4),
+      status: "approved" as const,
+      reviewedAt: "2026-06-01T10:00:00.000Z"
+    };
+    const newer = {
+      ...makeCandidate("newer", "Newer Event", "2026-07-08T17:00:00.000Z", 4),
+      status: "approved" as const,
+      reviewedAt: "2026-06-13T18:08:45.000Z"
+    };
+
+    expect(sortCandidatesByReviewedAt([older, newer]).map((item) => item.id)).toEqual(["newer", "older"]);
   });
 });

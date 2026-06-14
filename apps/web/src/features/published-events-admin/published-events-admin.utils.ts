@@ -52,7 +52,6 @@ export function groupPublishedEventsByPriority(items: AdminEventListHit[]): Publ
 
 function derivePublishedFlag(priority: number): string | null {
   if (priority === 0) return "PROMOTED";
-  if (priority === 1) return "HUGE";
   return "LIVE";
 }
 
@@ -95,6 +94,11 @@ export function toPublishedEventRowViewModel(hit: AdminEventListHit): EventRowVi
     imageUrl: hit.heroImageUrl,
     isFree: false,
     isLive: true,
-    featuredBadge: "default"
+    featuredBadge: "default",
+    descriptionSnippet: "",
+    venueAddress: hit.venueName,
+    tags: [],
+    ticketUrl: null,
+    externalUrl: null
   };
 }

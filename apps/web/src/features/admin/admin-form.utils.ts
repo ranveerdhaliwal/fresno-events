@@ -14,8 +14,13 @@ export function normalizedEventToFormState(
   event: NormalizedEvent,
   priority: number
 ): AdminEventFormState {
-  const startParts = decodeInstantToFormFields(event.startTs);
-  const endParts = event.endTs ? decodeInstantToFormFields(event.endTs, { isEnd: true }) : { date: "", time: "" };
+  const startParts = decodeInstantToFormFields(event.startTs, { timeUnknown: event.timeUnknown === true });
+  const endParts = event.endTs
+    ? decodeInstantToFormFields(event.endTs, { isEnd: true, timeUnknown: event.timeUnknown === true })
+    : { date: "", time: "" };
+
+  const timeTba = event.timeUnknown === true;
+  const allDay = !timeTba && isAllDayPacificStart(event.startTs);
 
   return {
     title: event.title,
@@ -25,6 +30,8 @@ export function normalizedEventToFormState(
     startTime: startParts.time,
     endDate: endParts.date,
     endTime: endParts.time,
+    allDay,
+    timeTba,
     venueName: event.venueName,
     venueCity: event.venueCity ?? "",
     venueAddress: event.venueAddress ?? "",
@@ -36,13 +43,14 @@ export function normalizedEventToFormState(
     priceMin: event.priceMin?.toString() ?? "",
     priceMax: event.priceMax?.toString() ?? "",
     priceNotes: event.priceNotes ?? "",
-    priority
+    priority,
+    mapPinEmoji: event.mapPinEmoji ?? ""
   };
 }
 
 function decodeInstantToFormFields(
   iso: string,
-  opts?: { isEnd?: boolean }
+  opts?: { isEnd?: boolean; timeUnknown?: boolean }
 ): { date: string; time: string } {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) {
@@ -50,6 +58,10 @@ function decodeInstantToFormFields(
   }
 
   const pacific = getPacificDateTimeParts(d);
+  if (opts?.timeUnknown && !opts?.isEnd) {
+    return { date: pacific.date, time: "" };
+  }
+
   const allDay = isAllDayPacificStart(iso);
 
   if (allDay && !opts?.isEnd) {
@@ -88,6 +100,11 @@ export function formStateToEventPatch(
   assignNumberOptional(patch, "priceMin", draft.priceMin, original.priceMin);
   assignNumberOptional(patch, "priceMax", draft.priceMax, original.priceMax);
   assignOptional(patch, "priceNotes", draft.priceNotes, original.priceNotes);
+  const nextPin = draft.mapPinEmoji.trim();
+  const prevPin = original.mapPinEmoji ?? "";
+  if (nextPin !== prevPin) {
+    patch.mapPinEmoji = nextPin.length > 0 ? nextPin : null;
+  }
 
   const startTs = encodeStartInstant(draft);
   if (startTs && startTs !== original.startTs) {
@@ -104,6 +121,11 @@ export function formStateToEventPatch(
     }
   }
 
+  const timeUnknown = draft.startTime.trim() ? false : draft.timeTba;
+  if (timeUnknown !== (original.timeUnknown === true)) {
+    patch.timeUnknown = timeUnknown;
+  }
+
   return patch;
 }
 
@@ -112,11 +134,42 @@ function encodeStartInstant(draft: AdminEventFormState): string | null {
   if (!date) {
     return null;
   }
-  if (!draft.startTime.trim()) {
-    // All-day events use noon UTC sentinel (matches ingest scrapers).
-    return new Date(`${date}T12:00:00Z`).toISOString();
+  if (draft.startTime.trim()) {
+    return instantFromPacificLocal(date, draft.startTime.trim());
   }
-  return instantFromPacificLocal(date, draft.startTime.trim());
+  // Date-only sentinel — paired with `allDay` or `timeTba` on the normalized event.
+  return new Date(`${date}T12:00:00.000Z`).toISOString();
+}
+
+export function applyAdminStartTimeChange(
+  draft: AdminEventFormState,
+  startTime: string
+): AdminEventFormState {
+  const trimmed = startTime.trim();
+  if (trimmed) {
+    return { ...draft, startTime: trimmed, allDay: false, timeTba: false };
+  }
+  return { ...draft, startTime: "" };
+}
+
+export function applyAdminAllDayChange(
+  draft: AdminEventFormState,
+  allDay: boolean
+): AdminEventFormState {
+  if (!allDay) {
+    return { ...draft, allDay: false };
+  }
+  return { ...draft, allDay: true, timeTba: false, startTime: "" };
+}
+
+export function applyAdminTimeTbaChange(
+  draft: AdminEventFormState,
+  timeTba: boolean
+): AdminEventFormState {
+  if (!timeTba) {
+    return { ...draft, timeTba: false };
+  }
+  return { ...draft, timeTba: true, allDay: false, startTime: "" };
 }
 
 function encodeEndInstant(draft: AdminEventFormState): string | undefined {

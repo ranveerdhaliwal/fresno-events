@@ -1,26 +1,36 @@
-import { useMutation } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, Loader2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ExternalLink } from "lucide-react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/Button/Button";
 import { DateInput } from "@/components/DateInput/DateInput";
 import { FormField } from "@/components/FormField/FormField";
+import { PlaceholderImage } from "@/components/PlaceholderImage";
 import { SelectInput } from "@/components/SelectInput/SelectInput";
 import { TextArea } from "@/components/TextArea/TextArea";
 import { TextInput } from "@/components/TextInput/TextInput";
 import { TimeInput } from "@/components/TimeInput/TimeInput";
 import { cn } from "@/lib/cn";
-import { approveCandidate, rejectCandidate } from "../admin/admin-api";
+import { approveCandidate, patchPublishedEvent, rejectCandidate } from "../admin/admin-api";
 import {
   ADMIN_EVENT_CATEGORIES,
   type AdminEventFormState
 } from "../admin/admin-form.types";
-import { formStateToEventPatch, normalizedEventToFormState } from "../admin/admin-form.utils";
-import { ORGANIC_CANDIDATE_DISPLAY_PRIORITY, type EventCategory } from "@fresno-events/shared";
+import { formStateToEventPatch, normalizedEventToFormState, applyAdminStartTimeChange } from "../admin/admin-form.utils";
+import { AdminScheduleOptions } from "@/features/admin/AdminScheduleOptions";
+import {
+  MAP_PIN_EMOJI_PRESETS,
+  ORGANIC_CANDIDATE_DISPLAY_PRIORITY,
+  type EventCategory
+} from "@fresno-events/shared";
+import { paletteKeyForCategory } from "@/lib/image-palette";
 import { formatPacificDateTimeLabel } from "@/lib/pacific-time";
 
+import { inferAdminPricingHint } from "@/features/admin/admin-pricing-hint.utils";
 import { AdminLocationPicker } from "@/features/admin-location/AdminLocationPicker";
 
+import { resolveCandidateListingUrl, resolveCandidateTicketUrl } from "./admin-candidate.utils";
+import { CandidateDetailDecisionActions, CandidateDetailDecisionBar } from "./CandidateDetailDecisionActions";
 import { ErrorBanner } from "./AdminReviewDetail.shared";
 import { type CandidateDetailProps } from "./AdminReviewWorkspace.types";
 import styles from "./AdminReviewWorkspace.module.css";
@@ -32,23 +42,31 @@ export function CandidateDetail({
   candidate,
   linkedCandidates,
   seriesSiblings,
+  publishVenuePreview,
   displayPriority,
   onPriorityChange,
   onAfterDecision,
   onSeriesUpdated,
   onSelectCandidate
 }: CandidateDetailProps) {
+  const queryClient = useQueryClient();
+  const isPendingReview = candidate.status === "pending_review";
+  const isPublishedEdit = candidate.status === "approved" && Boolean(candidate.matchedEventId);
   const [draft, setDraft] = useState<AdminEventFormState>(() =>
     normalizedEventToFormState(candidate.normalizedEvent, displayPriority)
   );
   const [reviewerName, setReviewerName] = useState<string>(() => sessionStorage.getItem("wuf:admin_name") ?? "");
   const [notes, setNotes] = useState<string>("");
   const [showRaw, setShowRaw] = useState<boolean>(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
 
   useEffect(() => {
     setDraft(normalizedEventToFormState(candidate.normalizedEvent, displayPriority));
     setNotes("");
-  }, [candidate.id, candidate.normalizedEvent, displayPriority]);
+    setSaveMessage(null);
+  }, [candidate.id, displayPriority]);
 
   useEffect(() => {
     if (reviewerName) {
@@ -56,19 +74,43 @@ export function CandidateDetail({
     }
   }, [reviewerName]);
 
-  const eventDiff = useMemo(
-    () => formStateToEventPatch(candidate.normalizedEvent, draft),
-    [candidate.normalizedEvent, draft]
-  );
+  const deferredDraft = useDeferredValue(draft);
+  const hasEdits = useMemo(() => {
+    return Object.keys(formStateToEventPatch(candidate.normalizedEvent, deferredDraft)).length > 0;
+  }, [candidate.normalizedEvent, deferredDraft]);
+
+  const savePublishedMutation = useMutation({
+    mutationFn: () => {
+      const currentDraft = draftRef.current;
+      const eventOverride = formStateToEventPatch(candidate.normalizedEvent, currentDraft);
+      const eventId = candidate.matchedEventId;
+      if (!eventId) {
+        throw new Error("This approved candidate is not linked to a published event.");
+      }
+      return patchPublishedEvent(token, eventId, {
+        event: eventOverride,
+        priority: currentDraft.priority,
+        ...(reviewerName.trim() ? { reviewedBy: reviewerName.trim() } : {})
+      });
+    },
+    onSuccess: () => {
+      setSaveMessage("Saved to the live calendar.");
+      void queryClient.invalidateQueries({ queryKey: ["admin", "candidate", candidate.id, token] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
+    }
+  });
 
   const approveMutation = useMutation({
-    mutationFn: () =>
-      approveCandidate(token, candidate.id, {
-        ...(Object.keys(eventDiff).length > 0 ? { event: eventDiff } : {}),
+    mutationFn: () => {
+      const currentDraft = draftRef.current;
+      const eventOverride = formStateToEventPatch(candidate.normalizedEvent, currentDraft);
+      return approveCandidate(token, candidate.id, {
+        event: eventOverride,
         ...(notes.trim() ? { notes: notes.trim() } : {}),
         ...(reviewerName.trim() ? { reviewedBy: reviewerName.trim() } : {}),
-        priority: draft.priority
-      }),
+        priority: currentDraft.priority
+      });
+    },
     onSuccess: () => {
       onAfterDecision(candidate.id);
     }
@@ -85,10 +127,43 @@ export function CandidateDetail({
     }
   });
 
-  const isBusy = approveMutation.isPending || rejectMutation.isPending;
-  const decisionError = approveMutation.error ?? rejectMutation.error;
+  const isBusy =
+    approveMutation.isPending || rejectMutation.isPending || savePublishedMutation.isPending;
+  const decisionError =
+    approveMutation.error ?? rejectMutation.error ?? savePublishedMutation.error;
+  const listingUrl = resolveCandidateListingUrl(candidate);
+  const resolvedTicketUrl = resolveCandidateTicketUrl(candidate);
   const externalUrl = draft.externalUrl.trim();
   const ticketUrl = draft.ticketUrl.trim();
+  const pricingHint = useMemo(
+    () => inferAdminPricingHint(candidate.normalizedEvent),
+    [candidate.normalizedEvent]
+  );
+
+  const handleVenueCoordsChange = useCallback((coords: { lat: string; lng: string }) => {
+    setDraft((d) => ({ ...d, venueLat: coords.lat, venueLng: coords.lng }));
+  }, []);
+
+  const handleReject = useCallback(() => rejectMutation.mutate(), [rejectMutation]);
+  const handleApprove = useCallback(() => {
+    if (isPublishedEdit) {
+      savePublishedMutation.mutate();
+      return;
+    }
+    approveMutation.mutate();
+  }, [approveMutation, isPublishedEdit, savePublishedMutation]);
+
+  const decisionActionProps = {
+    isBusy,
+    hasEdits,
+    onReject: handleReject,
+    onApprove: handleApprove,
+    hideReject: isPublishedEdit,
+    approveDisabled: isPublishedEdit && !hasEdits,
+    approveLabel: isPublishedEdit ? "Save changes" : "Approve",
+    approveWithEditsLabel: isPublishedEdit ? "Save changes" : "Approve with edits"
+  };
+
   return (
     <div className={styles.detailForm}>
       <header className={styles.detailHeader}>
@@ -106,28 +181,38 @@ export function CandidateDetail({
         </div>
       </header>
 
+      {isPublishedEdit ? (
+        <p className={styles.detailSubtitle}>Edits save directly to the live calendar.</p>
+      ) : null}
+
+      {isPendingReview || isPublishedEdit ? (
       <div className={styles.detailActions}>
         <div className={styles.detailActionsPrimary}>
-          <Button variant="reject" disabled={isBusy} onClick={() => rejectMutation.mutate()}>
-            <X className="size-4" aria-hidden />
-            Reject
-          </Button>
-          <Button variant="approve" disabled={isBusy} onClick={() => approveMutation.mutate()}>
-            {isBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CheckCircle2 className="size-4" aria-hidden />}
-            {Object.keys(eventDiff).length > 0 ? "Approve with edits" : "Approve"}
-          </Button>
+          <CandidateDetailDecisionActions {...decisionActionProps} />
         </div>
         <div className={styles.detailActionsSecondary}>
-          {candidate.sourceUrl ? (
+          {listingUrl ? (
             <Button
               variant="secondary"
               size="sm"
-              href={candidate.sourceUrl}
+              href={listingUrl}
               target="_blank"
               rel="noreferrer"
             >
               <ExternalLink className="size-3.5" aria-hidden />
-              Source
+              Event page
+            </Button>
+          ) : null}
+          {resolvedTicketUrl ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              href={resolvedTicketUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink className="size-3.5" aria-hidden />
+              Tickets
             </Button>
           ) : null}
           <Button variant="secondary" size="sm" onClick={() => setShowRaw((value) => !value)}>
@@ -135,10 +220,39 @@ export function CandidateDetail({
           </Button>
         </div>
       </div>
+      ) : null}
 
       <LinkedSourcesSection linkedCandidates={linkedCandidates} />
 
+      {saveMessage ? <p className={styles.pricingHint}>{saveMessage}</p> : null}
       {decisionError ? <ErrorBanner error={decisionError} /> : null}
+
+      <FormField
+        label="Display priority (published event)"
+        hint={
+          candidate.suggestedPriority !== undefined ? (
+            <>
+              Suggested P{candidate.suggestedPriority}
+              {candidate.suggestedPriority !== draft.priority ? " · you overrode" : ""}
+            </>
+          ) : undefined
+        }
+      >
+        <SelectInput
+          value={draft.priority}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            setDraft((d) => ({ ...d, priority: next }));
+            onPriorityChange(candidate.id, next);
+          }}
+        >
+          {ORGANIC_CANDIDATE_DISPLAY_PRIORITY.map((tier) => (
+            <option key={tier.value} value={tier.value}>
+              {tier.value} — {tier.label} ({tier.description})
+            </option>
+          ))}
+        </SelectInput>
+      </FormField>
 
       <div className={styles.detailFormGrid}>
         <FormField label="Title" fullWidth>
@@ -159,67 +273,73 @@ export function CandidateDetail({
             ))}
           </SelectInput>
         </FormField>
-        <FormField label="Start date (Pacific)">
-          <DateInput
-            value={draft.startDate}
-            onChange={(event) => setDraft((d) => ({ ...d, startDate: event.target.value }))}
-          />
+        <FormField label="Map pin">
+          <SelectInput
+            value={draft.mapPinEmoji}
+            onChange={(event) => setDraft((d) => ({ ...d, mapPinEmoji: event.target.value }))}
+          >
+            {MAP_PIN_EMOJI_PRESETS.map((preset) => (
+              <option key={preset.label} value={preset.value}>
+                {preset.label}
+              </option>
+            ))}
+          </SelectInput>
         </FormField>
-        <FormField label="Start time (Pacific, empty = all day)">
-          <TimeInput
-            value={draft.startTime}
-            onChange={(event) => setDraft((d) => ({ ...d, startTime: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="End date (Pacific, optional)">
-          <DateInput
-            value={draft.endDate}
-            onChange={(event) => setDraft((d) => ({ ...d, endDate: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="End time (Pacific, empty = end of day)">
-          <TimeInput
-            value={draft.endTime}
-            onChange={(event) => setDraft((d) => ({ ...d, endTime: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="Venue name" fullWidth>
-          <TextInput
-            value={draft.venueName}
-            onChange={(event) => setDraft((d) => ({ ...d, venueName: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="Venue city">
-          <TextInput
-            value={draft.venueCity}
-            onChange={(event) => setDraft((d) => ({ ...d, venueCity: event.target.value }))}
-          />
-        </FormField>
-        <FormField label="Venue address">
-          <TextInput
-            value={draft.venueAddress}
-            onChange={(event) => setDraft((d) => ({ ...d, venueAddress: event.target.value }))}
-          />
-        </FormField>
+        <div className={styles.detailFormDateTimePair}>
+          <FormField label="Start date (Pacific)">
+            <DateInput
+              value={draft.startDate}
+              onChange={(event) => setDraft((d) => ({ ...d, startDate: event.target.value }))}
+            />
+          </FormField>
+          <FormField label="Start time (Pacific)">
+            <TimeInput
+              value={draft.startTime}
+              onChange={(event) =>
+                setDraft((d) => applyAdminStartTimeChange(d, event.target.value))
+              }
+            />
+          </FormField>
+        </div>
+        <AdminScheduleOptions draft={draft} onChange={setDraft} />
+        <div className={styles.detailFormDateTimePair}>
+          <FormField label="End date (Pacific, optional)">
+            <DateInput
+              value={draft.endDate}
+              onChange={(event) => setDraft((d) => ({ ...d, endDate: event.target.value }))}
+            />
+          </FormField>
+          <FormField label="End time (Pacific, optional — empty with end date = 11:59 PM)">
+            <TimeInput
+              value={draft.endTime}
+              onChange={(event) => setDraft((d) => ({ ...d, endTime: event.target.value }))}
+            />
+          </FormField>
+        </div>
       </div>
-
-      <FormField label="Venue location" fullWidth>
-        <AdminLocationPicker
-          token={token}
-          lat={draft.venueLat}
-          lng={draft.venueLng}
-          address={draft.venueAddress}
-          city={draft.venueCity}
-          onChange={(coords) => setDraft((d) => ({ ...d, ...coords }))}
-        />
-      </FormField>
 
       <div className={styles.detailFormGrid}>
         <FormField label="Image URL" fullWidth>
-          <TextInput
-            value={draft.imageUrl}
-            onChange={(event) => setDraft((d) => ({ ...d, imageUrl: event.target.value }))}
-          />
+          <div
+            className={cn(
+              styles.imageUrlField,
+              displayPriority === 5 && styles.imageUrlFieldWithPreview
+            )}
+          >
+            {displayPriority === 5 ? (
+              <div className={styles.imageUrlPreview} aria-hidden>
+                <PlaceholderImage
+                  paletteKey={paletteKeyForCategory(draft.category, candidate.id)}
+                  label={draft.category}
+                  imageUrl={draft.imageUrl.trim() || null}
+                />
+              </div>
+            ) : null}
+            <TextInput
+              value={draft.imageUrl}
+              onChange={(event) => setDraft((d) => ({ ...d, imageUrl: event.target.value }))}
+            />
+          </div>
         </FormField>
         <FormField
           label="Ticket URL"
@@ -262,6 +382,9 @@ export function CandidateDetail({
             placeholder='e.g. "Free", "see website for details"'
           />
         </FormField>
+        {pricingHint?.kind === "unknown" ? (
+          <p className={styles.pricingHint}>{pricingHint.label}</p>
+        ) : null}
       </div>
 
       <FormField label="Description">
@@ -273,31 +396,37 @@ export function CandidateDetail({
         />
       </FormField>
 
-      <FormField
-        label="Display priority (published event)"
-        hint={
-          candidate.suggestedPriority !== undefined ? (
-            <>
-              Suggested P{candidate.suggestedPriority}
-              {candidate.suggestedPriority !== draft.priority ? " · you overrode" : ""}
-            </>
-          ) : undefined
-        }
-      >
-        <SelectInput
-          value={draft.priority}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            setDraft((d) => ({ ...d, priority: next }));
-            onPriorityChange(candidate.id, next);
-          }}
-        >
-          {ORGANIC_CANDIDATE_DISPLAY_PRIORITY.map((tier) => (
-            <option key={tier.value} value={tier.value}>
-              {tier.value} — {tier.label} ({tier.description})
-            </option>
-          ))}
-        </SelectInput>
+      <div className={styles.detailFormGrid}>
+        <FormField label="Venue name" fullWidth>
+          <TextInput
+            value={draft.venueName}
+            onChange={(event) => setDraft((d) => ({ ...d, venueName: event.target.value }))}
+          />
+        </FormField>
+        <FormField label="Venue city">
+          <TextInput
+            value={draft.venueCity}
+            onChange={(event) => setDraft((d) => ({ ...d, venueCity: event.target.value }))}
+          />
+        </FormField>
+        <FormField label="Venue address">
+          <TextInput
+            value={draft.venueAddress}
+            onChange={(event) => setDraft((d) => ({ ...d, venueAddress: event.target.value }))}
+          />
+        </FormField>
+      </div>
+
+      <FormField label="Venue location" fullWidth>
+        <AdminLocationPicker
+          token={token}
+          lat={draft.venueLat}
+          lng={draft.venueLng}
+          address={draft.venueAddress}
+          city={draft.venueCity}
+          {...(publishVenuePreview ? { publishVenuePreview } : {})}
+          onChange={handleVenueCoordsChange}
+        />
       </FormField>
 
       <div className={cn(styles.detailFormGrid, styles.detailFormGridNotes)}>
@@ -317,6 +446,13 @@ export function CandidateDetail({
           />
         </FormField>
       </div>
+
+      {isPendingReview || isPublishedEdit ? (
+        <CandidateDetailDecisionBar
+          {...decisionActionProps}
+          className={cn(styles.detailActions, styles.detailActionsBottom)}
+        />
+      ) : null}
 
       {showRaw ? (
         <details open className={styles.rawJson}>

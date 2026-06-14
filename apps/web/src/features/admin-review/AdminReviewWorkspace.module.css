@@ -272,12 +272,27 @@
   margin-left: auto;
 }
 
+.detailActionsBottom {
+  margin-top: 4px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: none;
+}
+
 .detailForm {
   display: flex;
   flex-direction: column;
   gap: 20px;
   flex: 1;
   min-height: 100%;
+}
+
+.pricingHint {
+  margin: -8px 0 0;
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .detailSeriesFooter {
@@ -289,6 +304,30 @@
   gap: 16px;
 }
 
+.imageUrlField {
+  display: block;
+}
+
+.imageUrlFieldWithPreview {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.imageUrlPreview {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  border: var(--border-card);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+.imageUrlFieldWithPreview input {
+  flex: 1;
+  min-width: 0;
+}
+
 .detailFormGrid {
   display: grid;
   gap: 16px;
@@ -297,10 +336,33 @@
 @media (min-width: 768px) {
   .detailFormGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
   }
 
   .detailFormGridNotes {
     grid-template-columns: minmax(0, 1fr) 220px;
+  }
+}
+
+.detailFormGrid .control {
+  box-sizing: border-box;
+  min-height: 42px;
+}
+
+.detailFormDateTimePair {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .detailFormDateTimePair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+  }
+
+  .detailFormDateTimePair .label {
+    min-height: 2.75rem;
   }
 }
 
@@ -363,6 +425,29 @@
 .diffPanelAfter {
   color: var(--ink);
   font-weight: 500;
+}
+
+.proposedFieldGroupChanged {
+  padding: 10px 12px;
+  border: 1.5px solid color-mix(in srgb, var(--mustard) 55%, var(--ink));
+  background: color-mix(in srgb, var(--mustard) 18%, var(--surface-card));
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.changeHighlightLegend {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary-on-card);
+  line-height: 1.45;
+}
+
+.changeHighlightLegendSample {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 2px 8px;
+  border: 1.5px solid color-mix(in srgb, var(--mustard) 55%, var(--ink));
+  background: color-mix(in srgb, var(--mustard) 18%, var(--surface-card));
+  vertical-align: baseline;
 }
 
 .rawJson {

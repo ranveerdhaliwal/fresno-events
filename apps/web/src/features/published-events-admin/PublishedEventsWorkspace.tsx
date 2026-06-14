@@ -17,10 +17,8 @@ import {
   listPublishedEvents
 } from "@/features/admin/admin-api";
 import { AdminSearchInput } from "@/features/admin-review/AdminSearchInput";
-import {
-  DetailLoading,
-  ErrorBanner
-} from "@/features/admin-review/AdminReviewDetail.shared";
+import { DetailLoading } from "@/components/DetailLoading";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { togglePageSelection } from "@/features/admin-review/admin-review-selection.utils";
 import styles from "@/features/admin-review/AdminReviewWorkspace.module.css";
 

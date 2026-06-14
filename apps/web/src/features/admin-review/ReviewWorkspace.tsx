@@ -18,25 +18,32 @@ import {
   bulkRejectCandidates,
   deleteCandidates,
   fetchPreApproveAudit,
+  fetchCandidateTabCounts,
   getCandidate,
   runOccurrenceRelinkOps,
-  runPriorityTriageOps,
+  runPriorityRerankOps,
   runVenueAddressBackfillOps,
   runVenueGeocodeOps,
   isAdminAuthError,
   listCandidates,
   reviewTabToStatus
 } from "../admin/admin-api";
+import { adminKeys } from "../admin/admin.queryKeys";
 import {
   buildSeriesDisplayPriorities,
   clearPriorityOverride,
   clearPriorityOverridesForIds,
   effectivePriority,
-  groupCandidatesByPriority,
+  groupCandidatesBySource,
   readPriorityOverrides,
-  sortCandidatesForReview,
+  sortCandidatesByReviewedAt,
+  sortCandidatesForSourceGroupedReview,
   writePriorityOverrides
 } from "../admin/admin-priority.utils";
+import {
+  resolveActiveCandidateId,
+  selectNextAfterDecision
+} from "./admin-review-navigation.utils";
 
 import { DetailLoading, EmptyDetail, ErrorBanner } from "./AdminReviewDetail.shared";
 import {
@@ -51,6 +58,7 @@ import { CandidateChangeDetail } from "./CandidateChangeDetail";
 import { CandidateDetail } from "./CandidateDetail";
 import { CandidateList } from "./CandidateList";
 import { filterCandidatesForSearch } from "./admin-review-search.utils";
+import { formatReviewTabLabel, tabCountForReviewTab } from "./admin-review-tab-counts.utils";
 import { togglePageSelection } from "./admin-review-selection.utils";
 import {
   AdminMaintenancePanel,
@@ -82,6 +90,7 @@ export function ReviewWorkspace({
   const [auditError, setAuditError] = useState<string | null>(null);
   const [maintenanceOp, setMaintenanceOp] = useState<MaintenanceOpKind | null>(null);
   const [maintenanceResult, setMaintenanceResult] = useState<MaintenanceOpResult | null>(null);
+  const [geocodeProgress, setGeocodeProgress] = useState<string | null>(null);
 
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
@@ -96,11 +105,26 @@ export function ReviewWorkspace({
     retry: (failureCount, error) => !isAdminAuthError(error) && failureCount < 1
   });
 
+  const tabCountsQuery = useQuery({
+    queryKey: ["admin", "candidate-counts", token],
+    queryFn: () => fetchCandidateTabCounts(token),
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) => !isAdminAuthError(error) && failureCount < 1
+  });
+
+  const tabCounts = tabCountsQuery.data;
+
   useEffect(() => {
     if (isAdminAuthError(candidatesQuery.error)) {
       onAuthFailure();
     }
   }, [candidatesQuery.error, onAuthFailure]);
+
+  useEffect(() => {
+    if (isAdminAuthError(tabCountsQuery.error)) {
+      onAuthFailure();
+    }
+  }, [tabCountsQuery.error, onAuthFailure]);
 
   const items = candidatesQuery.data?.items ?? [];
 
@@ -111,34 +135,58 @@ export function ReviewWorkspace({
     return filterCandidatesForSearch(items, searchQuery);
   }, [items, searchActive, searchQuery]);
 
-  const sortedItems = useMemo(
-    () => sortCandidatesForReview(items, priorityOverrides),
-    [items, priorityOverrides]
-  );
+  const sortedItems = useMemo(() => {
+    if (statusFilter === "approved" || statusFilter === "rejected") {
+      return sortCandidatesByReviewedAt(items);
+    }
+    return sortCandidatesForSourceGroupedReview(items, priorityOverrides);
+  }, [items, priorityOverrides, statusFilter]);
   const seriesDisplayPriorities = useMemo(
     () => buildSeriesDisplayPriorities(items, priorityOverrides),
     [items, priorityOverrides]
   );
-  const priorityGroups = useMemo(
-    () => groupCandidatesByPriority(sortedItems, priorityOverrides, seriesDisplayPriorities),
-    [sortedItems, priorityOverrides, seriesDisplayPriorities]
-  );
+  const sourceGroups = useMemo(() => {
+    if (statusFilter === "approved" || statusFilter === "rejected") {
+      return sortedItems.length > 0
+        ? [{ source: "", label: "", items: sortedItems }]
+        : [];
+    }
+    return groupCandidatesBySource(sortedItems, priorityOverrides, seriesDisplayPriorities);
+  }, [sortedItems, priorityOverrides, seriesDisplayPriorities, statusFilter]);
   const listGroups = useMemo(() => {
     if (!searchActive) {
-      return priorityGroups;
+      return sourceGroups;
     }
     if (searchResults.length === 0) {
       return [];
     }
+    if (statusFilter === "approved" || statusFilter === "rejected") {
+      const ordered = sortCandidatesByReviewedAt(searchResults);
+      return ordered.length > 0 ? [{ source: "", label: "", items: ordered }] : [];
+    }
     const searchSeriesPriorities = buildSeriesDisplayPriorities(searchResults, priorityOverrides);
-    return groupCandidatesByPriority(
-      sortCandidatesForReview(searchResults, priorityOverrides),
+    return groupCandidatesBySource(
+      sortCandidatesForSourceGroupedReview(searchResults, priorityOverrides, searchSeriesPriorities),
       priorityOverrides,
       searchSeriesPriorities
     );
-  }, [priorityGroups, searchActive, searchResults, priorityOverrides]);
+  }, [sourceGroups, searchActive, searchResults, priorityOverrides, statusFilter]);
 
   const visibleListItems = useMemo(() => listGroups.flatMap((group) => group.items), [listGroups]);
+
+  const navigationItems = visibleListItems;
+
+  const activeId = useMemo(
+    () => resolveActiveCandidateId(selectedId, navigationItems),
+    [selectedId, navigationItems]
+  );
+
+  useEffect(() => {
+    const resolved = resolveActiveCandidateId(selectedId, navigationItems);
+    if (resolved !== selectedId) {
+      onSelect(resolved);
+    }
+  }, [selectedId, navigationItems, onSelect]);
 
   const listSeriesDisplayPriorities = useMemo(
     () =>
@@ -151,14 +199,19 @@ export function ReviewWorkspace({
   const handleSelectAllPage = useCallback((pageIds: string[]) => {
     setSelectedIds((prev) => togglePageSelection(prev, pageIds));
   }, []);
-  const listLoading = candidatesQuery.isLoading;
-  const activeId = selectedId ?? sortedItems[0]?.id ?? null;
 
-  useEffect(() => {
-    if (selectedId && !sortedItems.some((item) => item.id === selectedId)) {
-      onSelect(null);
-    }
-  }, [sortedItems, selectedId, onSelect]);
+  const handleToggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+  const listLoading = candidatesQuery.isLoading;
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -170,8 +223,10 @@ export function ReviewWorkspace({
   const handleAfterDecision = (candidateId?: string) => {
     if (candidateId) {
       setPriorityOverrides((prev) => clearPriorityOverride(candidateId, prev));
+      onSelect(selectNextAfterDecision(navigationItems, candidateId));
     }
     queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
+    queryClient.invalidateQueries({ queryKey: ["admin", "candidate-counts"] });
     queryClient.invalidateQueries({ queryKey: ["admin", "candidate"] });
   };
 
@@ -369,8 +424,8 @@ export function ReviewWorkspace({
     }
   });
 
-  const priorityTriageMutation = useMutation({
-    mutationFn: (dryRun: boolean) => runPriorityTriageOps(token, dryRun),
+  const priorityRerankMutation = useMutation({
+    mutationFn: (dryRun: boolean) => runPriorityRerankOps(token, dryRun),
     onMutate: (dryRun) => {
       setMaintenanceOp("priority");
       setMaintenanceResult({ kind: "priority", dryRun });
@@ -378,12 +433,13 @@ export function ReviewWorkspace({
     onSuccess: (priority, dryRun) => {
       setMaintenanceResult({ kind: "priority", dryRun, priority });
       void queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
+      void queryClient.invalidateQueries({ queryKey: [...adminKeys.all, "published-events"] });
     },
     onError: (error: unknown, dryRun) => {
       setMaintenanceResult({
         kind: "priority",
         dryRun,
-        error: error instanceof AdminApiError ? error.message : "Priority triage failed."
+        error: error instanceof AdminApiError ? error.message : "Priority rerank failed."
       });
     },
     onSettled: () => {
@@ -392,10 +448,25 @@ export function ReviewWorkspace({
   });
 
   const geocodeOpsMutation = useMutation({
-    mutationFn: (dryRun: boolean) => runVenueGeocodeOps(token, dryRun),
+    mutationFn: (dryRun: boolean) =>
+      runVenueGeocodeOps(token, {
+        dryRun,
+        ...(dryRun
+          ? {}
+          : {
+              onProgress: (progress) => {
+                setGeocodeProgress(
+                  `Batch ${progress.batch}: ${progress.totalGeocoded} geocoded (${progress.totalScanned} scanned)…`
+                );
+              }
+            })
+      }),
     onMutate: (dryRun) => {
       setMaintenanceOp("geocode");
       setMaintenanceResult({ kind: "geocode", dryRun });
+      if (!dryRun) {
+        setGeocodeProgress("Starting geocode run…");
+      }
     },
     onSuccess: (geocode, dryRun) => {
       setMaintenanceResult({ kind: "geocode", dryRun, geocode });
@@ -409,6 +480,7 @@ export function ReviewWorkspace({
     },
     onSettled: () => {
       setMaintenanceOp(null);
+      setGeocodeProgress(null);
     }
   });
 
@@ -439,13 +511,13 @@ export function ReviewWorkspace({
     preApproveAuditMutation.isPending ||
     relinkOpsMutation.isPending ||
     addressBackfillMutation.isPending ||
-    priorityTriageMutation.isPending ||
+    priorityRerankMutation.isPending ||
     geocodeOpsMutation.isPending;
 
   const maintenanceLoading =
     relinkOpsMutation.isPending ||
     addressBackfillMutation.isPending ||
-    priorityTriageMutation.isPending ||
+    priorityRerankMutation.isPending ||
     geocodeOpsMutation.isPending;
 
   const handleMaintenanceCheck = useCallback(
@@ -462,9 +534,9 @@ export function ReviewWorkspace({
         geocodeOpsMutation.mutate(true);
         return;
       }
-      priorityTriageMutation.mutate(true);
+      priorityRerankMutation.mutate(true);
     },
-    [addressBackfillMutation, geocodeOpsMutation, priorityTriageMutation, relinkOpsMutation]
+    [addressBackfillMutation, geocodeOpsMutation, priorityRerankMutation, relinkOpsMutation]
   );
 
   const handleMaintenanceApply = useCallback(
@@ -492,7 +564,7 @@ export function ReviewWorkspace({
       if (kind === "geocode") {
         if (
           window.confirm(
-            "Geocode venues missing coordinates? Apply is rate-limited (~50 venues max per run)."
+            "Geocode all missing coordinates on venues and review candidates? This runs in rate-limited batches until finished and may take several minutes."
           )
         ) {
           geocodeOpsMutation.mutate(false);
@@ -501,13 +573,13 @@ export function ReviewWorkspace({
       }
       if (
         window.confirm(
-          "Apply priority triage? This patches suggested_priority on pending primaries when editorial rules match."
+          "Apply priority rerank? This patches suggested_priority on pending primaries and priority on published events (excluding manual) when the shared rules match."
         )
       ) {
-        priorityTriageMutation.mutate(false);
+        priorityRerankMutation.mutate(false);
       }
     },
-    [addressBackfillMutation, geocodeOpsMutation, priorityTriageMutation, relinkOpsMutation]
+    [addressBackfillMutation, geocodeOpsMutation, priorityRerankMutation, relinkOpsMutation]
   );
 
   const candidateQuery = useQuery({
@@ -536,9 +608,7 @@ export function ReviewWorkspace({
                 variant={activeTab === tab.id ? "approve" : "secondary"}
                 onClick={() => onActiveTabChange(tab.id)}
               >
-                {tab.label}
-                {tab.id === "new" && activeTab === "new" ? ` (${items.length})` : ""}
-                {tab.id === "updates" && activeTab === "updates" ? ` (${items.length})` : ""}
+                {formatReviewTabLabel(tab.label, tabCountForReviewTab(tab.id, tabCounts))}
               </Button>
             ))}
             <span className={styles.tabDivider} aria-hidden>
@@ -551,7 +621,7 @@ export function ReviewWorkspace({
                 variant={activeTab === tab.id ? "secondaryActive" : "secondary"}
                 onClick={() => onActiveTabChange(tab.id)}
               >
-                {tab.label}
+                {formatReviewTabLabel(tab.label, tabCountForReviewTab(tab.id, tabCounts))}
               </Button>
             ))}
           </div>
@@ -605,7 +675,10 @@ export function ReviewWorkspace({
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => candidatesQuery.refetch()}
+            onClick={() => {
+              void candidatesQuery.refetch();
+              void tabCountsQuery.refetch();
+            }}
           >
             <RefreshCcw className="size-3.5" aria-hidden />
             Refresh
@@ -625,6 +698,7 @@ export function ReviewWorkspace({
         activeOp={maintenanceOp}
         isLoading={maintenanceLoading}
         result={maintenanceResult}
+        progressMessage={maintenanceOp === "geocode" ? geocodeProgress : null}
         onCheck={handleMaintenanceCheck}
         onApply={handleMaintenanceApply}
         onDismiss={() => setMaintenanceResult(null)}
@@ -801,17 +875,7 @@ export function ReviewWorkspace({
           seriesDisplayPriorities={listSeriesDisplayPriorities}
           searchMode={searchActive}
           searchQuery={searchQuery}
-          onToggleSelected={(id) => {
-            setSelectedIds((prev) => {
-              const next = new Set(prev);
-              if (next.has(id)) {
-                next.delete(id);
-              } else {
-                next.add(id);
-              }
-              return next;
-            });
-          }}
+          onToggleSelected={handleToggleSelected}
           onSelectAll={handleSelectAllPage}
           />
         </div>
@@ -835,6 +899,9 @@ export function ReviewWorkspace({
                 {...(candidateQuery.data.publishedEvent
                   ? { publishedEvent: candidateQuery.data.publishedEvent }
                   : {})}
+                {...(candidateQuery.data.publishVenuePreview
+                  ? { publishVenuePreview: candidateQuery.data.publishVenuePreview }
+                  : {})}
                 displayPriority={effectivePriority(candidateQuery.data.candidate, priorityOverrides)}
                 onAfterDecision={handleAfterDecision}
               />
@@ -844,6 +911,9 @@ export function ReviewWorkspace({
                 candidate={candidateQuery.data.candidate}
                 linkedCandidates={candidateQuery.data.linkedCandidates ?? []}
                 seriesSiblings={candidateQuery.data.seriesSiblings ?? []}
+                {...(candidateQuery.data.publishVenuePreview
+                  ? { publishVenuePreview: candidateQuery.data.publishVenuePreview }
+                  : {})}
                 displayPriority={effectivePriority(candidateQuery.data.candidate, priorityOverrides)}
                 onPriorityChange={handlePriorityChange}
                 onAfterDecision={handleAfterDecision}

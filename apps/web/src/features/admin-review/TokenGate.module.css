@@ -1,0 +1,92 @@
+.gate {
+  max-width: 420px;
+  margin: 48px auto;
+  background: var(--surface-card);
+  border: var(--border-card);
+  box-shadow: var(--shadow-lg);
+  padding: 28px;
+  color-scheme: light;
+  color: var(--text-primary);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.iconWrap {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--mustard) 30%, transparent);
+  background: color-mix(in srgb, var(--mustard) 10%, transparent);
+  color: var(--mustard);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  color: var(--text-label);
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.hint {
+  margin: 16px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.code {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.errorBox {
+  margin-top: 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--coral) 40%, transparent);
+  background: color-mix(in srgb, var(--coral) 10%, transparent);
+  padding: 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.errorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.submit {
+  width: 100%;
+  min-height: 44px;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -29,19 +29,46 @@ describe("normalizedEventToFormState", () => {
     );
     expect(form.startDate).toBe("2026-05-23");
     expect(form.startTime).toBe("");
+    expect(form.allDay).toBe(true);
+    expect(form.timeTba).toBe(false);
+  });
+
+  it("decodes time TBA listings", () => {
+    const form = normalizedEventToFormState(
+      { ...baseEvent, startTs: "2026-05-23T12:00:00.000Z", timeUnknown: true },
+      5
+    );
+    expect(form.startTime).toBe("");
+    expect(form.allDay).toBe(false);
+    expect(form.timeTba).toBe(true);
   });
 });
 
 describe("formStateToEventPatch", () => {
-  it("encodes all-day when start time empty", () => {
+  it("encodes all-day when checkbox set", () => {
     const form = normalizedEventToFormState(baseEvent, 5);
     const patch = formStateToEventPatch(baseEvent, {
       ...form,
       startDate: "2026-08-01",
-      startTime: ""
+      startTime: "",
+      allDay: true,
+      timeTba: false
     });
-    expect(patch.startTs).toBeDefined();
-    expect(patch.timezone).toBe("America/Los_Angeles");
+    expect(patch.startTs).toBe("2026-08-01T12:00:00.000Z");
+    expect(patch.timeUnknown).toBeUndefined();
+  });
+
+  it("encodes time TBA when checkbox set", () => {
+    const form = normalizedEventToFormState(baseEvent, 5);
+    const patch = formStateToEventPatch(baseEvent, {
+      ...form,
+      startDate: "2026-08-01",
+      startTime: "",
+      allDay: false,
+      timeTba: true
+    });
+    expect(patch.startTs).toBe("2026-08-01T12:00:00.000Z");
+    expect(patch.timeUnknown).toBe(true);
   });
 
   it("round-trips venue coordinates in patch", () => {
@@ -57,5 +84,16 @@ describe("formStateToEventPatch", () => {
     });
     expect(patch.venueLat).toBe(36.8);
     expect(patch.venueLng).toBe(-119.9);
+  });
+
+  it("includes new price min and max in patch", () => {
+    const form = normalizedEventToFormState(baseEvent, 5);
+    const patch = formStateToEventPatch(baseEvent, {
+      ...form,
+      priceMin: "50",
+      priceMax: "150"
+    });
+    expect(patch.priceMin).toBe(50);
+    expect(patch.priceMax).toBe(150);
   });
 });
