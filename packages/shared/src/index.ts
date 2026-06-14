@@ -44,11 +44,14 @@ export { LineupEntrySchema, LineupSchema, parseLineup } from "./lineup.js";
 export {
   computeOccurrenceFingerprints,
   computeOccurrenceKey,
+  computeDateOnlyOccurrenceKey,
   computeLooseOccurrenceKey,
   computeUrlKey,
   normalizeTitle,
   normalizeVenue,
   canonicalOccurrenceTitle,
+  isUtcNoonAllDaySentinel,
+  pacificDateFromStartTs,
   normalizeListingUrl,
   isUniquePerPerformanceListingUrl,
   normalizedListingUrlForEvent,
@@ -90,6 +93,46 @@ export {
   type EventDisplayPriorityTier
 } from "./priority.js";
 export {
+  suggestEventPriority,
+  type PriorityRuleInput,
+  type PrioritySuggestion,
+  type PriorityRuleKind
+} from "./priority-rules.js";
+export {
+  formatIngestExclusionNotes,
+  getIngestExclusion,
+  type IngestExclusion,
+  type IngestExclusionInput
+} from "./ingest-exclusions.js";
+export {
+  compareEventsByPriorityStart,
+  selectEventPreview,
+  type EventPreviewSortable,
+  type PreviewCaps
+} from "./event-preview.js";
+export {
+  PACIFIC_TZ,
+  addDaysToIsoDate,
+  daysFromIsoThroughSunday,
+  pacificEndOfDay,
+  pacificMonthBounds,
+  pacificStartOfDay,
+  pacificTodayIso,
+  buildNextPacificMonths,
+  isoDateInPacificMonth,
+  resolvePacificDateWindow,
+  upcomingSundayIso,
+  type DateWindowPreset,
+  type PacificDateRange,
+  type PacificMonthTile
+} from "./pacific-date-ranges.js";
+export { DEFAULT_EVENT_DURATION_MS, resolveEndTs } from "./default-end-ts.js";
+export {
+  MAP_PIN_EMOJI_PRESETS,
+  resolveMapPinEmoji,
+  type MapPinEmojiInput
+} from "./map-pin-emoji.js";
+export {
   buildGoogleMapsSearchUrl,
   buildMapsSearchQuery,
   isValidCoordinate,
@@ -102,7 +145,7 @@ export {
   type VenueLocationParts
 } from "./venue-location.utils.js";
 
-export type CoordinatorMode = "real" | "dry-run" | "resume-jobs";
+export type CoordinatorMode = "real" | "dry-run";
 
 export interface ImageAsset {
   id: string;
@@ -159,6 +202,9 @@ export interface Event {
   title: string;
   descriptionHtml?: string;
   descriptionText?: string;
+  postedAt?: string;
+  lastVerifiedAt?: string;
+  sourceSyncId?: string;
   venueId: string;
   startTs: string;
   endTs?: string;
@@ -186,6 +232,8 @@ export interface Event {
   seriesId?: string;
   seriesName?: string;
   lineup?: LineupEntry[];
+  /** Map marker emoji override; empty = auto-detect; "pin" = default Leaflet pin */
+  mapPinEmoji?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -252,8 +300,77 @@ export interface HomepageSlotItem {
 
 export interface HomepageCurationResponse {
   featured: HomepageSlotItem[];
-  popular: HomepageSlotItem[];
+  /** @deprecated Use biggestMonth */
+  popular?: HomepageSlotItem[];
+  biggestMonth: EventListItem[];
   generatedAt: string;
+}
+
+export interface EventSectionBucket {
+  preview: EventListItem[];
+  total: number;
+  hidden: number;
+  fromIso: string;
+  untilIso: string;
+}
+
+export interface EventSectionsResponse {
+  today: EventSectionBucket;
+  week: EventSectionBucket;
+  weekend: EventSectionBucket;
+  generatedAt: string;
+}
+
+export interface CalendarDayBucket {
+  isoDate: string;
+  total: number;
+  preview: EventListItem[];
+  hidden: number;
+}
+
+export interface CalendarWeekBucket {
+  label: string;
+  fromIso: string;
+  untilIso: string;
+  total: number;
+  preview: EventListItem[];
+  hidden: number;
+}
+
+export interface CalendarMonthResponse {
+  year: number;
+  month: number;
+  days: CalendarDayBucket[];
+  weeks: CalendarWeekBucket[];
+  generatedAt: string;
+}
+
+export interface LocalContextWeather {
+  ok: true;
+  tempF: number;
+  condition: string;
+  icon: string;
+}
+
+export interface LocalContextAirQuality {
+  ok: true;
+  aqi: number;
+  category: string;
+}
+
+export interface LocalContextUnavailable {
+  ok: false;
+}
+
+export interface LocalContextResponse {
+  weather: LocalContextWeather | LocalContextUnavailable;
+  airQuality: LocalContextAirQuality | LocalContextUnavailable;
+  generatedAt: string;
+}
+
+export interface VenueDetailResponse {
+  venue: Venue;
+  upcomingEvents: EventListItem[];
 }
 
 export interface HomepageSlotEventSummary {
@@ -349,6 +466,8 @@ export interface NormalizedEvent {
   venueLng?: number;
   startTs: string;
   endTs?: string;
+  /** Source gave a calendar date but no wall-clock start (not the same as all-day). */
+  timeUnknown?: boolean;
   timezone?: string;
   category?: EventCategory;
   subcategories?: string[];
@@ -371,6 +490,7 @@ export interface NormalizedEvent {
   seriesListingRecId?: string;
   seriesPresentedBy?: string;
   lineup?: LineupEntry[];
+  mapPinEmoji?: string | null;
 }
 
 export interface ScrapeError {
@@ -387,7 +507,7 @@ export interface ScrapeContext {
   signal?: AbortSignal;
   secrets: Record<string, string | undefined>;
   config: Record<string, unknown>;
-  /** ai-crawl coordinator mode (defaults to real when omitted). */
+  /** Ingest dry-run vs real persist (defaults to real when omitted). */
   coordinatorMode?: CoordinatorMode;
 }
 
@@ -526,6 +646,14 @@ export interface EventCandidateListResponse {
   limit?: number;
 }
 
+/** Review queue tab totals (admin UI). */
+export interface EventCandidateTabCounts {
+  pending_review: number;
+  needs_changes: number;
+  approved: number;
+  rejected: number;
+}
+
 export type ContentDiffField =
   | "title"
   | "startTs"
@@ -536,7 +664,9 @@ export type ContentDiffField =
   | "descriptionText"
   | "ticketUrl"
   | "externalUrl"
-  | "category";
+  | "category"
+  | "priceMin"
+  | "priceMax";
 
 export interface ContentDiffEntry {
   field: ContentDiffField;
@@ -550,12 +680,23 @@ export interface ContentDiffSummary {
   entries: ContentDiffEntry[];
 }
 
+/** Venue pin shown on publish when the candidate has no coords of its own. */
+export interface PublishVenuePreview {
+  lat: number;
+  lng: number;
+  venueName: string;
+  venueSlug: string;
+  source: "existing_venue";
+}
+
 export interface EventCandidateDetailResponse {
   candidate: EventCandidate;
   linkedCandidates?: LinkedEventCandidate[];
   seriesSiblings?: SeriesSiblingCandidate[];
   publishedEvent?: Event;
   contentDiff?: ContentDiffSummary;
+  /** Matches post-approve map when ingest omitted venueLat/Lng but venues row exists. */
+  publishVenuePreview?: PublishVenuePreview;
 }
 
 export interface ReviewDecisionResponse {
@@ -637,8 +778,13 @@ export interface ReviewQueueAuditResponse {
 }
 
 export type {
+  ReviewOccurrenceRelinkLinkExample,
   ReviewOccurrenceRelinkOpsResponse,
   ReviewOccurrenceRelinkSummary,
+  ReviewPriorityRerankOpsResponse,
+  ReviewPriorityRerankRuleGroup,
+  ReviewPriorityRerankSection,
+  ReviewPriorityRerankSectionSummary,
   ReviewPriorityTriageOpsResponse,
   ReviewPriorityTriageRuleGroup,
   ReviewPriorityTriageSummary,

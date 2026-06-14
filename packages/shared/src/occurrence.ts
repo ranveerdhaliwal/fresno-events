@@ -55,6 +55,8 @@ export interface OccurrenceFingerprints {
   urlKey: string | null;
   /** Keys to probe for step A (current ±1 Pacific bucket). */
   occurrenceKeysForLookup: string[];
+  /** Same Pacific date + canonical title + venue; used for all-day ↔ timed linking. */
+  dateOnlyOccurrenceKey: string | null;
 }
 
 export function normalizeTitle(title: string): string {
@@ -81,6 +83,8 @@ export function canonicalOccurrenceTitle(normalizedTitle: string): string {
   }
 
   value = value.replace(/["'][^"']*["']/g, " ");
+
+  value = value.replace(/\band\b/g, " ");
 
   const grizzliesIdx = value.indexOf("fresno grizzlies vs");
   if (grizzliesIdx > 0) {
@@ -180,6 +184,59 @@ export function adjacentPacificBucketKeys(bucketKey: string): string[] {
   }
 
   return [...keys];
+}
+
+/** Downtown Fresno and similar scrapers use noon UTC as an all-day sentinel. */
+export function isUtcNoonAllDaySentinel(startTs: string): boolean {
+  const instant = new Date(startTs);
+  if (Number.isNaN(instant.getTime())) {
+    return false;
+  }
+  return instant.getUTCHours() === 12 && instant.getUTCMinutes() === 0 && instant.getUTCSeconds() === 0;
+}
+
+export function pacificDateFromStartTs(startTs: string): string | null {
+  const instant = new Date(startTs);
+  if (Number.isNaN(instant.getTime())) {
+    return null;
+  }
+  return getPacificDateTimeParts(instant).date;
+}
+
+function isFlexiblePacificStartMatch(startTs: string, timeUnknown?: boolean): boolean {
+  if (timeUnknown === true) {
+    return true;
+  }
+  return isUtcNoonAllDaySentinel(startTs);
+}
+
+function allPacificBucketKeysForDate(dateYmd: string): string[] {
+  const keys: string[] = [];
+  for (let minutes = 0; minutes < 24 * 60; minutes += BUCKET_MINUTES) {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    keys.push(`${dateYmd}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+  }
+  return keys;
+}
+
+export async function computeDateOnlyOccurrenceKey(
+  title: string,
+  startTs: string,
+  venueName: string
+): Promise<string | null> {
+  const date = pacificDateFromStartTs(startTs);
+  if (!date) {
+    return null;
+  }
+
+  const normalizedTitle = canonicalOccurrenceTitle(normalizeTitle(title));
+  const normalizedVenue = normalizeVenue(venueName);
+  if (!normalizedTitle || !normalizedVenue) {
+    return null;
+  }
+
+  return sha256Hex(`date-only|${normalizedTitle}|${date}|${normalizedVenue}`);
 }
 
 function unwrapAffiliateListingTarget(parsed: URL): string | null {
@@ -339,11 +396,12 @@ export async function computeUrlKey(event: ListingUrls): Promise<string | null> 
 }
 
 export async function computeOccurrenceFingerprints(
-  event: ListingUrls & { title: string; startTs: string; venueName: string }
+  event: ListingUrls & { title: string; startTs: string; venueName: string; timeUnknown?: boolean }
 ): Promise<OccurrenceFingerprints> {
   const bucket = pacificTimeBucketKey(event.startTs);
   const lookupBuckets = bucket ? adjacentPacificBucketKeys(bucket) : [];
   const occurrenceKeysForLookup: string[] = [];
+  const flexible = isFlexiblePacificStartMatch(event.startTs, event.timeUnknown);
 
   for (const bucketKey of lookupBuckets) {
     const key = await computeOccurrenceKeyForBucket(event.title, bucketKey, event.venueName);
@@ -352,16 +410,42 @@ export async function computeOccurrenceFingerprints(
     }
   }
 
+  const dateOnlyOccurrenceKey = await computeDateOnlyOccurrenceKey(
+    event.title,
+    event.startTs,
+    event.venueName
+  );
+
+  if (dateOnlyOccurrenceKey) {
+    occurrenceKeysForLookup.push(dateOnlyOccurrenceKey);
+  }
+
+  if (flexible && dateOnlyOccurrenceKey) {
+    const pacificDate = pacificDateFromStartTs(event.startTs);
+    if (pacificDate) {
+      for (const bucketKey of allPacificBucketKeysForDate(pacificDate)) {
+        const key = await computeOccurrenceKeyForBucket(event.title, bucketKey, event.venueName);
+        if (key) {
+          occurrenceKeysForLookup.push(key);
+        }
+      }
+    }
+  }
+
+  const preciseOccurrenceKey =
+    bucket !== null ? await computeOccurrenceKey(event.title, event.startTs, event.venueName) : null;
+
   const occurrenceKey =
-    (bucket ? await computeOccurrenceKey(event.title, event.startTs, event.venueName) : null) ??
-    occurrenceKeysForLookup[0] ??
-    null;
+    flexible && dateOnlyOccurrenceKey
+      ? dateOnlyOccurrenceKey
+      : (preciseOccurrenceKey ?? occurrenceKeysForLookup[0] ?? null);
 
   const urlKey = await computeUrlKey(event);
 
   return {
     occurrenceKey: occurrenceKey ?? "",
     urlKey,
+    dateOnlyOccurrenceKey,
     occurrenceKeysForLookup: [...new Set(occurrenceKeysForLookup)]
   };
 }

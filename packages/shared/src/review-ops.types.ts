@@ -1,3 +1,11 @@
+export interface ReviewOccurrenceRelinkLinkExample {
+  title: string;
+  primarySource: string;
+  linkedSources: string[];
+  crossSource: boolean;
+  wouldChange: boolean;
+}
+
 export interface ReviewOccurrenceRelinkSummary {
   candidates: number;
   relinkable: number;
@@ -14,6 +22,9 @@ export interface ReviewOccurrenceRelinkSummary {
   occurrenceKeyChanged: number;
   occurrenceIdChanged: number;
   priorityInherited: number;
+  linkGroups: number;
+  linkGroupsChanged: number;
+  linkExamples: ReviewOccurrenceRelinkLinkExample[];
 }
 
 export interface ReviewOccurrenceRelinkOpsResponse {
@@ -35,24 +46,43 @@ export interface ReviewVenueAddressBackfillOpsResponse {
   message: string;
 }
 
-export interface ReviewPriorityTriageRuleGroup {
+export interface ReviewPriorityRerankRuleGroup {
   ruleLabel: string;
   toPriority: number;
   count: number;
   samples: string[];
 }
 
-export interface ReviewPriorityTriageSummary {
+export interface ReviewPriorityRerankSectionSummary {
   scanned: number;
   wouldChange: number;
   applied: number;
   errors: number;
 }
 
+export interface ReviewPriorityRerankSection {
+  summary: ReviewPriorityRerankSectionSummary;
+  byRule: ReviewPriorityRerankRuleGroup[];
+}
+
+export interface ReviewPriorityRerankOpsResponse {
+  dryRun: boolean;
+  candidates: ReviewPriorityRerankSection;
+  events: ReviewPriorityRerankSection;
+  message: string;
+}
+
+/** @deprecated Use ReviewPriorityRerankRuleGroup */
+export type ReviewPriorityTriageRuleGroup = ReviewPriorityRerankRuleGroup;
+
+/** @deprecated Use ReviewPriorityRerankSectionSummary */
+export type ReviewPriorityTriageSummary = ReviewPriorityRerankSectionSummary;
+
+/** @deprecated Use ReviewPriorityRerankOpsResponse */
 export interface ReviewPriorityTriageOpsResponse {
   dryRun: boolean;
-  summary: ReviewPriorityTriageSummary;
-  byRule: ReviewPriorityTriageRuleGroup[];
+  summary: ReviewPriorityRerankSectionSummary;
+  byRule: ReviewPriorityRerankRuleGroup[];
   message: string;
 }
 
@@ -61,6 +91,13 @@ export interface ReviewVenueGeocodeSummary {
   geocoded: number;
   skipped: number;
   errors: number;
+  venueScanned: number;
+  candidateScanned: number;
+  candidateGeocoded: number;
+  batchesRun?: number;
+  remaining?: number;
+  remainingVenues?: number;
+  remainingCandidates?: number;
 }
 
 export interface ReviewVenueGeocodeOpsResponse {
