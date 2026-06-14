@@ -12,8 +12,8 @@ alwaysApply: true
 ## Safe real-run flow
 
 1. `pnpm ingest:dev` (user terminal)
-2. `pnpm ingest:preflight --source=<scraper-key>` — dry-run + `summary.validation.ok`
-3. `pnpm ingest:promote --source=<scraper-key>` — real persist (preflight + trigger)
+2. `pnpm ingest:preflight --source=<key>` — dry-run + `summary.validation.ok`
+3. `pnpm ingest:promote --source=<key>` — real persist
 4. Verify in Studio + `/admin`
 
 See [docs/INGEST_TESTING.md](docs/INGEST_TESTING.md).
@@ -34,7 +34,7 @@ WHERE status = 'pending_review' AND source = 'api:visitfresnocounty';
 
 Source values: `api:visitfresnocounty`, `api:milb`, `api:downtownfresno`.
 
-3. Optional: `DELETE FROM ingest_runs WHERE source = 'visit-fresno-api';` (metadata only)
+3. Optional: `DELETE FROM ingest_runs WHERE source IN ('ticketmaster', 'venunite', 'venue-ingest');` (metadata only)
 
 **Do not** delete from `events` unless the user asks to remove published rows.
 
@@ -48,6 +48,6 @@ Source values: `api:visitfresnocounty`, `api:milb`, `api:downtownfresno`.
 
 Defined in `workers/ingest/src/validation/source-profiles.ts`. Hard fail: duplicate `sourceEventId` in batch, missing fields, too many scrape errors. Soft warn: low event count.
 
-Batch dry-run: `pnpm ingest:preflight-direct`, `pnpm ingest:preflight-browser`, or `pnpm ingest:preflight-all`.
+Batch dry-run: `pnpm ingest:preflight-all` or `pnpm ingest:preflight --source=<key>`.
 
 Emergency bypass: `INGEST_SKIP_VALIDATION=true` (must log `ingest_validation_skipped`).

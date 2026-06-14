@@ -8,7 +8,7 @@
 
 **Venue location (address, geocode, maps):** [VENUE_LOCATION.md](VENUE_LOCATION.md) — per-source coords matrix, `upsertVenue`, address backfill, `GOOGLE_MAPS_PLATFORM_API_KEY`, admin maintenance ops.
 
-Single ingest path for Fresno venue sources: **repo modules** under `workers/ingest/src/venues/<key>/`, orchestrated by the **`venue-ingest`** scraper. Replaces legacy `ai-crawl`, `seed_urls`, and separate API registry keys.
+Single ingest path for Fresno venue sources: **repo modules** under `workers/ingest/src/venues/<key>/`, orchestrated by the **`venue-ingest`** scraper.
 
 Each venue has:
 
@@ -50,24 +50,17 @@ Lane is derived from `strategy` in code (`venue-lanes.utils.ts`); no extra confi
 Prerequisite: `pnpm ingest:dev` and `pnpm db:migrate` (or `pnpm db:reset`).
 
 ```bash
-# By lane
-pnpm ingest:preflight-direct      # API + html_parse (no BR)
-pnpm ingest:preflight-browser     # BR crawl venues
-pnpm ingest:promote-direct
-pnpm ingest:promote-browser
-
-# Everything
 pnpm ingest:preflight-all
 pnpm ingest:promote-all
 
-# One venue
-pnpm ingest:preflight --venue=tower-theatre
-pnpm ingest:promote --venue=strummers
+pnpm ingest:preflight --source=tower-theatre
+pnpm ingest:promote --source=strummers
+pnpm ingest:preflight --source=api:visitfresnocounty
 ```
 
-Trigger: `POST /trigger?venue=tower-theatre&force=true&dry_run=true` (source defaults to `venue-ingest`)
+`--source=` accepts venue keys (`strummers`), candidate sources (`api:milb`, `scrape:…`), or API scrapers (`ticketmaster`, `venunite`). Use **`promote-all`** / **`preflight-all`** for all venues — not `--source=venue-ingest`.
 
-**Deprecated (aliases):** `pnpm ingest:preflight-crawl` / `promote-crawl` → **browser** lane.
+Worker API (internal): `POST /trigger?source=venue-ingest&venue=tower-theatre&force=true&dry_run=true`
 
 ## Verify
 
@@ -82,9 +75,9 @@ LIMIT 10;
 
 1. Create `venues/<key>/venue.config.json` + `run.ts`.
 2. Register in `venues/registry.ts`.
-3. Preflight: `pnpm ingest:preflight --venue=<key>`.
+3. Preflight: `pnpm ingest:preflight --source=<key>`.
 
-Cron runs **`venue-ingest`** only (no `seed_urls`, no `ai-crawl`).
+Cron runs **`venue-ingest`** only for local venues.
 
 ## Venue addresses after ingest
 

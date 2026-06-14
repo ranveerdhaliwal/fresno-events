@@ -54,7 +54,7 @@ Same shape as `NormalizedEvent`. Ingest writes address fields per source; coords
 | --- | --- | --- |
 | **VenuNite** | Venue detail API | Yes — [`venunite-venue.utils.ts`](../workers/ingest/src/scrapers/venunite-venue.utils.ts) |
 | **Ticketmaster** | Venue block | Yes — `location.latitude` / `longitude` |
-| **Big Fresno Fair API** | `AddressLine1` | Yes — fair location coords |
+| **Big Fresno Fair API** | `AddressLine1`, else `1121 S. Chance Avenue, Fresno, CA 93702` | Yes — fair location coords |
 | **Save Mart API** | From listing/detail | Yes when API provides coords |
 | **Visit Fresno** | `address1` + `city` normalized at scrape + detail merge | **No** — CMS address only |
 | **MiLB / most venue HTML scrapers** | Varies | Usually no |

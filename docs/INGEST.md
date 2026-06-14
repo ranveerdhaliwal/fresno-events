@@ -2,7 +2,7 @@
 
 You only need to remember **three steps**:
 
-1. **Fetch** — pull raw events from a source (official API, or HTML + AI).
+1. **Fetch** — pull raw events from a registered source (venue module, Ticketmaster, or VenuNite).
 2. **Save to dev** — normalize into `event_candidates` in your **dev** database.
 3. **Review** — open `/admin`, approve or reject. Approved rows become `events` on dev. **Prod** gets copies later via promote (one approval, not twice). On approve, `upsertVenue` writes `venues.address` / `city` / `lat` / `lng` (geocoding when coords missing — see [VENUE_LOCATION.md](VENUE_LOCATION.md)).
 
@@ -15,14 +15,13 @@ Cron is the same script on a schedule. When you merge ingest changes to `main`, 
 | What | Where |
 | --- | --- |
 | **Venue addresses, lat/lng, geocoding, maps** | **[VENUE_LOCATION.md](VENUE_LOCATION.md)** |
-| Source list (Ticketmaster, ai-discovery, …) | [`workers/ingest/src/registry.ts`](../workers/ingest/src/registry.ts) |
-| Civic / venue URLs (legacy) | [`workers/ingest/src/sources/civic-urls.ts`](../workers/ingest/src/sources/civic-urls.ts) |
-| Crawl seeds (ai-crawl) | `public.seed_urls` + [AI_CRAWLER.md](AI_CRAWLER.md) |
-| Per-source fetch logic | [`workers/ingest/src/scrapers/`](../workers/ingest/src/scrapers/) |
+| Scraper registry (`ticketmaster`, `venunite`, `venue-ingest`) | [`workers/ingest/src/registry.ts`](../workers/ingest/src/registry.ts) |
+| Venue modules (12 enabled) | [`workers/ingest/src/venues/`](../workers/ingest/src/venues/) — [VENUE_INGEST.md](VENUE_INGEST.md) |
+| Shared API/HTML logic used by venue modules | [`workers/ingest/src/scrapers/`](../workers/ingest/src/scrapers/) (e.g. `visit-fresno-api.utils.ts`, not separate registry keys) |
 | Run orchestration | [`workers/ingest/src/runner.ts`](../workers/ingest/src/runner.ts) |
 | Manual script | `pnpm ingest:run` → [`scripts/ingest-run.sh`](../scripts/ingest-run.sh) |
 
-There is **no** `event_sources` table. Each scraper in the registry has `schedule` (`cron` | `manual-only`) and `defaultCadenceMinutes`. Cron runs all `schedule: cron` sources that are **due** (last run in `ingest_runs` + cadence) and **runnable** (required secrets present). `GET /health` on the ingest worker lists `lastRunAt` per source.
+There is **no** `event_sources` or `seed_urls` table. Each scraper in the registry has `schedule: cron` and `defaultCadenceMinutes`. Cron runs all cron sources that are **due** (last run in `ingest_runs` + cadence) and **runnable** (required secrets present). `GET /health` on the ingest worker lists `lastRunAt` per source.
 
 ---
 
@@ -50,13 +49,16 @@ pnpm ingest:run --source=ticketmaster --dry-run
 pnpm ingest:run --source=ticketmaster --force
 
 # Several sources
-pnpm ingest:run --source=ticketmaster,ai-discovery --force
+pnpm ingest:run --source=ticketmaster,venunite --force
 
-# Every source that has API keys / AI configured
+# Every runnable source
 pnpm ingest:run --all --force
 
-# Cron-style: schedule=cron sources that are due (visit, milb, downtown, ai-crawl, …)
+# Cron-style: schedule=cron sources that are due
 pnpm ingest:run
+
+# One venue module
+pnpm ingest:promote --source=strummers
 ```
 
 **Terminal 3 — review**
@@ -73,41 +75,21 @@ Check raw rows: Supabase Studio http://127.0.0.1:54423 → `event_candidates`, `
 
 ## Sources at a glance
 
-| Key | How it fetches | Needs in `.dev.vars` | Cron schedule | Cadence (typical) |
-| --- | --- | --- | --- | --- |
-| `ticketmaster` | Ticketmaster Discovery API (paginated) | `TICKETMASTER_API_KEY` | cron | 24h — [TICKETING_SOURCES.md](TICKETING_SOURCES.md) |
-| `venunite` | VenuNite REST aggregator (Fresno, skipModules) | — | cron | 14d |
-| `visit-fresno-api` | CMS REST (`get_simple_token` + `rest_v2`) | optional `VISIT_FRESNO_API_TOKEN` fallback | cron | 6h |
-| `milb-api` | statsapi | — | cron | 12h |
-| `downtown-fresno-api` | CityLight BBQ HTML + BR detail `/do/*` | `CLOUDFLARE_*` + LLM for details (BBQ key in code) | cron | 7d |
-| `seed-special-url` | Custom HTML parsers | — | cron | 12h |
-| `ai-crawl` | Browser Rendering `/crawl` + LLM | `CLOUDFLARE_*`, LLM | cron | 24h — [AI_CRAWLER.md](AI_CRAWLER.md) |
-| `eventbrite` | Official API | `EVENTBRITE_API_KEY` | manual-only | — |
-| `seatgeek` | Official API | `SEATGEEK_*` | manual-only | — |
-| `bandsintown` | Official API | `BANDSINTOWN_APP_ID` | manual-only | — |
-| `ai-discovery` | Fetch HTML + LLM (legacy) | LLM | manual-only | — |
+| Scraper key | What it runs | Needs in `.dev.vars` | Cadence (typical) |
+| --- | --- | --- | --- |
+| `venue-ingest` | All 12 venue modules in `workers/ingest/src/venues/` | `CLOUDFLARE_*` (browser lane) | 6h — [VENUE_INGEST.md](VENUE_INGEST.md) |
+| `ticketmaster` | Ticketmaster Discovery API (paginated) | `TICKETMASTER_API_KEY` | 24h — [TICKETING_SOURCES.md](TICKETING_SOURCES.md) |
+| `venunite` | VenuNite REST aggregator (Fresno) | — | 14d — [TICKETING_SOURCES.md](TICKETING_SOURCES.md) |
 
-`pnpm ingest:run --all --force` runs every **runnable** source, including `manual-only` (ignores `schedule`). Plain `pnpm ingest:run` uses cron rules only.
+**Venue modules** (via `venue-ingest`, not separate registry keys): visit-fresno-county, downtown-fresno, milb-grizzlies, gobulldogs, tower-theatre, save-mart, fresno-convention-center, chaffee-zoo, fulton-55, strummers, rainbow-ballroom, big-fresno-fair.
 
-To add a crawl seed: `INSERT` into `seed_urls` (or Studio).  
-To add a new API source: add a file under `scrapers/` and register it in `registry.ts`.
+To add a venue: create `venues/<key>/venue.config.json` + `run.ts`, register in `venues/registry.ts`. See [VENUE_INGEST.md](VENUE_INGEST.md).
 
 **Event priority (0–5)** is editorial: set at admin approve time on published `events`, default `5`. Not assigned during ingest.
 
-**Re-scrape behavior:** `event_candidates.content_fingerprint` detects content changes. Unchanged rows keep their review status and enrichment fields (`confidence_score`, `review_notes`, `normalized_event`, etc.); persist only bumps `run_id` / `updated_at` (plus occurrence/link fields when cross-source dedupe applies). Approved rows that changed go to `needs_changes` and appear in the admin **Updates** tab. Linked published `events` only get `last_seen_at` bumped on re-scrape; title/start/description and other content fields update when an admin **approves the update** (`POST /review/candidates/:id/approve-changes`).
+**Re-scrape behavior:** `event_candidates.content_fingerprint` detects content changes. Unchanged rows keep their review status and enrichment fields; persist only bumps `run_id` / `updated_at` (plus occurrence/link fields when cross-source dedupe applies). Approved rows that changed go to `needs_changes` and appear in the admin **Updates** tab.
 
 Structured persist logs: `ingest_candidate_new`, `ingest_candidate_changed`, and `ingest_persist_summary` (also stored on `ingest_runs.metrics.audit`).
-
----
-
-## Later: cron and time windows
-
-Not built yet, but the intended model:
-
-- **Daily job** — near-term events only (e.g. next 1–3 months); uses `schedule: cron` sources when due.
-- **Weekly job** — far-future sweep (e.g. 3–24 months); separate schedule or `--sources` list once implemented in scrapers.
-
-Improvements (better errors, date filters, per-site tuning) ship in ingest code; deploy to dev worker, then prod when ready. No database migration required for URL lists.
 
 ---
 

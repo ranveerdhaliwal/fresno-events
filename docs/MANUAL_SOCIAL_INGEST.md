@@ -1,6 +1,6 @@
 # Manual social event ingest (Instagram / Facebook)
 
-Venues that only post on Instagram or Facebook are **out of scope** for automated ai-crawl v1.
+Venues that only post on Instagram or Facebook are **out of scope** for automated venue ingest.
 
 ## v1 workflow (operator)
 

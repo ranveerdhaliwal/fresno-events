@@ -2,55 +2,63 @@
 
 **Tracked from:** [LAUNCH_PLAN.md Phase 5](LAUNCH_PLAN.md). Execute when cloud-dev ingest + review are solid.
 
-**Summary:** Prod ships the Hono API Worker (`fresno-events-api`), web on Cloudflare Pages (`whatupfresno.com`), and Supabase `what-up-fresno-prod`. Ingest stays off prod; events are promoted from cloud-dev. The web app is always one SPA; optional home bootstrap JSON speeds the default `/` view.
+**Summary:** Live site on Cloudflare (Pages + API + ingest Workers) with **cloud-dev Supabase (`what-up-fresno-dev`) as the single database** for v1. Public domain `whatupfresno.com`; no separate prod DB or promotion until needed later. Optional home bootstrap JSON speeds the default `/` view.
 
 ---
 
 ## Phase 5 checklist
 
-- [ ] Deploy cloud-dev API + ingest (`wrangler deploy --env dev`); validate `pnpm dev:web:cloud-dev`
-- [ ] Stand up `what-up-fresno-prod`: migrations, `dev-target.env` prod keys, R2 `fresno-event-images-prod`
-- [ ] `wrangler secret put … --env prod`; `wrangler deploy --env prod`; attach `api.whatupfresno.com`
-- [ ] Promote approved dev `events` (+ R2 images) to prod
-- [ ] Build web with `VITE_API_URL=https://api.whatupfresno.com`; deploy Pages (`VITE_COMING_SOON=false`)
+- [ ] Cloud-dev DB ready: migrations on `what-up-fresno-dev`, `dev-target.env` cloud-dev keys
+- [ ] Deploy API + ingest (`wrangler deploy --env dev`); cloud-dev secrets; `ALLOWED_ORIGINS` for whatupfresno.com; attach `api.whatupfresno.com`
+- [ ] Bootstrap events (full ingest + approve on cloud-dev)
+- [ ] Set Cloudflare Pages Production env vars (API + GA/AdSense); build web; deploy to `whatupfresno.com`
+- [ ] Cloud-dev ingest cron: enable scheduled runs for Ticketmaster, Venunite, venue-ingest (see ingest cron section below)
 - [ ] Optional: `apps/web/public/_headers` for asset vs HTML caching
 - [ ] Optional: `scripts/bootstrap-today.ts` — embed default home JSON; React Query hydrate on `/`
 - [ ] Optional: recover old deploy runbook from git (`git show <commit>:docs/DEPLOY.md`) if a step is missing here
 
 ---
 
-## Architecture at prod
+## Data strategy (v1 — locked)
+
+**Cloud-dev Supabase (`what-up-fresno-dev`) is the live database** for ingest, admin review, and the public website. No separate prod DB or promotion step for now.
+
+| v1 (now) | Future (if needed) |
+|----------|-------------------|
+| Single DB: `what-up-fresno-dev` | Optional `what-up-fresno-prod` + promotion job |
+| Ingest → approve → publish on same DB | Split read vs write DBs |
+| R2 `fresno-event-images-dev` | Optional prod R2 bucket |
+
+Wrangler profile names still say `dev` (`fresno-events-api-dev`) — that is a deploy profile label, not a throwaway environment. Live traffic uses `--env dev` Workers with public domains attached.
+
+## Architecture at launch
 
 ```mermaid
 flowchart LR
-  subgraph prod_edge [Cloudflare prod]
+  subgraph edge [Cloudflare live site]
     Pages["Pages whatupfresno.com"]
-    API["Worker fresno-events-api"]
-    R2prod["R2 fresno-event-images-prod"]
+    API["Worker fresno-events-api-dev"]
+    Ingest["Worker fresno-events-ingest-dev + cron"]
+    R2dev["R2 fresno-event-images-dev"]
   end
-  subgraph prod_data [Supabase prod]
-    PGprod["what-up-fresno-prod"]
+  subgraph data [Single database v1]
+    PG["what-up-fresno-dev"]
   end
-  subgraph dev_only [Cloud dev only - not prod]
-    IngestDev["ingest-dev + cron"]
-    PGdev["what-up-fresno-dev"]
-  end
-  Pages -->|"VITE_API_URL build-time"| API
-  API --> PGprod
-  API --> R2prod
-  IngestDev --> PGdev
-  PGdev -.->|"manual / future promote"| PGprod
+  Pages -->|"VITE_API_URL"| API
+  API --> PG
+  API --> R2dev
+  Ingest --> PG
 ```
 
-| Layer | Prod component | Not on prod |
-|-------|----------------|-------------|
-| API | [`apps/api`](../apps/api) Worker `fresno-events-api` | — |
-| Web | [`apps/web`](../apps/web) → Pages `apps/web/dist` | — |
-| DB | Supabase `what-up-fresno-prod` | — |
-| Images | R2 `fresno-event-images-prod` | — |
-| Ingest | **Intentionally absent** | [`workers/ingest`](../workers/ingest) — no prod cron |
+| Layer | Live component | Notes |
+|-------|----------------|-------|
+| Web | [`apps/web`](../apps/web) → Pages `whatupfresno.com` | Build-time `VITE_API_URL` |
+| API | [`apps/api`](../apps/api) `fresno-events-api-dev` (`--env dev`) | Secrets → cloud-dev Supabase |
+| DB | Supabase **`what-up-fresno-dev`** | Ingest, review, and public reads |
+| Images | R2 **`fresno-event-images-dev`** | Dev bucket binding |
+| Ingest | [`workers/ingest`](../workers/ingest) `fresno-events-ingest-dev` | Cron on dev profile only |
 
-Public users read **approved** rows in prod `events` only. Scraping and `/admin` review stay on **cloud-dev**; approve on dev, then promote data.
+Public users read **approved** `events` on cloud-dev. `/admin` review uses the same database — approve once, site updates immediately.
 
 ---
 
@@ -61,28 +69,33 @@ Config: [`apps/api/wrangler.toml`](../apps/api/wrangler.toml)
 | Profile | Command | Worker name | `APP_ENV` | CORS | R2 bucket |
 |---------|---------|-------------|-----------|------|-----------|
 | Local | `wrangler dev` | `fresno-events-api` | `local` | localhost | dev |
-| Cloud dev | `wrangler deploy --env dev` | `fresno-events-api-dev` | `dev` | localhost | dev |
-| **Production** | **`wrangler deploy --env prod`** | **`fresno-events-api`** | **`production`** | whatupfresno.com | **prod** |
+| **Live site (v1)** | **`wrangler deploy --env dev`** | **`fresno-events-api-dev`** | **`dev`** | **whatupfresno.com** | **dev** |
+| Future split DB | `wrangler deploy --env prod` | `fresno-events-api` | `production` | whatupfresno.com | prod |
 
-Intended API URL: **`https://api.whatupfresno.com`** — attach in Cloudflare dashboard (not in wrangler yet).
+Attach **`https://api.whatupfresno.com`** to the **dev** Worker in Cloudflare dashboard.
+
+**Before go-live:** update `[env.dev.vars]` `ALLOWED_ORIGINS` in [`apps/api/wrangler.toml`](../apps/api/wrangler.toml) to include `https://whatupfresno.com` and `https://www.whatupfresno.com`.
 
 ```bash
 cd apps/api
-wrangler deploy --env prod
+wrangler deploy --env dev
 ```
 
-`pnpm --filter @fresno-events/api deploy` does **not** pass `--env prod`; use wrangler explicitly.
+### Secrets (API — cloud-dev for v1)
 
-### Secrets (API prod)
+On **`--env dev`** from [`dev-target.env`](../dev-target.env):
 
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (`dev-target.env` → `SUPABASE_*_CLOUD_PROD`)
-- `ADMIN_REVIEW_TOKEN` (if using `/review` on prod)
-- Optional: `R2_PUBLIC_BASE_URL`, `SENTRY_DSN` — see [`apps/api/.dev.vars.example`](../apps/api/.dev.vars.example)
+- `SUPABASE_URL` → `SUPABASE_URL_CLOUD_DEV`
+- `SUPABASE_SERVICE_ROLE_KEY` → cloud-dev service role
+- `ADMIN_REVIEW_TOKEN` → `/review` and `/admin`
+- Optional: `R2_PUBLIC_BASE_URL`, `SENTRY_DSN`
 
 ```bash
-wrangler secret put SUPABASE_URL --env prod
+wrangler secret put SUPABASE_URL --env dev
 # … repeat per secret
 ```
+
+**Deferred:** `SUPABASE_*_CLOUD_PROD` / `--env prod` until a separate prod DB is needed.
 
 ---
 
@@ -94,7 +107,33 @@ Build-time API URL (not runtime discovery):
 VITE_API_URL=https://api.whatupfresno.com pnpm --filter @fresno-events/web build
 ```
 
-Deploy `apps/web/dist` to Pages, domain `whatupfresno.com`. Pre-launch: `VITE_COMING_SOON=true` ([README](../README.md)).
+Deploy `apps/web/dist` to Pages, domain `whatupfresno.com`.
+
+### Cloudflare deploy (when you are ready)
+
+In **Pages → Environment variables → Production**, set from [`dev-target.env`](../dev-target.env):
+
+| Variable | Value |
+|----------|-------|
+| `VITE_API_URL` | `https://api.whatupfresno.com` |
+| `VITE_GA_MEASUREMENT_ID` | `G-SP3QWX0EGP` |
+| `VITE_ADSENSE_CLIENT_ID` | `ca-pub-1385262226884616` |
+| `VITE_ADSENSE_SLOT_*` | After you create 4 ad units in AdSense: `VITE_ADSENSE_SLOT_BANNER_WIDE`, `VITE_ADSENSE_SLOT_BANNER_STACKED`, `VITE_ADSENSE_SLOT_CARD`, `VITE_ADSENSE_SLOT_SIDE` |
+
+**Then deploy.**
+
+Until slot IDs exist, the AdSense script can load but ad areas stay as placeholders.
+
+Vite inlines `VITE_*` at build time — changing env vars requires a new deployment. Optional: `VITE_SENTRY_DSN`. Local dev stays off unless you copy vars into `apps/web/.env.local`.
+
+```bash
+VITE_API_URL=https://api.whatupfresno.com \
+VITE_GA_MEASUREMENT_ID=G-SP3QWX0EGP \
+VITE_ADSENSE_CLIENT_ID=ca-pub-1385262226884616 \
+pnpm --filter @fresno-events/web build
+```
+
+Post-deploy: GA4 Realtime on `whatupfresno.com`; `https://whatupfresno.com/ads.txt`; AdSense site connection.
 
 Local smoke against deployed API: `.env.cloud-targets` + `pnpm dev:web:cloud-prod` ([`scripts/dev-web-cloud.sh`](../scripts/dev-web-cloud.sh)).
 
@@ -102,21 +141,48 @@ Local smoke against deployed API: `.env.cloud-targets` + `pnpm dev:web:cloud-pro
 
 ## Database and events before go-live
 
-1. **Schema:** `supabase db push` on prod project ([`scripts/db-migrate.sh`](../scripts/db-migrate.sh) blocks accidental prod unless intentional).
-2. **Events:** No ingest on prod. Promote approved dev `events` only ([INGESTION_OVERHAUL_PLAN §12.6](INGESTION_OVERHAUL_PLAN.md)); future `docs/PROMOTION.md`.
+1. **Schema:** `pnpm db:migrate:cloud-dev` on `what-up-fresno-dev`.
+2. **Events:** Ingest → approve in `/admin` → published `events` on the **same** cloud-dev DB. No promotion.
+3. **Bootstrap:** one-time full ingest from all sources before enabling cron.
+
+**Deferred:** `what-up-fresno-prod`, dev→prod promotion — only if we split databases later.
 
 ---
 
-## Recommended deploy sequence
+## Recommended launch sequence
 
-1. Cloud-dev workers (API + ingest) if not already live.
-2. Prod Supabase + R2 + `dev-target.env` prod keys.
-3. Prod API secrets + `wrangler deploy --env prod` + `api.whatupfresno.com` DNS.
-4. Promote events dev → prod.
-5. Pages build + deploy full app.
-6. `wrangler tail fresno-events-api`; optional Sentry on web.
+1. Cloud-dev DB: migrations + `dev-target.env` cloud-dev keys.
+2. Workers (`--env dev`): API + ingest secrets; deploy both; update `ALLOWED_ORIGINS`; attach `api.whatupfresno.com`. Ingest cron — see below.
+3. Bootstrap events on cloud-dev.
+4. **Cloudflare deploy:** Pages Production env vars; deploy `apps/web/dist`; attach `whatupfresno.com`.
+5. CI/CD: `ci.yml` on PR + `deploy-dev.yml` on merge to `main` (live site deploy).
+6. `wrangler tail fresno-events-api-dev`; optional Sentry on web.
 
-**Not in scope:** prod ingest deploy or cron.
+**Not in scope for v1:** separate prod Supabase, `[env.prod]` Workers, promotion, prod ingest cron.
+
+---
+
+## Cloud-dev ingest cron (venues + sources)
+
+Scraping stays on **cloud-dev only**. Cron triggers live on the **ingest Worker** (`fresno-events-ingest-dev`), not Pages or the API Worker.
+
+| Step | Where |
+|------|--------|
+| Define schedules | [`workers/ingest/wrangler.toml`](../workers/ingest/wrangler.toml) → `[env.dev.triggers]` |
+| Deploy | `cd workers/ingest && wrangler deploy --env dev` |
+| Verify | Cloudflare Dashboard → Workers → **fresno-events-ingest-dev** → Triggers → Cron Triggers |
+
+**Schedule (Mon + Thu 6am Pacific):** Monday — Ticketmaster full catalog + Venunite full + all venues. Thursday — Ticketmaster Thu–Sun window + all venues (no Venunite).
+
+Full per-source and per-venue matrix, date windows, bootstrap, and verification: **[INGEST_SCHEDULE.md](INGEST_SCHEDULE.md)** (created with ingest cron implementation).
+
+**Deploy checklist (summary):**
+
+1. Bootstrap cloud-dev DB with a one-time full promote from all sources.
+2. Set ingest dev secrets (`wrangler secret put … --env dev` from `dev-target.env`).
+3. Enable `[env.dev.triggers]` and profile routing (see INGEST_SCHEDULE.md).
+4. `wrangler deploy --env dev`; confirm scheduled invocations in dashboard logs.
+5. Manual override: `pnpm ingest:promote --source=…` still ignores cadence.
 
 ---
 
@@ -127,8 +193,8 @@ Local smoke against deployed API: `.env.cloud-targets` + `pnpm dev:web:cloud-pro
 | Approach | When |
 |----------|------|
 | **Default** | Pages + Vite build + separate API Worker |
-| **Cache headers** | Optional `public/_headers` — long cache on `/assets/*`, short on `index.html` |
-| **Coming soon** | `VITE_COMING_SOON=true` — minimal React, no API |
+| **Cache + CSP** | [`public/_headers`](../apps/web/public/_headers) — asset cache, CSP for GA/AdSense |
+| **Google analytics/ads** | `VITE_GA_*` / `VITE_ADSENSE_*` on Cloudflare Pages (see `dev-target.env`) |
 | **Home bootstrap** | Optional — see below |
 
 There is **no** separate static site that “becomes” the SPA later.
@@ -185,13 +251,78 @@ Optional phase 2: `renderToString` for SEO/LCP markup; JSON bootstrap is enough 
 
 ---
 
+## CI/CD (GitHub Actions)
+
+**Goal:** PR runs unit tests; merge to `main` deploys the **live site** (Workers `--env dev` + Pages on `whatupfresno.com`). Cloud-dev Supabase is the production database for v1.
+
+No `.github/workflows/` today. Tests exist per package (`vitest run` in [`apps/api`](../apps/api), [`apps/web`](../apps/web), [`workers/ingest`](../workers/ingest), [`packages/shared`](../packages/shared)). Add root `"test": "pnpm -r test"` to [`package.json`](../package.json).
+
+```mermaid
+flowchart TD
+  PR["Open / update PR"] --> CI["ci.yml"]
+  CI --> Checks["pnpm install · typecheck · lint · pnpm -r test"]
+  Merge["Merge to main"] --> DeployDev["deploy-dev.yml"]
+  DeployDev --> API["apps/api: wrangler deploy --env dev"]
+  DeployDev --> Ingest["workers/ingest: wrangler deploy --env dev"]
+  DeployDev --> Web["build web (VITE_*) → wrangler pages deploy apps/web/dist"]
+  Tag["git tag v* (manual)"] -.->|future| DeployProd["deploy-prod.yml (--env prod)"]
+```
+
+### `ci.yml` — on `pull_request`
+
+No Cloudflare secrets (Vitest stays mocked — no live Supabase/Cloudflare calls):
+
+```bash
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm lint
+pnpm -r test
+```
+
+Gate merges with a branch protection rule requiring `ci`.
+
+### `deploy-dev.yml` — on `push` to `main`
+
+| Target | Command | Worker / project |
+|--------|---------|------------------|
+| API | `cd apps/api && wrangler deploy --env dev` | `fresno-events-api-dev` |
+| Ingest | `cd workers/ingest && wrangler deploy --env dev` | `fresno-events-ingest-dev` (picks up `[env.dev.triggers]` once cron lands) |
+| Web | build with `VITE_*` → `wrangler pages deploy apps/web/dist` | Pages project |
+
+`wrangler deploy` uploads code + `wrangler.toml` bindings only — not runtime secrets. Supabase / API keys stay set in Cloudflare (`wrangler secret put` or dashboard); CI only needs Cloudflare auth.
+
+### GitHub secrets
+
+| Secret | Used for |
+|--------|----------|
+| `CLOUDFLARE_API_TOKEN` | Deploy Workers + Pages (Workers Scripts Edit + Pages Edit) |
+| `CLOUDFLARE_ACCOUNT_ID` | Wrangler auth |
+| `VITE_API_URL` | Web build |
+| `VITE_GA_MEASUREMENT_ID` | Web build |
+| `VITE_ADSENSE_CLIENT_ID` | Web build |
+| `VITE_ADSENSE_SLOT_*` | Web build, once ad units exist |
+
+### Not auto-deployed (deliberate)
+
+- **Separate prod DB** (`--env prod` Workers) — deferred until DB split is needed
+- **Supabase migrations** — keep manual / separate workflow
+- **Worker secrets** — set once in Cloudflare; deploy only updates code
+
+### Maturity path
+
+1. **v1 (now):** PR = tests; `main` = live site deploy; cloud-dev = production DB
+2. **v2 (future):** Optional `what-up-fresno-prod` + promotion if DB split needed
+3. **v3:** Path filters (deploy ingest only when `workers/ingest/**` changed)
+
+**Pages alternative:** Cloudflare Pages Git integration can auto-build web on push instead of `wrangler pages deploy` in CI. Otherwise keep everything in `deploy-dev.yml`.
+
 ## Gaps / manual steps
 
 | Topic | State |
 |-------|--------|
-| CI/CD | Manual Wrangler + Pages |
+| CI/CD | Planned — `ci.yml` + `deploy-dev.yml` (merge → live site). See CI/CD section |
 | API custom domain | Dashboard only |
-| Event promotion | Manual; `PROMOTION.md` not written |
+| Separate prod DB / promotion | Deferred — cloud-dev is live DB for v1 |
 | `deploy` npm script | No `--env prod` |
 
 ---
@@ -203,3 +334,5 @@ Optional phase 2: `renderToString` for SEO/LCP markup; JSON bootstrap is enough 
 | [LAUNCH_PLAN.md](LAUNCH_PLAN.md) | Master checklist; Phase 5 points here |
 | [DATABASE_ACCESS.md](DATABASE_ACCESS.md) | Supabase targets |
 | [INGESTION_OVERHAUL_PLAN.md](INGESTION_OVERHAUL_PLAN.md) | Promotion preview §12.6 |
+| [INGEST_SCHEDULE.md](INGEST_SCHEDULE.md) | Ingest cron matrix, Cloudflare setup, Mon/Thu profiles |
+| [INGEST.md](INGEST.md) | Ingest workflow overview |

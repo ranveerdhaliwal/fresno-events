@@ -32,6 +32,8 @@ isProject: false
 **Status:** Approved for manual setup (Phase 1 in [LAUNCH_PLAN.md](LAUNCH_PLAN.md)); code not implemented yet.  
 **Last updated:** May 2026 (tiny fixes: dry-run read-only, `--resume-jobs`, in-tree READMEs §12)
 
+> **Superseded (2026):** Part 2 (`ai-crawl`, `seed_urls`, `ai-discovery`) was replaced by **venue-ingest** (12 explicit venue modules). Use [INGEST.md](INGEST.md) and [VENUE_INGEST.md](VENUE_INGEST.md) for the current pipeline.
+
 ---
 
 ## 1. Executive summary

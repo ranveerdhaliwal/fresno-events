@@ -1,6 +1,6 @@
 # What Up Fresno — setup and build plan
 
-**One doc for what you do by hand.** Cloud production deploy (API, Pages, bootstrap SPA, promotion) is in **[PROD_DEPLOYMENT_PLAN.md](PROD_DEPLOYMENT_PLAN.md)** — Phase 5 below links there. Ingest pipeline design is in [INGESTION_OVERHAUL_PLAN.md](INGESTION_OVERHAUL_PLAN.md).
+**One doc for what you do by hand.** Cloud production deploy (API, Pages, bootstrap SPA, promotion) is in **[PROD_DEPLOYMENT_PLAN.md](PROD_DEPLOYMENT_PLAN.md)** — Phase 5 below links there. **Current ingest:** [INGEST.md](INGEST.md) and [VENUE_INGEST.md](VENUE_INGEST.md) (historical ai-crawl plan: [INGESTION_OVERHAUL_PLAN.md](INGESTION_OVERHAUL_PLAN.md)).
 
 ---
 

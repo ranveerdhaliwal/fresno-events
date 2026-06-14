@@ -4,7 +4,7 @@ Aggregators live in [`workers/ingest/src/registry.ts`](../workers/ingest/src/reg
 
 ## Preflight vs promote
 
-Both sources use the generic preflight (not `preflight-direct`, which is venue-ingest only):
+Both sources use the generic preflight/promote flow:
 
 ```bash
 pnpm ingest:preflight --source=ticketmaster
@@ -26,6 +26,8 @@ pnpm ingest:preflight --source=venunite
 | Signup | [developer.ticketmaster.com](https://developer.ticketmaster.com/) → Discovery API |
 
 **Behavior:** Paginated fetch (`size=200`), Fresno lat/long + radius, `startDateTime` from run time (override via scraper `defaultConfig` later). Logs `Rate-Limit-Available` header; retries once on HTTP 429.
+
+**Pricing:** Discovery no longer returns `priceRanges` (removed March 2025). We do not use Inventory Status API. After ingest, **linked occurrence harmonization** copies `priceMin` / `priceMax` from cross-source siblings (e.g. Big Fresno Fair scrape → Ticketmaster primary). Venue modules with their own ticketing (Tower TicketSauce, fair box office) remain the price source of record.
 
 **Quota:** Discovery free tier is 5k calls/day. A full daily run is ~1–3 pages (~1–3 calls). Far-future window sweeps stay well under budget.
 

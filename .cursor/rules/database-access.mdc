@@ -1,11 +1,39 @@
 ---
-description: How to query cloud dev (Supabase MCP) vs local Postgres (Docker). Use when the user asks about DB access, SQL, cleanup, migrations, or ingest data.
+description: How to query local Postgres (default) vs cloud dev (Supabase MCP). Use for DB access, SQL, cleanup, migrations, or ingest data.
 alwaysApply: true
 ---
 
 # Database access
 
 Full reference: [docs/DATABASE_ACCESS.md](docs/DATABASE_ACCESS.md)
+
+## Default: local Postgres first
+
+**For “what’s in the DB?”, ingest results, candidate rows, pricing checks, or promote verification — query local Docker Postgres first.** Local is where `pnpm ingest:promote` and `pnpm dev:api` write when `DEV_TARGET=local` (typical day-to-day dev). Cloud dev is often stale until you explicitly push or ingest there.
+
+Only use **cloud dev MCP** when the user says cloud dev, you need remote-only diagnostics, or local stack is not running and they confirm cloud.
+
+Confirm target: `dev-target.env` `DEV_TARGET` or `.dev.vars` `SUPABASE_URL` — `127.0.0.1` = local, `*.supabase.co` = cloud dev.
+
+## Local Postgres — use Docker / CLI (not MCP)
+
+Local stack: `pnpm db:start` then `pnpm db:reset` / `pnpm db:status`.
+
+- **Connection:** `postgresql://postgres:postgres@127.0.0.1:54322/postgres`
+- **Studio:** http://127.0.0.1:54423 (`supabase status` — 54323 often blocked on WSL/Windows)
+- **Container (typical):** `supabase_db_what-up-fresno` (`project_id` in `supabase/config.toml`)
+
+**Agent local queries:**
+
+```bash
+docker exec supabase_db_what-up-fresno psql -U postgres -d postgres -c "<SQL>"
+```
+
+If container name differs: `docker ps --filter name=supabase_db`.
+
+**Common ingest tables:** `event_candidates` (queue; pricing in `normalized_event` JSONB), `ingest_runs`, `events` (published after approve).
+
+**Push local → cloud dev:** `pnpm db:push-cloud-dev --confirm` — only when user wants cloud synced. See [docs/DATABASE_ACCESS.md](docs/DATABASE_ACCESS.md).
 
 ## Cloud dev — use Supabase MCP
 
@@ -25,30 +53,13 @@ Do **not** use `SUPABASE_ACCESS_TOKEN` / `sbp_` PAT unless MCP OAuth is broken a
 
 Workers still use `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` from generated `.dev.vars` (`dev-target.env` + `pnpm env:<target>`) — separate from MCP.
 
-## Local Postgres — use Docker / CLI (not MCP)
-
-Local stack: `pnpm db:start` then `pnpm db:reset` / `pnpm db:status`.
-
-- **Connection:** `postgresql://postgres:postgres@127.0.0.1:54322/postgres`
-- **Studio:** http://127.0.0.1:54423 (`supabase status` — 54323 often blocked on WSL/Windows)
-- **Container (typical):** `supabase_db_what-up-fresno` (`project_id` in `supabase/config.toml`)
-
-**Push local → cloud dev:** `pnpm db:push-cloud-dev --confirm` needs `SUPABASE_DB_PASSWORD_CLOUD_DEV` + `supabase link` (uses session pooler IPv4, not direct `db.*`). See [docs/DATABASE_ACCESS.md](docs/DATABASE_ACCESS.md).
-
-**Agent local queries:**
-
-```bash
-docker exec supabase_db_what-up-fresno psql -U postgres -d postgres -c "<SQL>"
-```
-
-If container name differs: `docker ps --filter name=supabase_db`.
-
 ## Pick the right target
 
 | User intent | Approach |
 | --- | --- |
-| Cloud dev data, cleanup, remote diagnostics | Supabase MCP `execute_sql` |
+| Inspect ingest/candidates, verify promote, “what’s in the DB?” | **Local** Docker `psql` (default) |
 | Local ingest test, fresh reset | `pnpm db:reset` + Docker `psql` |
-| “What’s in the DB?” without specifying | Check `dev-target.env` `DEV_TARGET` or generated `.dev.vars` `SUPABASE_URL`: `127.0.0.1` = local, `*.supabase.co` = cloud dev |
+| Cloud dev cleanup, remote diagnostics, user said cloud | Supabase MCP `execute_sql` |
+| Sync local → cloud after local approve | `pnpm db:push-cloud-dev --confirm` |
 
 Never point MCP or ingest writes at **prod** unless the user explicitly requests prod.

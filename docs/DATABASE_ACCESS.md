@@ -2,13 +2,19 @@
 
 How humans and Cursor agents should reach Postgres in this repo.
 
+## Default for agents: local first
+
+**Query local Docker Postgres first** when checking ingest results, `event_candidates`, pricing, promote outcomes, or “what’s in the DB?” — unless the user explicitly asks for cloud dev. Day-to-day `pnpm ingest:promote` and `pnpm dev:api` write to **local** when `DEV_TARGET=local`. Cloud dev is often behind until you run promote there or `pnpm db:push-cloud-dev --confirm`.
+
 | Target | Best for | How |
 | --- | --- | --- |
-| **Cloud dev** | Queries, cleanup, migrations on hosted dev data | Supabase MCP (OAuth) |
-| **Local Docker** | Ingest iteration before cloud, schema reset | `pnpm db:*` + Docker/`psql` |
+| **Local Docker** (default) | Current ingest data, promote verification, schema reset, iteration | `pnpm db:*` + Docker `psql` |
+| **Cloud dev** | Remote cleanup, shared dev DB, migrations on hosted data | Supabase MCP (OAuth) |
 | **Workers** | Runtime API/ingest reads/writes | Generated `.dev.vars` from `dev-target.env` (`pnpm env:<target>`) — not MCP |
 
 **Do not** point MCP or ingest at **prod** unless explicitly requested.
+
+Confirm which DB is active: `.dev.vars` `SUPABASE_URL` — `http://127.0.0.1:54321` = local, `https://mrfkpvbvgzbtcutulfnc.supabase.co` = cloud dev.
 
 ---
 
@@ -30,7 +36,7 @@ Configured in `.cursor/mcp.json` (gitignored):
 
 ### Agent workflow (cloud dev)
 
-Prefer MCP tools over raw `fetch` or guessing credentials:
+Use MCP when the user asks for **cloud dev**, remote cleanup, or local stack is down and they confirm cloud. Do **not** assume cloud dev matches local ingest state.
 
 1. `list_tables` — schema overview (`schemas: ["public"]`)
 2. `execute_sql` — `SELECT` / diagnostics (read-only by default at login scope)
@@ -93,9 +99,9 @@ pnpm db:reset       # wipe DB + all migrations + seed (destructive)
 
 `project_id` in `supabase/config.toml` is `what-up-fresno` → DB container name is typically `supabase_db_what-up-fresno`.
 
-### Agent workflow (local)
+### Agent workflow (local) — prefer this for ingest data
 
-MCP is scoped to **cloud dev** only. For local Postgres, use the shell:
+MCP is scoped to **cloud dev** only. For **up-to-date candidate/ingest rows**, use local shell:
 
 ```bash
 # Confirm stack is up
