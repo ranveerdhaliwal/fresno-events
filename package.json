@@ -22,17 +22,12 @@
     "ingest:detail-backfill": "bash scripts/ingest-detail-backfill.sh",
     "ingest:relink": "bash scripts/ingest-occurrence-relink.sh",
     "db:backfill-addresses": "bash scripts/backfill-venue-addresses.sh",
-    "ingest:preflight-direct": "bash scripts/ingest-preflight-direct.sh",
-    "ingest:preflight-browser": "bash scripts/ingest-preflight-browser.sh",
     "ingest:preflight-all": "bash scripts/ingest-preflight-all.sh",
-    "ingest:promote-direct": "bash scripts/ingest-promote-direct.sh",
-    "ingest:promote-browser": "bash scripts/ingest-promote-browser.sh",
     "ingest:promote-all": "bash scripts/ingest-promote-all.sh",
-    "ingest:preflight-crawl": "bash scripts/ingest-preflight-crawl.sh",
-    "ingest:promote-crawl": "bash scripts/ingest-promote-crawl.sh",
+    "ingest:sources": "node scripts/ingest-list-sources.mjs",
     "db:push-cloud-dev": "bash scripts/db-push-review-to-cloud.sh",
     "review:bulk-approve": "bash scripts/review-bulk-approve.sh",
-    "admin:priority-triage": "bash scripts/admin-priority-triage.sh",
+    "priority:rerank": "bash scripts/priority-rerank.sh",
     "env:status": "bash scripts/env-status.sh",
     "env:local": "bash scripts/env-use.sh local",
     "env:cloud-dev": "bash scripts/env-use.sh cloud-dev",
@@ -51,10 +46,11 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
     "format": "prettier --write ."
   },
   "devDependencies": {
     "prettier": "latest",
-    "typescript": "latest"
+    "typescript": "^6.0.3"
   }
 }

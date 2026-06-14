@@ -118,15 +118,20 @@ For DBeaver/Beekeeper, create a Postgres connection with host `127.0.0.1`, port 
 
 The web app reads through the Worker API when `VITE_API_URL` points at the local API (see `scripts/dev-ports.env`); without it, the UI falls back to mock data.
 
-## Coming Soon Deploy
+## Production web deploy (Cloudflare Pages)
 
-Cloudflare Pages can serve the minimal holding page while the full app stays available locally:
+Build with the prod API URL and Google keys from `dev-target.env`:
 
 ```bash
-VITE_COMING_SOON=true pnpm --filter @fresno-events/web build
+VITE_API_URL=https://api.whatupfresno.com \
+VITE_GA_MEASUREMENT_ID=G-SP3QWX0EGP \
+VITE_ADSENSE_CLIENT_ID=ca-pub-1385262226884616 \
+pnpm --filter @fresno-events/web build
 ```
 
-Use `apps/web/dist` as the Pages output directory and attach the `whatupfresno.com` custom domain. Set `VITE_COMING_SOON=false` or omit it when deploying the full app later.
+Set the same `VITE_*` variables in **Cloudflare Pages → Settings → Environment variables → Production** (plus `VITE_ADSENSE_SLOT_*` when ad units are created). Deploy `apps/web/dist` and attach `whatupfresno.com`.
+
+Local dev keeps GA/ads off unless you copy those vars into `apps/web/.env.local` and restart the dev server.
 
 ## Event Review Flow
 
@@ -184,55 +189,46 @@ pnpm dev:api            # terminal 2 — for /admin (or pnpm dev)
 | Command | What it does |
 | --- | --- |
 | `pnpm ingest:dev` | Start local ingest worker (port 8788) |
-| `pnpm ingest:preflight-direct` | Dry-run direct lane (visit, downtown, milb, gobulldogs) |
-| `pnpm ingest:preflight-browser` | Dry-run Browser Rendering crawl venues |
-| `pnpm ingest:preflight-all` | Dry-run all enabled venues |
-| `pnpm ingest:promote-direct` | Real persist — direct lane |
-| `pnpm ingest:promote-browser` | Real persist — browser lane |
-| `pnpm ingest:promote-all` | Real persist — all venues |
-| `pnpm ingest:preflight --venue=<key>` | Dry-run one venue |
-| `pnpm ingest:promote --venue=<key>` | Real persist one venue |
+| `pnpm ingest:preflight-all` | Dry-run all enabled venue sources |
+| `pnpm ingest:promote-all` | Real persist — all venue sources |
+| `pnpm ingest:preflight --source=<key>` | Dry-run one source |
+| `pnpm ingest:promote --source=<key>` | Real persist one source |
 | `pnpm ingest:run` | Lower-level `POST /trigger` (see flags below) |
-| `pnpm ingest:enrich` | AI enrichment on existing `pending_review` rows (`suggested_priority`, confidence, …) |
+| `pnpm ingest:enrich` | AI enrichment on existing `pending_review` rows |
 
 **`ingest:run` flags:**
 
-- `--source=<key>` — scraper key, comma list, or `--all`
+- `--source=<key>` — resolved scraper key (usually via `ingest:promote`)
 - `--force` — run even if not “due” on the schedule
 - `--dry-run` — no DB writes (same idea as preflight)
 - `--no-enrich` — after a real run, skip background enrichment
-- `--resume-jobs` — ai-crawl resume (not with `--dry-run`)
 
 **`ingest:enrich` flags:**
 
 - `--dry-run` — log patches only, no DB update
-- `--source=api:visitfresnocounty` — filter by DB `event_candidates.source` (not scraper key)
+- `--source=api:visitfresnocounty` — filter by DB `event_candidates.source`
 - `--limit=N` — max rows per request (default 25; max 100 per API call)
 - `--all` — loop batches until no pending rows are left without `[ai]` review notes (default batch size 100; use `--limit=50` for smaller batches)
 
 For **100+ pending** candidates after promote: `pnpm ingest:enrich --all` (runs multiple batches automatically), or `pnpm ingest:enrich --limit=100` repeatedly until `processed` is 0.
 
-### Scraper keys (`--source=` for preflight / promote / run)
+### Sources (`--source=`)
 
-| Scraper key | Typical `event_candidates.source` | Notes |
-| --- | --- | --- |
-| `visit-fresno-api` | `api:visitfresnocounty` | ~224 events typical |
-| `downtown-fresno-api` | `api:downtownfresno` | ~27 |
-| `milb-api` | `api:milb` | ~88 |
-| `seed-special-url` | varies | e.g. gobulldogs (often 0) |
-| `ticketmaster`, `seatgeek`, `eventbrite`, `bandsintown` | per provider | Needs API keys in `workers/ingest/.dev.vars` |
-| `ai-discovery`, `ai-crawl` | crawl lanes | BR + LLM keys |
+| `--source=` | Notes |
+| --- | --- |
+| `pnpm ingest:promote-all` | All 12 venue modules — see [VENUE_INGEST.md](docs/VENUE_INGEST.md) |
+| `ticketmaster` | Needs `TICKETMASTER_API_KEY` |
+| `venunite` | Public API, no key |
+| `strummers`, `save-mart`, … | Venue key (same as module folder) |
+| `api:visitfresnocounty`, `api:milb`, … | Candidate source value from admin |
 
 ### Recommended workflow (local)
 
 ```bash
 pnpm env:local
 pnpm ingest:dev
-pnpm ingest:preflight-direct
-pnpm ingest:promote-direct
-pnpm ingest:preflight-browser
-pnpm ingest:promote-browser
-# or: pnpm ingest:preflight-all && pnpm ingest:promote-all
+pnpm ingest:preflight-all && pnpm ingest:promote-all
+pnpm ingest:preflight --source=ticketmaster && pnpm ingest:promote --source=ticketmaster
 pnpm ingest:enrich --limit=50
 pnpm dev:api                           # open http://127.0.0.1:5182/admin
 ```
@@ -263,10 +259,9 @@ Validation can be bypassed in an emergency with `INGEST_SKIP_VALIDATION=true` in
 **Ingest** (see [Data ingestion](#data-ingestion))
 
 - `pnpm ingest:dev`
-- `pnpm ingest:preflight-direct` / `preflight-browser` / `preflight-all`
-- `pnpm ingest:promote-direct` / `promote-browser` / `promote-all`
-- `pnpm ingest:preflight --venue=<key>` / `pnpm ingest:promote --venue=<key>`
-- `pnpm ingest:run [--source=...] [--venue=...] [--force] [--dry-run] [--no-enrich]`
+- `pnpm ingest:preflight-all` / `pnpm ingest:promote-all`
+- `pnpm ingest:preflight --source=<key>` / `pnpm ingest:promote --source=<key>`
+- `pnpm ingest:run [--source=...] [--force] [--dry-run] [--no-enrich]`
 - `pnpm ingest:enrich [--dry-run] [--source=api:...] [--limit=N]`
 - `pnpm --filter @fresno-events/ingest deploy` — deploy ingest worker (cron from `wrangler.toml`)
 
