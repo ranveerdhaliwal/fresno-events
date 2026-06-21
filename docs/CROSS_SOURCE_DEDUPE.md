@@ -24,6 +24,7 @@ Same real-world events from Visit Fresno, Downtown Fresno, venue scrapers, and M
 
 - **Venue aliases** — e.g. Strummer's → Strummers scrape slug, Warnors Center → Warnors Theatre, Saroyan name variants, Save Mart sub-names.
 - **Title canonicalization (occurrence only)** — Promo-night Grizzlies titles collapse to `fresno grizzlies vs {opponent}`; strips trailing `- Fresno` / `Live In Concert` before hashing. Miss California week listings (`Competition Week`, `2026`, etc.) collapse to `miss california` or `miss california teen`. Display titles are unchanged.
+- **Fuzzy title match (step C)** — When step A/B miss, same normalized venue + Pacific show date + high significant-word overlap (`packages/shared/src/title-similarity.utils.ts`) can link rows (e.g. Lil Wayne Ticketmaster vs Venunite tour wording). Admin shows lower-threshold near-matches that are not yet linked.
 - **URL keys** — Ticketmaster `/event/{id}` and Eventbrite numeric event IDs normalize to stable `url_key` (helps Venunite `eb:` rows and TM overlap).
 - **Primary source order** — When linking duplicates, **Ticketmaster** is preferred over scrapers and Visit/Downtown APIs (approved / already-published rows still win when they carry `matched_event_id`).
 - **Series URLs** — Shared listing URLs (multi-night runs) only link when **occurrence buckets overlap** (same show time). A week-long Visit page URL will not merge Jun 16 and Jun 17 into one occurrence.
@@ -47,7 +48,9 @@ pnpm ingest:relink --source=ticketmaster
 ## Admin
 
 - **New** tab: `canonical_candidate_id is null` (primaries only).
+- **Updates** tab: same — linked secondaries stay `duplicate` when their source changes; only the primary can surface `needs_changes`.
 - Detail: **Also listed on** lists siblings with the same `occurrence_id`.
+- Detail: **Possibly the same show** (amber) lists same venue/night rows with high title word overlap that are not yet duplicates.
 - Approve the primary; siblings get `matched_event_id`. `source_refs.alternates` updated on approve.
 
 ## Disable linking (shadow mode)

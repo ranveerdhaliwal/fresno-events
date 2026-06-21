@@ -6,6 +6,7 @@ import { pickPrimaryCandidate, resolveOccurrenceForPersist } from "@/candidates/
 const emptyIndex: OccurrenceMatchIndex = {
   candidatesByOccurrenceKey: new Map(),
   candidatesByUrlKey: new Map(),
+  candidatesByVenueDate: new Map(),
   candidatesByOccurrenceId: new Map(),
   eventsByOccurrenceKey: new Map(),
   eventsByOccurrenceId: new Map()
@@ -18,6 +19,9 @@ describe("occurrence-resolve.utils", () => {
         id: "scrape",
         source: "scrape:www.savemartcenter.com",
         source_event_id: "1",
+        title: "Scrape Show",
+        venue_name: "Save Mart Center",
+        start_ts: "2026-06-01T02:00:00.000Z",
         status: "pending_review",
         matched_event_id: null,
         occurrence_id: "occ",
@@ -30,6 +34,9 @@ describe("occurrence-resolve.utils", () => {
         id: "tm",
         source: "ticketmaster",
         source_event_id: "2",
+        title: "TM Show",
+        venue_name: "Save Mart Center",
+        start_ts: "2026-06-01T02:00:00.000Z",
         status: "pending_review",
         matched_event_id: null,
         occurrence_id: "occ",
@@ -49,6 +56,9 @@ describe("occurrence-resolve.utils", () => {
         id: "b",
         source: "api:downtownfresno",
         source_event_id: "2",
+        title: "Jazz Night",
+        venue_name: "Tower Theatre",
+        start_ts: "2026-06-01T02:00:00.000Z",
         status: "pending_review",
         matched_event_id: null,
         occurrence_id: "occ",
@@ -61,6 +71,9 @@ describe("occurrence-resolve.utils", () => {
         id: "a",
         source: "api:visitfresnocounty",
         source_event_id: "1",
+        title: "Jazz Night",
+        venue_name: "Tower Theatre",
+        start_ts: "2026-06-01T02:00:00.000Z",
         status: "approved",
         matched_event_id: "evt",
         occurrence_id: "occ",
@@ -97,6 +110,9 @@ describe("occurrence-resolve.utils", () => {
               id: "primary",
               source: "api:visitfresnocounty",
               source_event_id: "v1",
+              title: "Jazz Night",
+              venue_name: "Tower Theatre",
+              start_ts: "2026-06-01T02:00:00.000Z",
               status: "pending_review",
               matched_event_id: null,
               occurrence_id: "occ-1",
@@ -157,6 +173,9 @@ describe("occurrence-resolve.utils", () => {
               id: "visit-night-two",
               source: "api:visitfresnocounty",
               source_event_id: "visit-2",
+              title: "Miss California 2026",
+              venue_name: "William Saroyan Theatre",
+              start_ts: "2026-06-18T02:00:00.000Z",
               status: "approved",
               matched_event_id: "evt-2",
               occurrence_id: "occ-2",
@@ -179,5 +198,57 @@ describe("occurrence-resolve.utils", () => {
 
     expect(result.matchStep).toBe("new");
     expect(result.canonicalCandidateId).toBeNull();
+  });
+
+  it("links cross-source rows via fuzzy title overlap at same venue and date", async () => {
+    const { venueDateLookupKey } = await import("@fresno-events/shared");
+    const event = {
+      source: "venunite" as const,
+      sourceEventId: "eb-1",
+      title: "Lil Wayne Live in Fresno - 20 Years of Carter Classics Tour",
+      venueName: "Save Mart Center at Fresno State - SMG",
+      startTs: "2026-08-29T03:00:00.000Z",
+      category: "music" as const
+    };
+    const lookupKey = venueDateLookupKey(event.venueName, event.startTs);
+    expect(lookupKey).toBeTruthy();
+
+    const index: OccurrenceMatchIndex = {
+      ...emptyIndex,
+      candidatesByVenueDate: new Map([
+        [
+          lookupKey!,
+          [
+            {
+              id: "tm-primary",
+              source: "ticketmaster",
+              source_event_id: "tm-1",
+              title: "LIL WAYNE: 20 YEARS OF CARTER CLASSICS WITH THE GAME",
+              venue_name: "Save Mart Center",
+              start_ts: "2026-08-29T02:00:00.000Z",
+              status: "pending_review",
+              matched_event_id: null,
+              occurrence_id: "occ-tm",
+              canonical_candidate_id: null,
+              created_at: "2026-01-01T00:00:00.000Z",
+              occurrence_key: "tm-key",
+              url_key: null
+            }
+          ]
+        ]
+      ])
+    };
+
+    const result = await resolveOccurrenceForPersist({
+      event,
+      baseStatus: "awaiting_enrichment",
+      crossSourceDedupe: true,
+      matchIndex: index
+    });
+
+    expect(result.matchStep).toBe("title_fuzzy");
+    expect(result.occurrenceId).toBe("occ-tm");
+    expect(result.statusOverride).toBe("duplicate");
+    expect(result.canonicalCandidateId).toBe("tm-primary");
   });
 });

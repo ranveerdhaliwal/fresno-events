@@ -216,7 +216,7 @@ function resolveRelinkStatus(row: RelinkCandidateRow, isPrimary: boolean, crossS
     }
     return row.status;
   }
-  if (row.status === "needs_changes") {
+  if (row.status === "rejected") {
     return row.status;
   }
   return "duplicate";

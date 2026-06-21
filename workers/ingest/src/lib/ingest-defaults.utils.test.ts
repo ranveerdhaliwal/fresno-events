@@ -11,9 +11,17 @@ const base = {
 };
 
 describe("applyIngestDefaults", () => {
-  it("adds a default end when the source omitted one", () => {
+  it("does not invent an end time when the source omitted one", () => {
     const result = applyIngestDefaults(base);
-    expect(result.endTs).toBe("2026-06-01T18:00:00.000Z");
+    expect(result.endTs).toBeUndefined();
+  });
+
+  it("keeps an explicit end time from the source", () => {
+    const result = applyIngestDefaults({
+      ...base,
+      endTs: "2026-06-01T19:00:00.000Z"
+    });
+    expect(result.endTs).toBe("2026-06-01T19:00:00.000Z");
   });
 
   it("does not invent an end time when the source marked timeUnknown", () => {
@@ -38,5 +46,15 @@ describe("applyIngestDefaults", () => {
     expect(result.venueAddress).toBe("1725 Broadway St");
     expect(result.venueLat).toBe(36.7402635);
     expect(result.venueLng).toBe(-119.7994878);
+  });
+
+  it("rounds fractional display prices up to whole dollars", () => {
+    const result = applyIngestDefaults({
+      ...base,
+      priceMin: 31.83,
+      priceMax: 34.92
+    });
+    expect(result.priceMin).toBe(32);
+    expect(result.priceMax).toBe(35);
   });
 });

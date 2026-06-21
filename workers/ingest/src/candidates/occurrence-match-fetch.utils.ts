@@ -1,5 +1,5 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
-import { computeOccurrenceFingerprints } from "@fresno-events/shared";
+import { computeOccurrenceFingerprints, startTsLookupWindow, venueDateLookupKey } from "@fresno-events/shared";
 
 import type {
   OccurrenceMatchCandidate,
@@ -12,7 +12,7 @@ import type { SupabaseConfig } from "@/sources";
 export const OCCURRENCE_IN_FILTER_BATCH_SIZE = 48;
 
 const CANDIDATE_SELECT =
-  "id,source,source_event_id,status,matched_event_id,occurrence_id,canonical_candidate_id,created_at,occurrence_key,url_key";
+  "id,source,source_event_id,title,venue_name,start_ts,status,matched_event_id,occurrence_id,canonical_candidate_id,created_at,occurrence_key,url_key";
 
 function supabaseHeaders(config: SupabaseConfig) {
   return {
@@ -58,6 +58,8 @@ export async function buildOccurrenceMatchIndex(
 ): Promise<OccurrenceMatchIndex> {
   const occurrenceKeys = new Set<string>();
   const urlKeys = new Set<string>();
+  const venueDateKeys = new Set<string>();
+  const startTsWindows: Array<{ from: string; to: string }> = [];
 
   for (const event of events) {
     const fp = await computeOccurrenceFingerprints(event);
@@ -67,14 +69,28 @@ export async function buildOccurrenceMatchIndex(
     if (fp.urlKey) {
       urlKeys.add(fp.urlKey);
     }
+    const venueDateKey = venueDateLookupKey(event.venueName, event.startTs);
+    if (venueDateKey) {
+      venueDateKeys.add(venueDateKey);
+    }
+    const window = startTsLookupWindow(event.startTs);
+    if (window) {
+      startTsWindows.push(window);
+    }
   }
 
-  const candidates = await fetchCandidatesByKeys(config, [...occurrenceKeys], [...urlKeys]);
+  const candidates = await fetchCandidatesByKeys(
+    config,
+    [...occurrenceKeys],
+    [...urlKeys],
+    startTsWindows
+  );
   const occurrenceIds = [...new Set(candidates.map((row) => row.occurrence_id).filter(Boolean))];
   const publishedEvents = await fetchPublishedEvents(config, [...occurrenceKeys], occurrenceIds);
 
   const candidatesByOccurrenceKey = new Map<string, OccurrenceMatchCandidate[]>();
   const candidatesByUrlKey = new Map<string, OccurrenceMatchCandidate[]>();
+  const candidatesByVenueDate = new Map<string, OccurrenceMatchCandidate[]>();
   const candidatesByOccurrenceId = new Map<string, OccurrenceMatchCandidate[]>();
   const eventsByOccurrenceKey = new Map<string, OccurrenceMatchEvent[]>();
   const eventsByOccurrenceId = new Map<string, OccurrenceMatchEvent[]>();
@@ -85,6 +101,10 @@ export async function buildOccurrenceMatchIndex(
     }
     if (row.url_key) {
       appendToMap(candidatesByUrlKey, row.url_key, row);
+    }
+    const venueDateKey = venueDateLookupKey(row.venue_name, row.start_ts);
+    if (venueDateKey) {
+      appendToMap(candidatesByVenueDate, venueDateKey, row);
     }
     appendToMap(candidatesByOccurrenceId, row.occurrence_id, row);
   }
@@ -101,6 +121,7 @@ export async function buildOccurrenceMatchIndex(
   return {
     candidatesByOccurrenceKey,
     candidatesByUrlKey,
+    candidatesByVenueDate,
     candidatesByOccurrenceId,
     eventsByOccurrenceKey,
     eventsByOccurrenceId
@@ -110,9 +131,10 @@ export async function buildOccurrenceMatchIndex(
 async function fetchCandidatesByKeys(
   config: SupabaseConfig,
   occurrenceKeys: string[],
-  urlKeys: string[]
+  urlKeys: string[],
+  startTsWindows: Array<{ from: string; to: string }>
 ): Promise<OccurrenceMatchCandidate[]> {
-  if (occurrenceKeys.length === 0 && urlKeys.length === 0) {
+  if (occurrenceKeys.length === 0 && urlKeys.length === 0 && startTsWindows.length === 0) {
     return [];
   }
 
@@ -123,6 +145,9 @@ async function fetchCandidatesByKeys(
   }
   for (const batch of chunkValues(urlKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE)) {
     merged.push(...(await fetchCandidatesInFilter(config, "url_key", batch)));
+  }
+  for (const window of startTsWindows) {
+    merged.push(...(await fetchCandidatesInStartTsWindow(config, window)));
   }
 
   return dedupeById(merged);
@@ -154,6 +179,37 @@ async function fetchCandidatesInFilter(
         status: response.status,
         column,
         batch_size: values.length
+      })
+    );
+    return [];
+  }
+
+  return (await response.json()) as OccurrenceMatchCandidate[];
+}
+
+async function fetchCandidatesInStartTsWindow(
+  config: SupabaseConfig,
+  window: { from: string; to: string }
+): Promise<OccurrenceMatchCandidate[]> {
+  const params = new URLSearchParams({
+    select: CANDIDATE_SELECT,
+    and: `(start_ts.gte.${window.from},start_ts.lte.${window.to})`,
+    status: "in.(awaiting_enrichment,pending_review,needs_changes,approved)",
+    limit: "400"
+  });
+
+  const response = await fetch(`${config.url}/rest/v1/event_candidates?${params}`, {
+    headers: supabaseHeaders(config)
+  });
+
+  if (!response.ok) {
+    console.log(
+      JSON.stringify({
+        event: "ingest_occurrence_fetch_candidates_failed",
+        status: response.status,
+        column: "start_ts_window",
+        from: window.from,
+        to: window.to
       })
     );
     return [];

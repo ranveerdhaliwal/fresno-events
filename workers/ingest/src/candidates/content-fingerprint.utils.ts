@@ -18,6 +18,7 @@ export interface ExistingCandidateRow {
   start_ts: string;
   venue_name: string;
   normalized_event: NormalizedEvent;
+  eventbrite_detail_status?: string | null;
 }
 
 /** Stable fields for “did the source change?” — excludes run metadata and confidence. */
@@ -55,7 +56,15 @@ export function resolveStatusOnRescrape(
   }
 
   if (existing.content_fingerprint === newFingerprint) {
+    if (existing.canonical_candidate_id && existing.status === "needs_changes") {
+      return "duplicate";
+    }
     return existing.status;
+  }
+
+  /** Linked secondaries never enter the Updates queue — primary owns the published event. */
+  if (existing.canonical_candidate_id && existing.status !== "rejected") {
+    return "duplicate";
   }
 
   if (existing.status === "approved" && existing.matched_event_id) {

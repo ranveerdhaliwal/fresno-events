@@ -61,6 +61,23 @@ describe("content-fingerprint.utils", () => {
     expect(resolveStatusOnRescrape(existing, "new")).toBe("needs_changes");
   });
 
+  it("resolveStatusOnRescrape keeps linked secondaries duplicate when content changes", () => {
+    const existing = existingRow({
+      content_fingerprint: "old",
+      canonical_candidate_id: "primary-1",
+      status: "approved"
+    });
+    expect(resolveStatusOnRescrape(existing, "new")).toBe("duplicate");
+  });
+
+  it("resolveStatusOnRescrape normalizes stale linked needs_changes to duplicate", () => {
+    const existing = existingRow({
+      canonical_candidate_id: "primary-1",
+      status: "needs_changes"
+    });
+    expect(resolveStatusOnRescrape(existing, "abc")).toBe("duplicate");
+  });
+
   it("resolveStatusOnRescrape uses awaiting_enrichment for new candidates", () => {
     expect(resolveStatusOnRescrape(undefined, "fp")).toBe("awaiting_enrichment");
   });

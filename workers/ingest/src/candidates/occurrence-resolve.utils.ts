@@ -1,5 +1,11 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
-import { computeOccurrenceFingerprints, sourcePriorityRank } from "@fresno-events/shared";
+import {
+  computeOccurrenceFingerprints,
+  isStrongCrossSourceTitleMatch,
+  scoreTitleSimilarity,
+  sourcePriorityRank,
+  venueDateLookupKey
+} from "@fresno-events/shared";
 
 import type {
   OccurrenceMatchCandidate,
@@ -98,6 +104,36 @@ function findScheduledEvent(
   return null;
 }
 
+function selfKeyFromEvent(event: NormalizedEvent): string {
+  return candidateKey(event.source, event.sourceEventId);
+}
+
+function collectFuzzyTitleMatches(
+  index: OccurrenceMatchIndex,
+  event: NormalizedEvent,
+  selfKey: string
+): OccurrenceMatchCandidate[] {
+  const lookupKey = venueDateLookupKey(event.venueName, event.startTs);
+  if (!lookupKey) {
+    return [];
+  }
+
+  const pool = index.candidatesByVenueDate.get(lookupKey) ?? [];
+  const matches: OccurrenceMatchCandidate[] = [];
+
+  for (const row of pool) {
+    if (candidateKey(row.source, row.source_event_id) === selfKey) {
+      continue;
+    }
+    const score = scoreTitleSimilarity(event.title, row.title);
+    if (isStrongCrossSourceTitleMatch(score)) {
+      matches.push(row);
+    }
+  }
+
+  return matches;
+}
+
 function collectCandidatesForMatch(
   index: OccurrenceMatchIndex,
   fingerprints: Awaited<ReturnType<typeof computeOccurrenceFingerprints>>,
@@ -105,6 +141,7 @@ function collectCandidatesForMatch(
   event: NormalizedEvent
 ): { group: OccurrenceMatchCandidate[]; step: OccurrenceMatchStep } {
   const seen = new Map<string, OccurrenceMatchCandidate>();
+  const selfKey = selfKeyFromEvent(event);
 
   for (const key of fingerprints.occurrenceKeysForLookup) {
     for (const row of index.candidatesByOccurrenceKey.get(key) ?? []) {
@@ -126,6 +163,11 @@ function collectCandidatesForMatch(
 
   if (seen.size > 0) {
     return { group: [...seen.values()], step: "url_key" };
+  }
+
+  const fuzzyGroup = collectFuzzyTitleMatches(index, event, selfKey);
+  if (fuzzyGroup.length > 0) {
+    return { group: fuzzyGroup, step: "title_fuzzy" };
   }
 
   return { group: [], step: "new" };

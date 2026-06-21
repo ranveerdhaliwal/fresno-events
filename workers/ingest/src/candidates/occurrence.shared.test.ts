@@ -23,6 +23,30 @@ describe("occurrence fingerprints", () => {
     expect(normalizeVenue("Save Mart Center at Fresno State - SMG")).toBe("save-mart-center");
     expect(normalizeVenue("Paul Paul Theatre")).toBe("big-fresno-fair");
     expect(normalizeVenue("Big Fresno Fair")).toBe("big-fresno-fair");
+    expect(normalizeVenue("CMAC - Community Media Access Collaborative")).toBe("cmac");
+    expect(normalizeVenue("1555 Van Ness Ave #201")).toBe("cmac");
+  });
+
+  it("matches Filmmaker Meetup across downtown Fresno and Venunite (CMAC vs street address)", async () => {
+    const downtownFp = await computeOccurrenceFingerprints({
+      title: "Filmmaker Meetup",
+      startTs: "2026-08-01T01:00:00.000Z",
+      venueName: "CMAC - Community Media Access Collaborative",
+      ticketUrl: "https://FMJuly26.eventbrite.com/?aff=CC",
+      externalUrl: undefined
+    });
+    const venuniteFp = await computeOccurrenceFingerprints({
+      title: "Filmmaker Meetup",
+      startTs: "2026-08-01T01:00:00.000Z",
+      venueName: "1555 Van Ness Ave #201",
+      ticketUrl: "https://www.eventbrite.com/e/filmmaker-meetup-tickets-1991636680926",
+      externalUrl: undefined
+    });
+
+    expect(downtownFp.occurrenceKey).toBe(venuniteFp.occurrenceKey);
+    expect(
+      downtownFp.occurrenceKeysForLookup.some((key) => venuniteFp.occurrenceKeysForLookup.includes(key))
+    ).toBe(true);
   });
 
   it("canonicalOccurrenceTitle aligns and vs & in co-headliner titles", () => {

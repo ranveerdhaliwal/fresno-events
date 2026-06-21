@@ -1,9 +1,12 @@
-export type OccurrenceMatchStep = "occurrence_key" | "url_key" | "new";
+export type OccurrenceMatchStep = "occurrence_key" | "url_key" | "title_fuzzy" | "new";
 
 export interface OccurrenceMatchCandidate {
   id: string;
   source: string;
   source_event_id: string;
+  title: string;
+  venue_name: string;
+  start_ts: string;
   status: string;
   matched_event_id: string | null;
   occurrence_id: string;
@@ -23,6 +26,7 @@ export interface OccurrenceMatchEvent {
 export interface OccurrenceMatchIndex {
   candidatesByOccurrenceKey: Map<string, OccurrenceMatchCandidate[]>;
   candidatesByUrlKey: Map<string, OccurrenceMatchCandidate[]>;
+  candidatesByVenueDate: Map<string, OccurrenceMatchCandidate[]>;
   candidatesByOccurrenceId: Map<string, OccurrenceMatchCandidate[]>;
   eventsByOccurrenceKey: Map<string, OccurrenceMatchEvent[]>;
   eventsByOccurrenceId: Map<string, OccurrenceMatchEvent[]>;

@@ -2,6 +2,8 @@ import type { NormalizedEvent, ScrapeResult } from "@fresno-events/shared";
 
 import { persistScrapeResult, type PersistenceResult, type PersistAuditSummary } from "@/candidates";
 import type { IngestEnv } from "@/env";
+import { runEventbriteDetailBackfill } from "@/eventbrite-detail-backfill";
+import { runTicketSiteDetailBackfill } from "@/ticket-site-detail-backfill";
 import { runPostIngestEnrichment } from "@/runner";
 import type { EnrichmentSummary } from "@/enrichment";
 import { applySeriesMetadata } from "@/lib/series-metadata.utils";
@@ -56,6 +58,32 @@ export async function persistAndEnrichVenueEvents(
       source_filter: sourceFilter,
       events: events.length,
       persistence
+    })
+  );
+
+  const eventbriteLimit = Math.min(Math.max(events.length, 5), 20);
+  const eventbriteSummary = await runEventbriteDetailBackfill(env, {
+    sourceFilter,
+    limit: eventbriteLimit
+  });
+  console.log(
+    JSON.stringify({
+      event: "venue_ingest_eventbrite_detail_done",
+      source_filter: sourceFilter,
+      ...eventbriteSummary
+    })
+  );
+
+  const ticketSiteLimit = Math.min(Math.max(events.length, 5), 20);
+  const ticketSiteSummary = await runTicketSiteDetailBackfill(env, {
+    sourceFilter,
+    limit: ticketSiteLimit
+  });
+  console.log(
+    JSON.stringify({
+      event: "venue_ingest_ticket_site_detail_done",
+      source_filter: sourceFilter,
+      ...ticketSiteSummary
     })
   );
 

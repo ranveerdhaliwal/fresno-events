@@ -188,11 +188,6 @@ export async function enrichRecentCandidates(
         continue;
       }
       summary.skipped_sufficient_data += 1;
-      const shortTitle =
-        row.normalized_event.title.length > 48
-          ? `${row.normalized_event.title.slice(0, 47)}…`
-          : row.normalized_event.title;
-      console.log(`[ingest] sufficient (no LLM): "${shortTitle}"`);
       logStruct(env, "ai_enrichment_item_sufficient", {
         candidate_id: row.id,
         title: row.normalized_event.title,
@@ -464,9 +459,14 @@ export async function runEnrichmentPipeline(
       const promoted = await enrichRecentCandidates(env, supabase, batchSize, options);
       total.updated += promoted.updated;
       total.skipped_sufficient_data += promoted.skipped_sufficient_data;
+      total.skipped_pending_detail += promoted.skipped_pending_detail;
       total.batches = promoteRound;
-      if (promoted.updated === 0 && promoted.skipped_sufficient_data === 0) {
-        if (promoteRound === 1) {
+      if (promoted.updated === 0) {
+        if (
+          promoteRound === 1 &&
+          promoted.skipped_sufficient_data === 0 &&
+          promoted.skipped_pending_detail === 0
+        ) {
           logPhase(env, "AI enrichment skipped (no candidates need enrichment)", { ...counts });
         }
         break;
@@ -571,12 +571,11 @@ interface CandidatePatch {
 
 async function markSufficientWithoutLlm(supabase: SupabaseConfig, row: EnrichmentCandidateRow) {
   const venuePriority = resolveVenueSuggestedPriority(row.normalized_event);
-  // Preserve an already-set editorial priority (e.g. confidence backfill on a re-scraped
-  // pending_review row); only seed from the venue override / default for fresh rows.
-  const priority = row.suggested_priority ?? venuePriority ?? 5;
+  // Venue rules win over a stale suggested_priority (e.g. cross-title series harmonize).
+  const priority = venuePriority ?? row.suggested_priority ?? 5;
   const notes =
     venuePriority !== null
-      ? `[ingest] skipped LLM — source already has title, time, category, and description · [venue] → P${priority}`
+      ? `[ingest] skipped LLM — source already has title, time, category, and description · [venue] → P${venuePriority}`
       : "[ingest] skipped LLM — source already has title, time, category, and description";
 
   await patchCandidate(supabase, row.id, {
@@ -586,6 +585,8 @@ async function markSufficientWithoutLlm(supabase: SupabaseConfig, row: Enrichmen
     review_notes: notes,
     updated_at: new Date().toISOString()
   });
+
+  await harmonizeSeriesSuggestedPriority(supabase, row, priority);
 }
 
 async function rejectIngestExcludedCandidate(

@@ -46,6 +46,18 @@ describe("venue-priority.utils", () => {
     ).toBe(2);
   });
 
+  it("demotes Big Fresno Fair flea market to P4", () => {
+    expect(
+      resolveVenueSuggestedPriority({
+        source: "scrape:www.fresnofair.com",
+        sourceEventId: "venue:big-fresno-fair:411:2026-10-23",
+        title: "Fresno Flea Market",
+        venueName: "Big Fresno Fair",
+        startTs: "2026-10-23T13:00:00.000Z"
+      })
+    ).toBe(4);
+  });
+
   it("demotes recurring listings even at a known venue (farmers market → P5)", () => {
     expect(
       resolveVenueSuggestedPriority({

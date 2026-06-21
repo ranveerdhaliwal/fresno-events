@@ -134,10 +134,19 @@ describe("persist-analysis.utils", () => {
     expect(analyses[0]?.auditKind).toBe("changed");
   });
 
-  it("analyzeEventsForPersist does not flag default endTs as a content change", async () => {
+  it("analyzeEventsForPersist omits endTs when the source did not supply one", async () => {
     const incoming: NormalizedEvent = {
       ...base,
-      venueName: "Selland Arena"
+      venueName: "Tower Theatre for the Performing Arts"
+    };
+    const { analyses } = await analyzeEventsForPersist([incoming], new Map());
+    expect(analyses[0]?.event.endTs).toBeUndefined();
+  });
+
+  it("analyzeEventsForPersist flags removal of a legacy fabricated endTs", async () => {
+    const incoming: NormalizedEvent = {
+      ...base,
+      venueName: "Tower Theatre for the Performing Arts"
     };
     const stored = {
       ...applyIngestDefaults(incoming),
@@ -150,15 +159,15 @@ describe("persist-analysis.utils", () => {
         existingRow({
           content_fingerprint: fingerprint,
           normalized_event: stored,
-          venue_name: "Selland Arena"
+          venue_name: "Tower Theatre for the Performing Arts"
         })
       ]
     ]);
 
     const { summary } = await analyzeEventsForPersist([incoming], existingByKey);
 
-    expect(summary.changed).toBe(0);
-    expect(summary.unchanged).toBe(1);
+    expect(summary.changed).toBe(1);
+    expect(summary.unchanged).toBe(0);
   });
 
   it("mergePersistAuditSummaries aggregates per-source previews", () => {

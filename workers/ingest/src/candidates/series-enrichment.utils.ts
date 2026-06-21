@@ -26,11 +26,21 @@ export function enrichmentSeriesListingUrl(event: NormalizedEvent): string | nul
   }
 }
 
-function seriesFilterParams(row: EnrichmentCandidateRow): URLSearchParams | null {
+function normalizeSeriesTitleKey(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function seriesHarmonizeFilterParams(row: EnrichmentCandidateRow): URLSearchParams | null {
   const seriesId = row.normalized_event.seriesId?.trim();
   if (seriesId) {
     const params = new URLSearchParams();
     params.set("normalized_event->>seriesId", `eq.${seriesId}`);
+    // Venue-season series ids span unrelated listings — only harmonize same title
+    // (e.g. flea market dates together, not Kansas + flea market).
+    const title = row.normalized_event.title?.trim();
+    if (title) {
+      params.set("title", `eq.${title}`);
+    }
     return params;
   }
 
@@ -55,7 +65,7 @@ export async function harmonizeSeriesSuggestedPriority(
   row: EnrichmentCandidateRow,
   priority: number
 ): Promise<SeriesPriorityHarmonizeResult> {
-  const seriesParams = seriesFilterParams(row);
+  const seriesParams = seriesHarmonizeFilterParams(row);
   if (!seriesParams) {
     return { unified: priority, siblingsUpdated: 0 };
   }
@@ -74,10 +84,7 @@ export async function harmonizeSeriesSuggestedPriority(
     supabase,
     `/rest/v1/event_candidates?${params}`
   );
-  const unified =
-    siblings.length === 0
-      ? priority
-      : Math.min(priority, ...siblings.map((s) => s.suggested_priority ?? 5));
+  const unified = priority;
 
   let siblingsUpdated = 0;
 

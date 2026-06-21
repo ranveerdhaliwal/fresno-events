@@ -362,4 +362,39 @@ describe("computeRelinkPatches", () => {
     expect(summary.link_examples[0]?.primary_source).toBe("ticketmaster");
     expect(summary.link_examples[0]?.linked_sources).toContain("visitfresnocounty");
   });
+
+  it("demotes linked needs_changes secondaries to duplicate on relink", async () => {
+    const rows = [
+      row({
+        id: "primary",
+        source: "scrape:www.savemartcenter.com",
+        title: "Nate Bargatze",
+        status: "approved",
+        matched_event_id: "evt-1",
+        created_at: "2026-01-01T00:00:00.000Z",
+        normalized_event: {
+          venueName: "Save Mart Center",
+          startTs: "2026-07-20T02:00:00.000Z"
+        }
+      }),
+      row({
+        id: "tm",
+        source: "ticketmaster",
+        title: "Nate Bargatze",
+        status: "needs_changes",
+        matched_event_id: "evt-1",
+        created_at: "2026-01-02T00:00:00.000Z",
+        normalized_event: {
+          venueName: "Save Mart Center",
+          startTs: "2026-07-20T02:00:00.000Z"
+        }
+      })
+    ];
+
+    const { patches } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const tmPatch = patches.find((patch) => patch.id === "tm");
+
+    expect(tmPatch?.canonical_candidate_id).toBe("primary");
+    expect(tmPatch?.status).toBe("duplicate");
+  });
 });

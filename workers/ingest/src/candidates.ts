@@ -404,6 +404,7 @@ interface ExistingCandidateRowRaw {
   start_ts: string;
   venue_name: string;
   normalized_event: unknown;
+  eventbrite_detail_status?: string | null;
 }
 
 async function fetchExistingCandidatesForEvents(
@@ -429,7 +430,7 @@ async function fetchExistingCandidatesForSource(
 ): Promise<Map<string, ExistingCandidateRow>> {
   const params = new URLSearchParams({
     select:
-      "id,source,source_event_id,status,content_fingerprint,confidence_score,raw_payload,matched_event_id,occurrence_id,canonical_candidate_id,reviewed_at,reviewed_by,review_notes,title,start_ts,venue_name,normalized_event",
+      "id,source,source_event_id,status,content_fingerprint,confidence_score,raw_payload,matched_event_id,occurrence_id,canonical_candidate_id,reviewed_at,reviewed_by,review_notes,title,start_ts,venue_name,normalized_event,eventbrite_detail_status",
     source: `eq.${source}`,
     limit: "2000"
   });
