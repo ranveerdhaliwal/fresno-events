@@ -6,7 +6,6 @@ import { pacificRequestLogger } from "@/lib/structured-log";
 import { artistsRoute } from "@/routes/artists";
 import { contextRoute } from "@/routes/context";
 import { eventsRoute } from "@/routes/events";
-import { imagesRoute } from "@/routes/images";
 import { ogRoute } from "@/routes/og";
 import { reviewRoute } from "@/routes/review";
 import { reviewHomepageRoute } from "@/routes/review-homepage";
@@ -87,7 +86,6 @@ app.route("/og", ogRoute);
 app.route("/review", reviewRoute);
 app.route("/review", reviewHomepageRoute);
 app.route("/review", reviewEventsRoute);
-app.route("/images", imagesRoute);
 
 app.notFound((c) => c.json({ ok: false, error: { code: "not_found", message: "Route not found." } }, 404));
 

@@ -11,7 +11,7 @@ import {
 
 import type { Env } from "@/env";
 import { toEventSource } from "@/lib/event-source";
-import { mirrorImageToR2 } from "@/lib/images";
+import { registerSourceImage } from "@/lib/images";
 import { mergeNormalizedEvent, toEventCategory } from "@/routes/review-mappers.utils";
 import { updateCandidate } from "@/routes/review-candidate.service";
 import { upsertVenue } from "@/routes/review-event.service";
@@ -102,8 +102,8 @@ export async function patchPublishedEventById(
 
   let heroImageId = existing.hero_image_id;
   if (normalized.imageUrl && normalized.imageUrl !== baseline.imageUrl) {
-    const mirrored = await mirrorImageToR2(env, normalized.imageUrl, normalized.title);
-    heroImageId = mirrored?.id ?? heroImageId;
+    const registered = await registerSourceImage(env, normalized.imageUrl, normalized.title);
+    heroImageId = registered?.id ?? heroImageId;
   }
 
   const priority = clampPatchPriority(options.priority, existing.priority ?? EVENT_PRIORITY_DEFAULT);

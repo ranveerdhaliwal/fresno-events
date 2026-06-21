@@ -15,8 +15,5 @@ export interface Env {
   INGEST_URL?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_IMAGES_TOKEN?: string;
-  R2_BUCKET_NAME?: string;
-  R2_PUBLIC_BASE_URL?: string;
   SENTRY_DSN?: string;
-  EVENT_IMAGES?: R2Bucket;
 }

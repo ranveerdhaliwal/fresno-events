@@ -1,12 +1,7 @@
-export interface MirroredImage {
+export interface RegisteredImage {
   id: string;
   storage_key: string;
   cdn_url: string;
-}
-
-export interface DownloadedImage {
-  bytes: Uint8Array;
-  contentType: string;
 }
 
 export interface ImageInsert {

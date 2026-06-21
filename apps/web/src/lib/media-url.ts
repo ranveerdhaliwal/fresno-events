@@ -1,6 +1,6 @@
 /**
- * Hero images from approve may use `/images/...` (served by the API Worker).
- * The Vite app runs on a different port — resolve against VITE_API_URL.
+ * Hero images use upstream HTTPS URLs from ingest sources.
+ * Relative paths (legacy) resolve against VITE_API_URL when set.
  */
 export function resolveMediaUrl(url: string | null | undefined): string | null {
   if (!url?.trim()) {

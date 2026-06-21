@@ -1,20 +1,18 @@
 import type { Env } from "@/env";
 import { supabaseRequest } from "@/lib/supabase-client";
-import type { DownloadedImage, ImageInsert, MirroredImage } from "@/lib/images.types";
+import type { ImageInsert, RegisteredImage } from "@/lib/images.types";
 import { logError } from "@/lib/structured-log";
 
-export type { MirroredImage } from "@/lib/images.types";
+export type { RegisteredImage } from "@/lib/images.types";
 
 /**
- * Mirror a remote event image to the R2 EVENT_IMAGES bucket and persist a row
- * in the `public.images` table. Returns the image id (or null when mirroring is
- * skipped because the bucket is not bound or the image cannot be fetched).
+ * Persist a hero image row that points at the upstream source URL (no download or self-hosting).
  */
-export async function mirrorImageToR2(env: Env, imageUrl: string, altText: string | null): Promise<MirroredImage | null> {
-  if (!env.EVENT_IMAGES) {
-    return null;
-  }
-
+export async function registerSourceImage(
+  env: Env,
+  imageUrl: string,
+  altText: string | null
+): Promise<RegisteredImage | null> {
   if (!isHttpUrl(imageUrl)) {
     return null;
   }
@@ -24,85 +22,28 @@ export async function mirrorImageToR2(env: Env, imageUrl: string, altText: strin
     return existing;
   }
 
-  const downloaded = await downloadImage(imageUrl);
-  if (!downloaded) {
-    return null;
-  }
-
-  const sha = await sha256Hex(downloaded.bytes);
-  const extension = inferExtension(downloaded.contentType, imageUrl);
-  const storageKey = `events/${sha}${extension}`;
-
-  const head = await env.EVENT_IMAGES.head(storageKey);
-  if (!head) {
-    await env.EVENT_IMAGES.put(storageKey, downloaded.bytes, {
-      httpMetadata: { contentType: downloaded.contentType }
-    });
-  }
-
-  const cdnUrl = buildCdnUrl(env, storageKey);
+  const storageKey = await storageKeyForSourceUrl(imageUrl);
 
   return await upsertImageRow(env, {
     storage_key: storageKey,
-    cdn_url: cdnUrl,
+    cdn_url: imageUrl,
     source_url: imageUrl,
     alt_text: altText
   });
 }
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const FETCH_TIMEOUT_MS = 8_000;
-
-async function downloadImage(imageUrl: string): Promise<DownloadedImage | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(imageUrl, {
-      headers: { Accept: "image/*" },
-      signal: controller.signal,
-      redirect: "follow"
-    });
-
-    if (!response.ok || !response.body) {
-      return null;
-    }
-
-    const contentType = (response.headers.get("content-type") ?? "").split(";")[0]?.trim() || "application/octet-stream";
-    if (!contentType.startsWith("image/")) {
-      return null;
-    }
-
-    const length = Number(response.headers.get("content-length") ?? 0);
-    if (length && length > MAX_IMAGE_BYTES) {
-      return null;
-    }
-
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength === 0 || buffer.byteLength > MAX_IMAGE_BYTES) {
-      return null;
-    }
-
-    return { bytes: new Uint8Array(buffer), contentType };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function findImageBySource(env: Env, imageUrl: string): Promise<MirroredImage | null> {
+async function findImageBySource(env: Env, imageUrl: string): Promise<RegisteredImage | null> {
   const params = new URLSearchParams({
     select: "id,storage_key,cdn_url",
     source_url: `eq.${imageUrl}`,
     limit: "1"
   });
 
-  const rows = await supabaseRequest<MirroredImage[]>(env, `/rest/v1/images?${params}`);
+  const rows = await supabaseRequest<RegisteredImage[]>(env, `/rest/v1/images?${params}`);
   return rows[0] ?? null;
 }
 
-async function upsertImageRow(env: Env, row: ImageInsert): Promise<MirroredImage> {
+async function upsertImageRow(env: Env, row: ImageInsert): Promise<RegisteredImage> {
   const existingByKey = await findImageByStorageKey(env, row.storage_key);
   if (existingByKey) {
     return existingByKey;
@@ -114,7 +55,7 @@ async function upsertImageRow(env: Env, row: ImageInsert): Promise<MirroredImage
       on_conflict: "storage_key"
     });
 
-    const rows = await supabaseRequest<MirroredImage[]>(env, `/rest/v1/images?${params}`, {
+    const rows = await supabaseRequest<RegisteredImage[]>(env, `/rest/v1/images?${params}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -150,24 +91,24 @@ async function upsertImageRow(env: Env, row: ImageInsert): Promise<MirroredImage
   }
 }
 
-async function findImageByStorageKey(env: Env, storageKey: string): Promise<MirroredImage | null> {
+async function findImageByStorageKey(env: Env, storageKey: string): Promise<RegisteredImage | null> {
   const params = new URLSearchParams({
     select: "id,storage_key,cdn_url",
     storage_key: `eq.${storageKey}`,
     limit: "1"
   });
 
-  const rows = await supabaseRequest<MirroredImage[]>(env, `/rest/v1/images?${params}`);
+  const rows = await supabaseRequest<RegisteredImage[]>(env, `/rest/v1/images?${params}`);
   return rows[0] ?? null;
 }
 
-async function insertImageRow(env: Env, row: ImageInsert): Promise<MirroredImage | null> {
+async function insertImageRow(env: Env, row: ImageInsert): Promise<RegisteredImage | null> {
   const params = new URLSearchParams({
     select: "id,storage_key,cdn_url"
   });
 
   try {
-    const rows = await supabaseRequest<MirroredImage[]>(env, `/rest/v1/images?${params}`, {
+    const rows = await supabaseRequest<RegisteredImage[]>(env, `/rest/v1/images?${params}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -187,40 +128,9 @@ async function insertImageRow(env: Env, row: ImageInsert): Promise<MirroredImage
   }
 }
 
-function buildCdnUrl(env: Env, storageKey: string) {
-  const base = env.R2_PUBLIC_BASE_URL?.replace(/\/$/, "");
-  if (base) {
-    return `${base}/${storageKey}`;
-  }
-
-  return `/images/${storageKey}`;
-}
-
-function inferExtension(contentType: string, sourceUrl: string) {
-  const fromMime: Record<string, string> = {
-    "image/jpeg": ".jpg",
-    "image/jpg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
-    "image/avif": ".avif",
-    "image/svg+xml": ".svg"
-  };
-  if (fromMime[contentType]) {
-    return fromMime[contentType];
-  }
-
-  try {
-    const pathname = new URL(sourceUrl).pathname;
-    const match = pathname.match(/\.[a-zA-Z0-9]{2,5}$/);
-    if (match) {
-      return match[0].toLowerCase();
-    }
-  } catch {
-    // ignore
-  }
-
-  return ".bin";
+async function storageKeyForSourceUrl(imageUrl: string): Promise<string> {
+  const hash = await sha256Hex(new TextEncoder().encode(imageUrl));
+  return `source/${hash}`;
 }
 
 function isHttpUrl(value: string) {

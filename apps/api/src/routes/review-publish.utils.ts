@@ -10,7 +10,7 @@ import {
 } from "@fresno-events/shared";
 
 import type { Env } from "@/env";
-import { mirrorImageToR2 } from "@/lib/images";
+import { registerSourceImage } from "@/lib/images";
 import { logError, logStructured } from "@/lib/structured-log";
 import {
   partitionCandidatesForApprove,
@@ -45,11 +45,11 @@ import type {
   SupabaseCandidateRow
 } from "@/routes/review.types";
 
-async function mirrorImageWithLogging(env: Env, imageUrl: string, altText: string) {
+async function registerImageWithLogging(env: Env, imageUrl: string, altText: string) {
   try {
-    return await mirrorImageToR2(env, imageUrl, altText);
+    return await registerSourceImage(env, imageUrl, altText);
   } catch (error) {
-    logError("image_mirror_failed", error, { image_url: imageUrl });
+    logError("image_register_failed", error, { image_url: imageUrl });
     return null;
   }
 }
@@ -63,7 +63,7 @@ export async function publishCandidateToEvent(
   const venue = await upsertVenue(env, normalized);
 
   const heroImage = normalized.imageUrl
-    ? await mirrorImageWithLogging(env, normalized.imageUrl, normalized.title)
+    ? await registerImageWithLogging(env, normalized.imageUrl, normalized.title)
     : null;
 
   const siblings = options.siblings ?? [];
