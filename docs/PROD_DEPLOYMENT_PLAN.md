@@ -8,14 +8,16 @@
 
 ## Phase 5 checklist
 
-- [ ] Cloud-dev DB ready: migrations on `what-up-fresno-dev`, `dev-target.env` cloud-dev keys
-- [ ] Deploy API + ingest (`wrangler deploy --env dev`); cloud-dev secrets; `ALLOWED_ORIGINS` for whatupfresno.com; attach `api.whatupfresno.com`
-- [ ] Bootstrap events (full ingest + approve on cloud-dev)
-- [ ] Set Cloudflare Pages Production env vars (API + GA/AdSense); build web; deploy to `whatupfresno.com`
-- [ ] Cloud-dev ingest cron: enable scheduled runs for Ticketmaster, Venunite, venue-ingest (see ingest cron section below)
-- [ ] Optional: `apps/web/public/_headers` for asset vs HTML caching
-- [ ] Optional: `scripts/bootstrap-today.ts` — embed default home JSON; React Query hydrate on `/`
-- [ ] Optional: recover old deploy runbook from git (`git show <commit>:docs/DEPLOY.md`) if a step is missing here
+- [x] Cloud-dev DB ready: migrations on `what-up-fresno-dev`, `dev-target.env` cloud-dev keys; data synced (752 events)
+- [x] Deploy API + ingest (`wrangler deploy --env dev`); cloud-dev secrets; `ALLOWED_ORIGINS` for whatupfresno.com; **`api.whatupfresno.com` live**
+- [x] Bootstrap events (ingest + approve on cloud-dev)
+- [x] **Attach `whatupfresno.com` + `www` to Pages** — live
+- [x] Web built with `VITE_API_URL=https://api.whatupfresno.com` + GA/AdSense client; deployed to Pages (`fresno-events.pages.dev`)
+- [ ] Cloud-dev ingest cron: Mon/Thu 6am PT — see [INGEST_SCHEDULE.md](INGEST_SCHEDULE.md) (code in repo; deploy + dashboard verify)
+- [x] `apps/web/public/_headers` (cache + CSP; `img-src https:` for source hero URLs)
+- [x] API custom domain route in `apps/api/wrangler.toml` (`api.whatupfresno.com`)
+- [ ] GitHub Actions CI + Workers deploy — see [CI_CD.md](CI_CD.md); connect Pages via Cloudflare GitHub integration
+- [ ] GA/AdSense verification on `whatupfresno.com` (slots still manual)
 
 ---
 
@@ -109,6 +111,8 @@ VITE_API_URL=https://api.whatupfresno.com pnpm --filter @fresno-events/web build
 
 Deploy `apps/web/dist` to Pages, domain `whatupfresno.com`.
 
+**Attach apex domain (manual):** Dashboard → Workers & Pages → **fresno-events** → Custom domains → add `whatupfresno.com` and `www.whatupfresno.com`. Preview until then: `https://fresno-events.pages.dev`. `api.whatupfresno.com` is already live on the API worker.
+
 ### Cloudflare deploy (when you are ready)
 
 In **Pages → Environment variables → Production**, set from [`dev-target.env`](../dev-target.env):
@@ -172,17 +176,17 @@ Scraping stays on **cloud-dev only**. Cron triggers live on the **ingest Worker*
 | Deploy | `cd workers/ingest && wrangler deploy --env dev` |
 | Verify | Cloudflare Dashboard → Workers → **fresno-events-ingest-dev** → Triggers → Cron Triggers |
 
-**Schedule (Mon + Thu 6am Pacific):** Monday — Ticketmaster full catalog + Venunite full + all venues. Thursday — Ticketmaster Thu–Sun window + all venues (no Venunite).
+**Schedule:** Monday and Thursday 6am Pacific — **all sources** (`ticketmaster`, `venunite`, `venue-ingest`), full promote + enrichment. No per-day profiles.
 
-Full per-source and per-venue matrix, date windows, bootstrap, and verification: **[INGEST_SCHEDULE.md](INGEST_SCHEDULE.md)** (created with ingest cron implementation).
+Full matrix, bootstrap, and verification: **[INGEST_SCHEDULE.md](INGEST_SCHEDULE.md)**.
 
 **Deploy checklist (summary):**
 
 1. Bootstrap cloud-dev DB with a one-time full promote from all sources.
 2. Set ingest dev secrets (`wrangler secret put … --env dev` from `dev-target.env`).
-3. Enable `[env.dev.triggers]` and profile routing (see INGEST_SCHEDULE.md).
-4. `wrangler deploy --env dev`; confirm scheduled invocations in dashboard logs.
-5. Manual override: `pnpm ingest:promote --source=…` still ignores cadence.
+3. Deploy ingest (`wrangler deploy --env dev`); confirm 2 cron triggers in dashboard.
+4. After first tick: `ingest_runs` + admin **New** tab show `pending_review` for all sources.
+5. Manual override: `pnpm ingest:promote --source=…` anytime.
 
 ---
 
@@ -251,76 +255,25 @@ Optional phase 2: `renderToString` for SEO/LCP markup; JSON bootstrap is enough 
 
 ---
 
-## CI/CD (GitHub Actions)
+## CI/CD
 
-**Goal:** PR runs unit tests; merge to `main` deploys the **live site** (Workers `--env dev` + Pages on `whatupfresno.com`). Cloud-dev Supabase is the production database for v1.
+See **[CI_CD.md](CI_CD.md)** for the full setup.
 
-No `.github/workflows/` today. Tests exist per package (`vitest run` in [`apps/api`](../apps/api), [`apps/web`](../apps/web), [`workers/ingest`](../workers/ingest), [`packages/shared`](../packages/shared)). Add root `"test": "pnpm -r test"` to [`package.json`](../package.json).
+| Layer | How |
+|-------|-----|
+| **CI** | `.github/workflows/ci.yml` — typecheck, lint, test on PR + `main` |
+| **Pages** | Cloudflare Dashboard GitHub connection → auto-build `main` → `whatupfresno.com` |
+| **Workers** | `ci.yml` deploy job on push `main` (after tests) — api + ingest `--env dev` |
 
-```mermaid
-flowchart TD
-  PR["Open / update PR"] --> CI["ci.yml"]
-  CI --> Checks["pnpm install · typecheck · lint · pnpm -r test"]
-  Merge["Merge to main"] --> DeployDev["deploy-dev.yml"]
-  DeployDev --> API["apps/api: wrangler deploy --env dev"]
-  DeployDev --> Ingest["workers/ingest: wrangler deploy --env dev"]
-  DeployDev --> Web["build web (VITE_*) → wrangler pages deploy apps/web/dist"]
-  Tag["git tag v* (manual)"] -.->|future| DeployProd["deploy-prod.yml (--env prod)"]
-```
+GitHub secrets for Workers: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. Pages `VITE_*` live in Cloudflare Pages env settings.
 
-### `ci.yml` — on `pull_request`
-
-No Cloudflare secrets (Vitest stays mocked — no live Supabase/Cloudflare calls):
-
-```bash
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm lint
-pnpm -r test
-```
-
-Gate merges with a branch protection rule requiring `ci`.
-
-### `deploy-dev.yml` — on `push` to `main`
-
-| Target | Command | Worker / project |
-|--------|---------|------------------|
-| API | `cd apps/api && wrangler deploy --env dev` | `fresno-events-api-dev` |
-| Ingest | `cd workers/ingest && wrangler deploy --env dev` | `fresno-events-ingest-dev` (picks up `[env.dev.triggers]` once cron lands) |
-| Web | build with `VITE_*` → `wrangler pages deploy apps/web/dist` | Pages project |
-
-`wrangler deploy` uploads code + `wrangler.toml` bindings only — not runtime secrets. Supabase / API keys stay set in Cloudflare (`wrangler secret put` or dashboard); CI only needs Cloudflare auth.
-
-### GitHub secrets
-
-| Secret | Used for |
-|--------|----------|
-| `CLOUDFLARE_API_TOKEN` | Deploy Workers + Pages (Workers Scripts Edit + Pages Edit) |
-| `CLOUDFLARE_ACCOUNT_ID` | Wrangler auth |
-| `VITE_API_URL` | Web build |
-| `VITE_GA_MEASUREMENT_ID` | Web build |
-| `VITE_ADSENSE_CLIENT_ID` | Web build |
-| `VITE_ADSENSE_SLOT_*` | Web build, once ad units exist |
-
-### Not auto-deployed (deliberate)
-
-- **Separate prod DB** (`--env prod` Workers) — deferred until DB split is needed
-- **Supabase migrations** — keep manual / separate workflow
-- **Worker secrets** — set once in Cloudflare; deploy only updates code
-
-### Maturity path
-
-1. **v1 (now):** PR = tests; `main` = live site deploy; cloud-dev = production DB
-2. **v2 (future):** Optional `what-up-fresno-prod` + promotion if DB split needed
-3. **v3:** Path filters (deploy ingest only when `workers/ingest/**` changed)
-
-**Pages alternative:** Cloudflare Pages Git integration can auto-build web on push instead of `wrangler pages deploy` in CI. Otherwise keep everything in `deploy-dev.yml`.
+**Not auto-deployed:** Supabase migrations, worker runtime secrets, separate prod stack.
 
 ## Gaps / manual steps
 
 | Topic | State |
 |-------|--------|
-| CI/CD | Planned — `ci.yml` + `deploy-dev.yml` (merge → live site). See CI/CD section |
+| CI/CD | [CI_CD.md](CI_CD.md) — `ci.yml` + Cloudflare Pages GitHub connection |
 | API custom domain | Dashboard only |
 | Separate prod DB / promotion | Deferred — cloud-dev is live DB for v1 |
 | `deploy` npm script | No `--env prod` |
@@ -334,5 +287,6 @@ Gate merges with a branch protection rule requiring `ci`.
 | [LAUNCH_PLAN.md](LAUNCH_PLAN.md) | Master checklist; Phase 5 points here |
 | [DATABASE_ACCESS.md](DATABASE_ACCESS.md) | Supabase targets |
 | [INGESTION_OVERHAUL_PLAN.md](INGESTION_OVERHAUL_PLAN.md) | Promotion preview §12.6 |
-| [INGEST_SCHEDULE.md](INGEST_SCHEDULE.md) | Ingest cron matrix, Cloudflare setup, Mon/Thu profiles |
+| [INGEST_SCHEDULE.md](INGEST_SCHEDULE.md) | Ingest cron — Mon/Thu all sources |
+| [CI_CD.md](CI_CD.md) | GitHub CI + Cloudflare deploy split |
 | [INGEST.md](INGEST.md) | Ingest workflow overview |

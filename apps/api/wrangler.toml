@@ -29,6 +29,10 @@ ALLOWED_ORIGINS = "http://localhost:5182,https://whatupfresno.com,https://www.wh
 enabled = true
 head_sampling_rate = 1
 
+[[env.dev.routes]]
+pattern = "api.whatupfresno.com"
+custom_domain = true
+
 # --- Production profile ---------------------------------------------------
 # `wrangler deploy --env prod` ships the prod API Worker.
 [env.prod]

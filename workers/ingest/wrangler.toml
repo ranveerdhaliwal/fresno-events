@@ -5,9 +5,7 @@ account_id = "b8c559487d24af4a208be0a5584512a9"
 
 # Top-level config = the implicit "local" profile used by `wrangler dev` /
 # `wrangler deploy` without --env. Per-env overrides live below.
-
-[triggers]
-crons = ["0 */4 * * *"]
+# No top-level cron — local runs use `wrangler dev --test-scheduled` manually.
 
 [vars]
 APP_ENV = "local"
@@ -28,10 +26,15 @@ head_sampling_rate = 1
 
 # --- Cloud dev profile -----------------------------------------------------
 # Use with: `wrangler dev --env dev` (loads workers/ingest/.dev.vars.dev) or
-# `wrangler deploy --env dev` to ship the dev-suffixed Worker. No cron in dev
-# by default; trigger manually via /trigger.
+# `wrangler deploy --env dev` to ship the dev-suffixed Worker.
 [env.dev]
 name = "fresno-events-ingest-dev"
+
+[env.dev.triggers]
+crons = [
+  "0 14 * * 1",  # Monday ~6am PT (7am PDT) — wrangler uses UTC only
+  "0 14 * * 4"   # Thursday ~6am PT
+]
 
 [env.dev.vars]
 APP_ENV = "dev"

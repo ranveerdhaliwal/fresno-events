@@ -6,7 +6,7 @@ You only need to remember **three steps**:
 2. **Save to dev** — normalize into `event_candidates` in your **dev** database.
 3. **Review** — open `/admin`, approve or reject. Approved rows become `events` on dev. **Prod** gets copies later via promote (one approval, not twice). On approve, `upsertVenue` writes `venues.address` / `city` / `lat` / `lng` (geocoding when coords missing — see [VENUE_LOCATION.md](VENUE_LOCATION.md)).
 
-Cron is the same script on a schedule. When you merge ingest changes to `main`, the next cron run (or a manual trigger in Cloudflare) uses the new code.
+Cron runs on the **cloud-dev ingest worker** — Monday and Thursday 6am Pacific, all sources, full promote pipeline. See **[INGEST_SCHEDULE.md](INGEST_SCHEDULE.md)** for setup, bootstrap, and verification.
 
 ---
 
@@ -19,9 +19,10 @@ Cron is the same script on a schedule. When you merge ingest changes to `main`, 
 | Venue modules (12 enabled) | [`workers/ingest/src/venues/`](../workers/ingest/src/venues/) — [VENUE_INGEST.md](VENUE_INGEST.md) |
 | Shared API/HTML logic used by venue modules | [`workers/ingest/src/scrapers/`](../workers/ingest/src/scrapers/) (e.g. `visit-fresno-api.utils.ts`, not separate registry keys) |
 | Run orchestration | [`workers/ingest/src/runner.ts`](../workers/ingest/src/runner.ts) |
+| Cron schedule (Mon/Thu) | **[INGEST_SCHEDULE.md](INGEST_SCHEDULE.md)** |
 | Manual script | `pnpm ingest:run` → [`scripts/ingest-run.sh`](../scripts/ingest-run.sh) |
 
-There is **no** `event_sources` or `seed_urls` table. Each scraper in the registry has `schedule: cron` and `defaultCadenceMinutes`. Cron runs all cron sources that are **due** (last run in `ingest_runs` + cadence) and **runnable** (required secrets present). `GET /health` on the ingest worker lists `lastRunAt` per source.
+There is **no** `event_sources` or `seed_urls` table. Each scraper in the registry has `schedule: cron` and `defaultCadenceMinutes`. **Scheduled cron** (`fresno-events-ingest-dev`) runs **all** runnable sources with `force` twice weekly; manual `pnpm ingest:promote` can target one source anytime. `GET /health` on the ingest worker lists `lastRunAt` per source.
 
 ---
 

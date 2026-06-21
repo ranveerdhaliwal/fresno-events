@@ -7,17 +7,17 @@ import { runVenueAddressBackfill } from "@/venue-address-backfill";
 import { compactRunSummaryForLog } from "@/log-compact.utils";
 import { runIngest, runPostIngestEnrichment } from "@/runner";
 import { listRunnableSources } from "@/planner";
+import { runScheduledIngest } from "@/scheduled-ingest.utils";
 import { INGEST_VALIDATION_POLICY } from "@/validation";
 
 export default {
   async scheduled(_controller: ScheduledController, env: IngestEnv, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(
-      (async () => {
-        const summaries = await runIngest(env);
-        for (const summary of summaries) {
-          console.log(JSON.stringify({ event: "ingest_run", trigger: "scheduled", ...compactRunSummaryForLog(summary) }));
-        }
-      })()
+      runScheduledIngest(env, {
+        runIngest,
+        runPostIngestEnrichment,
+        log: (message) => console.log(message)
+      })
     );
   },
 
