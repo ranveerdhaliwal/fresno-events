@@ -1,6 +1,7 @@
 import type { Event, EventListItem } from "@fresno-events/shared";
 import { clampEventPriority, daysFromIsoThroughSunday } from "@fresno-events/shared";
 
+import { eventIsFree, formatListPrice } from "@/lib/event-price.utils";
 import { formatEventDate, formatMonthLong, formatShortTime, isTonight, isWeekend, toIsoDateLocal } from "@/lib/event-time";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
@@ -50,17 +51,10 @@ const TAGLINE_FALLBACKS: Partial<Record<Event["category"], string>> = {
 };
 
 export function formatPrice(event: Event): string {
-  if (event.isFree || (event.priceMin === 0 && event.priceMax === 0)) {
-    return "Free";
-  }
-  if (typeof event.priceMin === "number" && typeof event.priceMax === "number") {
-    return event.priceMin === event.priceMax ? `$${event.priceMin}` : `$${event.priceMin}-${event.priceMax}`;
-  }
-  if (typeof event.priceMin === "number") {
-    return `From $${event.priceMin}`;
-  }
-  return "";
+  return formatListPrice(event);
 }
+
+export { formatDetailPrice, formatListPrice, eventIsFree } from "@/lib/event-price.utils";
 
 export function deriveDescriptionSnippet(event: Event, maxChars = 200): string {
   const text = (event.descriptionText ?? "").trim();
@@ -130,7 +124,7 @@ export function toEventRowViewModel(item: EventListItem, now = new Date()): Even
     paletteKey,
     paletteGradient: gradientForPalette(paletteKey),
     imageUrl: resolveMediaUrl(heroImage?.cdnUrl ?? null),
-    isFree: Boolean(event.isFree),
+    isFree: eventIsFree(event),
     isLive: false,
     featuredBadge: deriveFeaturedBadge(event, now),
     descriptionSnippet: deriveDescriptionSnippet(event),

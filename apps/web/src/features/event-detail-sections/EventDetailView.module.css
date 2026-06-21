@@ -285,6 +285,13 @@
   font-size: 14px;
 }
 
+.sourceNote {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-secondary-on-card);
+}
+
 .seriesAllLink,
 .venueLink {
   color: var(--coral);

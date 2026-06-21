@@ -14,6 +14,7 @@ import {
 } from "@/features/admin/admin-form.types";
 import { formStateToEventPatch, normalizedEventToFormState, applyAdminStartTimeChange } from "@/features/admin/admin-form.utils";
 import { AdminScheduleOptions } from "@/features/admin/AdminScheduleOptions";
+import { AdminPricingOptions } from "@/features/admin/AdminPricingOptions";
 import { adminKeys } from "@/features/admin/admin.queryKeys";
 import { patchPublishedEvent } from "@/features/admin/admin-api";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -241,9 +242,11 @@ export function PublishedEventDetail({ token, detail, onSaved }: PublishedEventD
             onChange={(event) => setDraft((d) => ({ ...d, externalUrl: event.target.value }))}
           />
         </FormField>
+        <AdminPricingOptions draft={draft} onChange={setDraft} />
         <FormField label="Price min ($)">
           <TextInput
             value={draft.priceMin}
+            disabled={draft.isFree}
             onChange={(event) => setDraft((d) => ({ ...d, priceMin: event.target.value }))}
             inputMode="decimal"
           />
@@ -251,15 +254,16 @@ export function PublishedEventDetail({ token, detail, onSaved }: PublishedEventD
         <FormField label="Price max ($)">
           <TextInput
             value={draft.priceMax}
+            disabled={draft.isFree}
             onChange={(event) => setDraft((d) => ({ ...d, priceMax: event.target.value }))}
             inputMode="decimal"
           />
         </FormField>
-        <FormField label="Price notes (CMS text)" fullWidth>
+        <FormField label="Price notes (detail page)" fullWidth>
           <TextInput
             value={draft.priceNotes}
             onChange={(event) => setDraft((d) => ({ ...d, priceNotes: event.target.value }))}
-            placeholder='e.g. "Free", "see website for details"'
+            placeholder='e.g. "Donations welcome"'
           />
         </FormField>
       </div>
@@ -267,7 +271,6 @@ export function PublishedEventDetail({ token, detail, onSaved }: PublishedEventD
       <FormField label="Description">
         <TextArea
           variant="description"
-          rows={10}
           value={draft.descriptionText}
           onChange={(event) => setDraft((d) => ({ ...d, descriptionText: event.target.value }))}
         />

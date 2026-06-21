@@ -48,8 +48,11 @@ describe("resolveActiveCandidateId", () => {
     expect(resolveActiveCandidateId("missing", items)).toBe("a");
   });
 
-  it("returns null when the visible list is empty", () => {
-    expect(resolveActiveCandidateId("a", [])).toBeNull();
+  it("keeps off-list selection while the visible list is still loading", () => {
+    expect(resolveActiveCandidateId("a", [])).toBe("a");
+  });
+
+  it("returns null when nothing is selected and the list is empty", () => {
     expect(resolveActiveCandidateId(null, [])).toBeNull();
   });
 });

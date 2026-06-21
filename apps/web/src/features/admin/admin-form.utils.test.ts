@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { NormalizedEvent } from "@fresno-events/shared";
 
-import { formStateToEventPatch, normalizedEventToFormState } from "./admin-form.utils";
+import { formStateToEventPatch, normalizedEventToFormState, changedAdminFormFieldsFromDraft } from "./admin-form.utils";
 
 const baseEvent: NormalizedEvent = {
   source: "api:visitfresnocounty",
@@ -95,5 +95,44 @@ describe("formStateToEventPatch", () => {
     });
     expect(patch.priceMin).toBe(50);
     expect(patch.priceMax).toBe(150);
+  });
+
+  it("sets isFree and zero prices when Free is checked", () => {
+    const form = normalizedEventToFormState(baseEvent, 5);
+    const patch = formStateToEventPatch(baseEvent, {
+      ...form,
+      isFree: true,
+      priceMin: "",
+      priceMax: ""
+    });
+    expect(patch.isFree).toBe(true);
+    expect(patch.priceMin).toBe(0);
+    expect(patch.priceMax).toBe(0);
+  });
+
+  it("round-trips isFree from normalized event", () => {
+    const event = { ...baseEvent, isFree: true };
+    const form = normalizedEventToFormState(event, 5);
+    expect(form.isFree).toBe(true);
+    expect(formStateToEventPatch(event, form)).toEqual({});
+  });
+
+  it("returns an empty patch after round-trip through form state", () => {
+    const form = normalizedEventToFormState(baseEvent, 5);
+    expect(formStateToEventPatch(baseEvent, form)).toEqual({});
+  });
+
+  it("returns an empty patch for time TBA round-trip", () => {
+    const event = { ...baseEvent, startTs: "2026-05-23T12:00:00.000Z", timeUnknown: true };
+    const form = normalizedEventToFormState(event, 5);
+    expect(formStateToEventPatch(event, form)).toEqual({});
+  });
+
+  it("tracks changed fields for priority and title edits", () => {
+    const baseline = normalizedEventToFormState(baseEvent, 5);
+    const draft = { ...baseline, priority: 2, title: "Renamed Show" };
+    expect(changedAdminFormFieldsFromDraft(baseEvent, baseline, draft)).toEqual(
+      new Set(["priority", "title"])
+    );
   });
 });

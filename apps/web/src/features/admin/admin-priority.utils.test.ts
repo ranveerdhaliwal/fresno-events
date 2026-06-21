@@ -9,6 +9,7 @@ import {
   groupCandidatesByPriority,
   groupCandidatesBySource,
   listDisplayPriority,
+  queueDisplayPriority,
   sortCandidatesByReviewedAt,
   sortCandidatesForReview,
   sortCandidatesForSourceGroupedReview,
@@ -98,6 +99,30 @@ describe("series display priority", () => {
     expect(groups[0]?.priority).toBe(4);
     expect(groups[1]?.priority).toBe(5);
   });
+
+  it("does not unify display priority across different titles in a venue-season series", () => {
+    const seriesId = "series:bigfresnofair:2026";
+    const withSeries = (id: string, title: string, startTs: string, priority: number): EventCandidate => ({
+      ...makeCandidate(id, title, startTs, priority, `https://www.fresnofair.com/events/${id}`, "scrape:www.fresnofair.com"),
+      normalizedEvent: {
+        ...makeCandidate(id, title, startTs, priority, `https://www.fresnofair.com/events/${id}`, "scrape:www.fresnofair.com")
+          .normalizedEvent,
+        seriesId,
+        seriesName: "Big Fresno Fair"
+      }
+    });
+
+    const items = [
+      withSeries("headliner", "R&B Night Out with Ashanti & Soul For Real", "2026-10-10T02:00:00.000Z", 2),
+      withSeries("flea-1", "Fresno Flea Market", "2026-10-16T13:00:00.000Z", 4),
+      withSeries("flea-2", "Fresno Flea Market", "2026-10-17T13:00:00.000Z", 4)
+    ];
+
+    const seriesPriorities = buildSeriesDisplayPriorities(items, {});
+    expect(listDisplayPriority(items[0]!, seriesPriorities, {})).toBe(2);
+    expect(listDisplayPriority(items[1]!, seriesPriorities, {})).toBe(4);
+    expect(listDisplayPriority(items[2]!, seriesPriorities, {})).toBe(4);
+  });
 });
 
 describe("source grouping", () => {
@@ -177,5 +202,19 @@ describe("sortCandidatesByReviewedAt", () => {
     };
 
     expect(sortCandidatesByReviewedAt([older, newer]).map((item) => item.id)).toEqual(["newer", "older"]);
+  });
+});
+
+describe("queueDisplayPriority", () => {
+  it("uses publishedPriority on the approved tab when present", () => {
+    const candidate = {
+      ...makeCandidate("a", "George Lopez", "2026-10-24T03:00:00.000Z", 3),
+      status: "approved" as const,
+      publishedPriority: 2
+    };
+
+    expect(queueDisplayPriority(candidate, {}, true)).toBe(2);
+    expect(queueDisplayPriority(candidate, {}, false)).toBe(3);
+    expect(queueDisplayPriority(candidate, { a: 4 }, true)).toBe(4);
   });
 });

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import { cn } from "@/lib/cn";
+import { isListTicketPriceLabel } from "@/lib/event-price.utils";
 
 import type { EventRowProps } from "./EventRow.types";
 import styles from "./EventRow.module.css";
@@ -81,7 +82,11 @@ export function EventRow({
           </div>
         ) : null}
         {priorityLabel ? <small className={styles.rowPriority}>{priorityLabel}</small> : null}
-        {event.priceLabel ? <span>{event.priceLabel}</span> : null}
+        {event.priceLabel ? (
+          <span className={cn(isListTicketPriceLabel(event.priceLabel) && styles.priceTicketHint)}>
+            {event.priceLabel}
+          </span>
+        ) : null}
         {priceSubLabel ? <small>{priceSubLabel}</small> : null}
       </div>
     </>

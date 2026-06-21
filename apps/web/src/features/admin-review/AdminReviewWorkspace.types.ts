@@ -1,6 +1,7 @@
 import type {
   EventCandidate,
   LinkedEventCandidate,
+  NearMatchCandidate,
   PublishVenuePreview,
   SeriesSiblingCandidate
 } from "@fresno-events/shared";
@@ -26,7 +27,7 @@ export const TAB_COPY: Record<ReviewQueueTab, { title: string; subtitle: string 
   },
   updates: {
     title: "Updates",
-    subtitle: "Source changed since last approval. Live site is unchanged until you approve."
+    subtitle: "Primary sources only — linked listings stay duplicate when their source changes."
   },
   approved: {
     title: "Approved",
@@ -43,7 +44,7 @@ export const AUTH_FAILURE_MESSAGE = "That token was rejected. Check ADMIN_REVIEW
 export type ReviewWorkspaceProps = {
   token: string;
   activeTab: ReviewQueueTab;
-  onActiveTabChange: (value: ReviewQueueTab) => void;
+  onActiveTabChange: (value: ReviewQueueTab, selectedId?: string | null) => void;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onChangeToken: () => void;
@@ -54,6 +55,8 @@ export type CandidateDetailProps = {
   token: string;
   candidate: EventCandidate;
   linkedCandidates: LinkedEventCandidate[];
+  nearMatchCandidates?: NearMatchCandidate[];
+  primaryCandidate?: LinkedEventCandidate;
   seriesSiblings?: SeriesSiblingCandidate[];
   publishVenuePreview?: PublishVenuePreview;
   displayPriority: number;
@@ -61,6 +64,7 @@ export type CandidateDetailProps = {
   onAfterDecision: (candidateId?: string) => void;
   onSeriesUpdated: () => void;
   onSelectCandidate: (id: string) => void;
+  onOpenPrimary: (primary: LinkedEventCandidate) => void;
 };
 
 export type TokenGateProps = {

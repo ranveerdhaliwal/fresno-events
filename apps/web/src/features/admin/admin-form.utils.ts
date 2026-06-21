@@ -40,6 +40,7 @@ export function normalizedEventToFormState(
     imageUrl: event.imageUrl ?? "",
     ticketUrl: event.ticketUrl ?? "",
     externalUrl: event.externalUrl ?? "",
+    isFree: event.isFree === true || (event.priceMin === 0 && event.priceMax === 0),
     priceMin: event.priceMin?.toString() ?? "",
     priceMax: event.priceMax?.toString() ?? "",
     priceNotes: event.priceNotes ?? "",
@@ -85,7 +86,7 @@ export function formStateToEventPatch(
   const patch: Partial<NormalizedEvent> = {};
 
   setIfDifferent(patch, "title", draft.title.trim() || original.title, original.title);
-  setIfDifferent(patch, "category", draft.category, original.category);
+  setIfDifferent(patch, "category", draft.category, original.category ?? "community");
   setIfDifferent(patch, "venueName", draft.venueName.trim() || original.venueName, original.venueName);
 
   assignOptional(patch, "descriptionText", draft.descriptionText, original.descriptionText);
@@ -97,8 +98,21 @@ export function formStateToEventPatch(
   assignOptional(patch, "ticketUrl", draft.ticketUrl, original.ticketUrl);
   assignOptional(patch, "externalUrl", draft.externalUrl, original.externalUrl);
 
-  assignNumberOptional(patch, "priceMin", draft.priceMin, original.priceMin);
-  assignNumberOptional(patch, "priceMax", draft.priceMax, original.priceMax);
+  const originalIsFree = original.isFree === true || (original.priceMin === 0 && original.priceMax === 0);
+  if (draft.isFree !== originalIsFree) {
+    if (draft.isFree) {
+      patch.isFree = true;
+      patch.priceMin = 0;
+      patch.priceMax = 0;
+    } else {
+      patch.isFree = false;
+    }
+  }
+
+  if (!draft.isFree) {
+    assignNumberOptional(patch, "priceMin", draft.priceMin, original.priceMin);
+    assignNumberOptional(patch, "priceMax", draft.priceMax, original.priceMax);
+  }
   assignOptional(patch, "priceNotes", draft.priceNotes, original.priceNotes);
   const nextPin = draft.mapPinEmoji.trim();
   const prevPin = original.mapPinEmoji ?? "";
@@ -170,6 +184,16 @@ export function applyAdminTimeTbaChange(
     return { ...draft, timeTba: false };
   }
   return { ...draft, timeTba: true, allDay: false, startTime: "" };
+}
+
+export function applyAdminIsFreeChange(
+  draft: AdminEventFormState,
+  isFree: boolean
+): AdminEventFormState {
+  if (!isFree) {
+    return { ...draft, isFree: false };
+  }
+  return { ...draft, isFree: true, priceMin: "", priceMax: "" };
 }
 
 function encodeEndInstant(draft: AdminEventFormState): string | undefined {
@@ -261,4 +285,65 @@ function assignNumberOptional<K extends keyof NormalizedEvent>(
   if (parsed !== original) {
     patch[key] = parsed as NormalizedEvent[K];
   }
+}
+
+export type AdminReviewFormFieldKey =
+  | "priority"
+  | "title"
+  | "category"
+  | "mapPinEmoji"
+  | "start"
+  | "end"
+  | "imageUrl"
+  | "ticketUrl"
+  | "externalUrl"
+  | "isFree"
+  | "priceMin"
+  | "priceMax"
+  | "priceNotes"
+  | "descriptionText"
+  | "venueName"
+  | "venueCity"
+  | "venueAddress"
+  | "venueLocation";
+
+export function changedAdminFormFieldsFromDraft(
+  original: NormalizedEvent,
+  baseline: AdminEventFormState,
+  draft: AdminEventFormState
+): Set<AdminReviewFormFieldKey> {
+  const changed = new Set<AdminReviewFormFieldKey>();
+
+  if (baseline.priority !== draft.priority) {
+    changed.add("priority");
+  }
+
+  const patch = formStateToEventPatch(original, draft);
+  if (patch.title !== undefined) changed.add("title");
+  if (patch.category !== undefined) changed.add("category");
+  if (patch.mapPinEmoji !== undefined) changed.add("mapPinEmoji");
+  if (patch.startTs !== undefined || patch.timeUnknown !== undefined) changed.add("start");
+  if (patch.endTs !== undefined) changed.add("end");
+  if (patch.imageUrl !== undefined) changed.add("imageUrl");
+  if (patch.ticketUrl !== undefined) changed.add("ticketUrl");
+  if (patch.externalUrl !== undefined) changed.add("externalUrl");
+  if (patch.isFree !== undefined) changed.add("isFree");
+  if (patch.priceMin !== undefined) changed.add("priceMin");
+  if (patch.priceMax !== undefined) changed.add("priceMax");
+  if (patch.priceNotes !== undefined) changed.add("priceNotes");
+  if (patch.descriptionText !== undefined) changed.add("descriptionText");
+  if (patch.venueName !== undefined) changed.add("venueName");
+  if (patch.venueCity !== undefined) changed.add("venueCity");
+  if (patch.venueAddress !== undefined) changed.add("venueAddress");
+  if (patch.venueLat !== undefined || patch.venueLng !== undefined) changed.add("venueLocation");
+
+  return changed;
+}
+
+export function hasAdminFormEdits(
+  original: NormalizedEvent,
+  baseline: AdminEventFormState,
+  draft: AdminEventFormState
+): boolean {
+  return changedAdminFormFieldsFromDraft(original, baseline, draft).size > 0;
 }

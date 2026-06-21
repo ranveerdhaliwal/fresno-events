@@ -12,8 +12,10 @@ export type ChangeFormFieldKey =
   | "venueLocation"
   | "externalUrl"
   | "ticketUrl"
+  | "isFree"
   | "priceMin"
   | "priceMax"
+  | "priceNotes"
   | "descriptionText";
 
 const DIFF_TO_FORM_FIELD: Record<ContentDiffField, ChangeFormFieldKey | ChangeFormFieldKey[]> = {

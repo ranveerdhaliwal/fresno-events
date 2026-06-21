@@ -17,6 +17,17 @@ describe("event-view-model", () => {
     expect(formatPrice({ ...rest, isFree: false })).toBe("");
   });
 
+  it("shows ticket hint on list when price unknown but ticket URL exists", () => {
+    const { priceMin: _min, priceMax: _max, isFree: _free, ...rest } = first.event;
+    expect(
+      formatPrice({
+        ...rest,
+        isFree: false,
+        ticketUrl: "https://tickets.example.com/show"
+      })
+    ).toBe("See Tickets for price");
+  });
+
   it("derives tagline from description", () => {
     const tagline = deriveTagline(first.event);
     expect(tagline.length).toBeGreaterThan(0);

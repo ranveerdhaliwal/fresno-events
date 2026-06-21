@@ -1,0 +1,110 @@
+.section {
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--mustard) 55%, transparent);
+  background: color-mix(in srgb, var(--mustard) 8%, var(--surface-card));
+  padding: 16px;
+}
+
+.header {
+  display: grid;
+  gap: 4px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: color-mix(in srgb, var(--mustard) 85%, var(--text-primary));
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--mustard) 35%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 88%, var(--text-primary));
+  padding: 10px 12px;
+}
+
+.meta {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-label);
+}
+
+.sharedWords {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.reviewButton {
+  border: 1px solid color-mix(in srgb, var(--mustard) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mustard) 18%, transparent);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.reviewButton:hover {
+  background: color-mix(in srgb, var(--mustard) 28%, transparent);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  border: var(--border-card);
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.link:hover {
+  border-color: color-mix(in srgb, var(--mustard) 70%, transparent);
+}

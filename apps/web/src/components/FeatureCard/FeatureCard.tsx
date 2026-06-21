@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import type { FeatureCardViewModel } from "@/lib/event-view-model";
 import { cn } from "@/lib/cn";
+import { isListTicketPriceLabel } from "@/lib/event-price.utils";
 
 import styles from "./FeatureCard.module.css";
 
@@ -35,7 +36,15 @@ export function FeatureCard({ card, variant = "small" }: FeatureCardProps) {
         {variant === "hero" && card.description ? <p className={styles.desc}>{card.description}</p> : null}
         <div className={styles.priceRow}>
           {card.priceLabel ? (
-            <span className={cn(styles.price, card.isFree && styles.free)}>{card.priceLabel}</span>
+            <span
+              className={cn(
+                styles.price,
+                card.isFree && styles.free,
+                isListTicketPriceLabel(card.priceLabel) && styles.priceTicketHint
+              )}
+            >
+              {card.priceLabel}
+            </span>
           ) : null}
           <span className={styles.source}>via What Up Fresno</span>
         </div>

@@ -61,10 +61,53 @@ export function effectivePriority(
   return overrides[candidate.id] ?? suggestedPriorityFor(candidate);
 }
 
+/** Approved tab: show live calendar priority, not ingest suggested_priority. */
+export function queueDisplayPriority(
+  candidate: EventCandidate,
+  overrides: Record<string, number>,
+  usePublishedPriority = false
+): number {
+  if (usePublishedPriority && candidate.publishedPriority !== undefined) {
+    return overrides[candidate.id] ?? candidate.publishedPriority;
+  }
+  return effectivePriority(candidate, overrides);
+}
+
+export function resolveDetailDisplayPriority(
+  candidate: EventCandidate,
+  publishedEventPriority: number | undefined,
+  overrides: Record<string, number>
+): number {
+  if (candidate.status === "approved" && publishedEventPriority !== undefined) {
+    return overrides[candidate.id] ?? publishedEventPriority;
+  }
+  return effectivePriority(candidate, overrides);
+}
+
+export function buildBulkApprovePriorityById(
+  ids: string[],
+  overrides: Record<string, number>
+): Record<string, number> | undefined {
+  const out: Record<string, number> = {};
+  for (const id of ids) {
+    const priority = overrides[id];
+    if (priority !== undefined) {
+      out[id] = priority;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function normalizeSeriesTitleKey(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 export function seriesGroupKey(candidate: EventCandidate): string | null {
   const seriesId = candidate.normalizedEvent.seriesId?.trim();
   if (seriesId) {
-    return `series:${seriesId}`;
+    // Venue-season series ids (e.g. Big Fresno Fair) span many unrelated listings — include
+    // title so flea market does not inherit a headliner's display priority in the admin queue.
+    return `series:${seriesId}:${normalizeSeriesTitleKey(candidate.title)}`;
   }
 
   const listingUrl = resolveCandidateListingUrl(candidate);
@@ -159,10 +202,11 @@ export function compareCandidatesWithinSource(
   a: EventCandidate,
   b: EventCandidate,
   overrides: Record<string, number>,
-  seriesPriorities: Map<string, number>
+  seriesPriorities: Map<string, number>,
+  usePublishedPriority = false
 ): number {
-  const pa = listDisplayPriority(a, seriesPriorities, overrides);
-  const pb = listDisplayPriority(b, seriesPriorities, overrides);
+  const pa = listDisplayPriority(a, seriesPriorities, overrides, usePublishedPriority);
+  const pb = listDisplayPriority(b, seriesPriorities, overrides, usePublishedPriority);
   if (pa !== pb) {
     return pa - pb;
   }
@@ -179,9 +223,12 @@ export function compareCandidatesWithinSource(
 export function sortCandidatesWithinSource(
   items: EventCandidate[],
   overrides: Record<string, number>,
-  seriesPriorities: Map<string, number>
+  seriesPriorities: Map<string, number>,
+  usePublishedPriority = false
 ): EventCandidate[] {
-  return [...items].sort((a, b) => compareCandidatesWithinSource(a, b, overrides, seriesPriorities));
+  return [...items].sort((a, b) =>
+    compareCandidatesWithinSource(a, b, overrides, seriesPriorities, usePublishedPriority)
+  );
 }
 
 /** Flat list order: source groups (A→Z), then priority and date within each source. */
@@ -271,9 +318,13 @@ export function buildSeriesDisplayPriorities(
 export function listDisplayPriority(
   candidate: EventCandidate,
   seriesDisplayPriorities: Map<string, number>,
-  overrides: Record<string, number>
+  overrides: Record<string, number>,
+  usePublishedPriority = false
 ): number {
-  return seriesDisplayPriorities.get(candidate.id) ?? effectivePriority(candidate, overrides);
+  return (
+    seriesDisplayPriorities.get(candidate.id) ??
+    queueDisplayPriority(candidate, overrides, usePublishedPriority)
+  );
 }
 
 export function groupCandidatesByPriority(

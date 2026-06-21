@@ -36,9 +36,9 @@ export function AdminReviewWorkspace() {
     <ReviewWorkspace
       token={token}
       activeTab={activeTab}
-      onActiveTabChange={(value) => {
+      onActiveTabChange={(value, nextSelectedId) => {
         setActiveTab(value);
-        setSelectedId(null);
+        setSelectedId(nextSelectedId ?? null);
       }}
       selectedId={selectedId}
       onSelect={setSelectedId}

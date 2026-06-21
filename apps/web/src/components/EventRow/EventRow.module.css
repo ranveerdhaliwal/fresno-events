@@ -146,6 +146,15 @@
   color: var(--olive);
 }
 
+.priceTicketHint {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.25;
+  max-width: 4.75rem;
+}
+
 .rowPrice small {
   display: block;
   font-family: var(--font-body);
@@ -207,6 +216,11 @@
 
 .p1 .rowPrice {
   font-size: 16px;
+}
+
+.p1 .priceTicketHint {
+  font-size: 11px;
+  max-width: 5.25rem;
 }
 
 .p2 {

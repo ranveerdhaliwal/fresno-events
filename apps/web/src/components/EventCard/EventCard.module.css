@@ -72,6 +72,15 @@
   color: var(--olive);
 }
 
+.priceTicketHint {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.25;
+  max-width: 4.75rem;
+  text-align: right;
+}
+
 @media (max-width: 600px) {
   .card {
     display: grid;

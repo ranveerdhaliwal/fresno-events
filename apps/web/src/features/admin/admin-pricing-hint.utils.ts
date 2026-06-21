@@ -25,7 +25,10 @@ export function inferAdminPricingHint(event: NormalizedEvent): AdminPricingHint 
   }
 
   if (event.source === "ticketmaster" || event.ticketUrl?.trim()) {
-    return { kind: "unknown", label: "No price from source" };
+    return {
+      kind: "unknown",
+      label: "No price from source — check Free or enter min/max; list shows See Tickets for price when a ticket URL is set"
+    };
   }
 
   return null;
@@ -36,7 +39,7 @@ function formatNormalizedPrice(event: NormalizedEvent): string {
     return event.priceMin === event.priceMax ? `$${event.priceMin}` : `$${event.priceMin}-${event.priceMax}`;
   }
   if (typeof event.priceMin === "number") {
-    return `From $${event.priceMin}`;
+    return `$${event.priceMin}`;
   }
   return "";
 }

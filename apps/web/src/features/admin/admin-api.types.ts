@@ -21,6 +21,7 @@ export interface BulkApproveBody {
   notes?: string;
   reviewedBy?: string;
   priority?: number;
+  priorityById?: Record<string, number>;
   status?: "pending_review";
   limit?: number;
 }

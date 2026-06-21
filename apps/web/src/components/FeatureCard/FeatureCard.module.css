@@ -123,6 +123,14 @@
   color: var(--olive);
 }
 
+.priceTicketHint {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  max-width: 5rem;
+}
+
 .source {
   font-size: 11px;
   color: var(--text-secondary-on-card);

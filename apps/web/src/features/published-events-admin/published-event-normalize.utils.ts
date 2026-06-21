@@ -43,6 +43,9 @@ export function publishedEventToNormalized(
   if (event.priceMax !== undefined) {
     normalized.priceMax = event.priceMax;
   }
+  if (event.isFree === true || (event.priceMin === 0 && event.priceMax === 0)) {
+    normalized.isFree = true;
+  }
   if (heroImage?.cdnUrl) {
     normalized.imageUrl = heroImage.cdnUrl;
   }

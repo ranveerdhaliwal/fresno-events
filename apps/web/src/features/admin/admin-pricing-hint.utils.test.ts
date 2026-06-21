@@ -33,7 +33,10 @@ describe("inferAdminPricingHint", () => {
       startTs: "2026-08-22T02:00:00Z",
       ticketUrl: "https://www.ticketmaster.com/event/abc"
     });
-    expect(hint).toEqual({ kind: "unknown", label: "No price from source" });
+    expect(hint).toEqual({
+      kind: "unknown",
+      label: "No price from source — check Free or enter min/max; list shows See Tickets for price when a ticket URL is set"
+    });
   });
 
   it("returns null when there is no price signal and no ticket URL", () => {

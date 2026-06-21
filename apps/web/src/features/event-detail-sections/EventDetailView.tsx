@@ -10,7 +10,7 @@ import { ContextStrip } from "@/components/ContextStrip";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { EventShareCard } from "@/components/EventShareCard";
 import { VenueMiniMap } from "@/components/VenueMiniMap";
-import { deriveTagline, formatPrice, toEventRowViewModel } from "@/lib/event-view-model";
+import { deriveTagline, eventIsFree, formatDetailPrice, toEventRowViewModel } from "@/lib/event-view-model";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
 import { buildGoogleMapsSearchUrl } from "@fresno-events/shared";
 import { resolveMediaUrl } from "@/lib/media-url";
@@ -37,7 +37,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
     ...(venue.lng != null ? { lng: venue.lng } : {})
   });
   const hasCoords = venue.lat != null && venue.lng != null;
-  const priceLabel = formatPrice(event);
+  const priceLabel = formatDetailPrice(event);
   const originalUrl = event.externalUrl ?? event.ticketUrl ?? null;
   const shareUrl = typeof globalThis.location !== "undefined" ? globalThis.location.href : "";
 
@@ -106,7 +106,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
         {priceLabel ? (
           <div className={styles.fact}>
             <span className={styles.lab}>Price</span>
-            <span className={`${styles.val} ${event.isFree ? styles.olive : styles.coral}`}>{priceLabel}</span>
+            <span className={`${styles.val} ${eventIsFree(event) ? styles.olive : styles.coral}`}>{priceLabel}</span>
           </div>
         ) : null}
       </div>
@@ -158,9 +158,15 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
             <SecHead number="04" script="the" title="ORIGINAL LINK" />
             <div className={styles.sourceBox}>
               {originalUrl ? (
-                <a href={originalUrl} target="_blank" rel="noreferrer" className={styles.sourceLink}>
-                  View original listing <ExternalLink size={14} aria-hidden />
-                </a>
+                <>
+                  <a href={originalUrl} target="_blank" rel="noreferrer" className={styles.sourceLink}>
+                    View original listing <ExternalLink size={14} aria-hidden />
+                  </a>
+                  <p className={styles.sourceNote}>
+                    Check the original listing for details we may have missed here — and to confirm
+                    pricing and whether the event is still on.
+                  </p>
+                </>
               ) : (
                 <p className={styles.sourceMissing}>No external listing link on file yet.</p>
               )}

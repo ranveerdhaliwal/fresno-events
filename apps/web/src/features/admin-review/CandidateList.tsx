@@ -20,6 +20,7 @@ export interface CandidateListProps {
   selectedIds: Set<string>;
   priorityOverrides: Record<string, number>;
   seriesDisplayPriorities: Map<string, number>;
+  usePublishedPriority?: boolean;
   onToggleSelected: (id: string) => void;
   onSelectAll: (pageIds: string[]) => void;
   searchMode?: boolean;
@@ -35,6 +36,7 @@ export const CandidateList = memo(function CandidateList({
   selectedIds,
   priorityOverrides,
   seriesDisplayPriorities,
+  usePublishedPriority = false,
   onToggleSelected,
   onSelectAll,
   searchMode = false,
@@ -100,7 +102,12 @@ export const CandidateList = memo(function CandidateList({
           ) : null}
           <ul className={styles.rows}>
             {group.items.map((candidate) => {
-              const priority = listDisplayPriority(candidate, seriesDisplayPriorities, priorityOverrides);
+              const priority = listDisplayPriority(
+                candidate,
+                seriesDisplayPriorities,
+                priorityOverrides,
+                usePublishedPriority
+              );
               const row = toCandidateEventRowViewModel(candidate, priority, {
                 showStatusInLabel: searchMode
               });

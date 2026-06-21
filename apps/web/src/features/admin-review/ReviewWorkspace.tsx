@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ClipboardList, Loader2, LogOut, RefreshCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { ReviewQueueAuditResponse } from "@fresno-events/shared";
+import type { LinkedEventCandidate, ReviewQueueAuditResponse } from "@fresno-events/shared";
 import { ORGANIC_CANDIDATE_DISPLAY_PRIORITY } from "@fresno-events/shared";
 
 import { Button } from "@/components/Button/Button";
@@ -15,6 +15,7 @@ import {
   bulkApproveChanges,
   bulkApproveChangesAll,
   bulkSetCandidatePriority,
+  bulkSetPublishedEventPriority,
   bulkRejectCandidates,
   deleteCandidates,
   fetchPreApproveAudit,
@@ -30,10 +31,11 @@ import {
 } from "../admin/admin-api";
 import { adminKeys } from "../admin/admin.queryKeys";
 import {
+  buildBulkApprovePriorityById,
   buildSeriesDisplayPriorities,
   clearPriorityOverride,
   clearPriorityOverridesForIds,
-  effectivePriority,
+  resolveDetailDisplayPriority,
   groupCandidatesBySource,
   readPriorityOverrides,
   sortCandidatesByReviewedAt,
@@ -41,6 +43,7 @@ import {
   writePriorityOverrides
 } from "../admin/admin-priority.utils";
 import {
+  candidateStatusToReviewTab,
   resolveActiveCandidateId,
   selectNextAfterDecision
 } from "./admin-review-navigation.utils";
@@ -242,6 +245,18 @@ export function ReviewWorkspace({
     });
   };
 
+  const handleOpenPrimary = useCallback(
+    (primary: LinkedEventCandidate) => {
+      const tab = candidateStatusToReviewTab(primary.status);
+      if (tab !== activeTab) {
+        onActiveTabChange(tab, primary.id);
+      } else {
+        onSelect(primary.id);
+      }
+    },
+    [activeTab, onActiveTabChange, onSelect]
+  );
+
   const formatBulkApproveMessage = (result: {
     approved: number;
     skipped: Array<{ reason: string }>;
@@ -305,7 +320,12 @@ export function ReviewWorkspace({
 
   const approveSelectedMutation = useMutation({
     mutationFn: (ids: string[]) =>
-      bulkApproveCandidates(token, ids, { reviewedBy: "admin-bulk-ui" }),
+      bulkApproveCandidates(token, ids, {
+        reviewedBy: "admin-bulk-ui",
+        ...(buildBulkApprovePriorityById(ids, priorityOverrides)
+          ? { priorityById: buildBulkApprovePriorityById(ids, priorityOverrides) }
+          : {})
+      }),
     onSuccess: (result) => {
       setApproveMessage(formatBulkApproveMessage(result));
       setSelectedIds(new Set());
@@ -317,7 +337,16 @@ export function ReviewWorkspace({
   });
 
   const approveAllMutation = useMutation({
-    mutationFn: () => bulkApproveAllPending(token, { reviewedBy: "admin-bulk-ui" }),
+    mutationFn: () => {
+      const priorityById = buildBulkApprovePriorityById(
+        items.map((candidate) => candidate.id),
+        priorityOverrides
+      );
+      return bulkApproveAllPending(token, {
+        reviewedBy: "admin-bulk-ui",
+        ...(priorityById ? { priorityById } : {})
+      });
+    },
     onSuccess: (result) => {
       setApproveMessage(formatBulkApproveMessage(result));
       setSelectedIds(new Set());
@@ -353,14 +382,35 @@ export function ReviewWorkspace({
   });
 
   const bulkPriorityMutation = useMutation({
-    mutationFn: ({ ids, priority }: { ids: string[]; priority: number }) =>
-      bulkSetCandidatePriority(token, ids, priority),
+    mutationFn: async ({ ids, priority }: { ids: string[]; priority: number }) => {
+      if (activeTab === "approved") {
+        const eventIds = [
+          ...new Set(
+            ids
+              .map((id) => items.find((candidate) => candidate.id === id)?.matchedEventId)
+              .filter((eventId): eventId is string => typeof eventId === "string" && eventId.length > 0)
+          )
+        ];
+        const [candidateResult, eventResult] = await Promise.all([
+          bulkSetCandidatePriority(token, ids, priority),
+          eventIds.length > 0
+            ? bulkSetPublishedEventPriority(token, eventIds, priority)
+            : Promise.resolve({ priority, updated: 0, failed: [] })
+        ]);
+        return { ...candidateResult, eventUpdated: eventResult.updated };
+      }
+      return bulkSetCandidatePriority(token, ids, priority);
+    },
     onSuccess: (result, variables) => {
       setPriorityOverrides((prev) => clearPriorityOverridesForIds(prev, variables.ids));
       setSelectedIds(new Set());
       const failedPart =
         result.failed.length > 0 ? ` ${result.failed.length} failed.` : "";
-      setApproveMessage(`Set priority P${result.priority} on ${result.updated} row(s).${failedPart}`);
+      const eventPart =
+        "eventUpdated" in result && result.eventUpdated > 0
+          ? ` Updated ${result.eventUpdated} published event(s).`
+          : "";
+      setApproveMessage(`Set priority P${result.priority} on ${result.updated} row(s).${eventPart}${failedPart}`);
       handleAfterDecision();
     },
     onError: (error: unknown) => {
@@ -873,6 +923,7 @@ export function ReviewWorkspace({
           selectedIds={selectedIds}
           priorityOverrides={priorityOverrides}
           seriesDisplayPriorities={listSeriesDisplayPriorities}
+          usePublishedPriority={activeTab === "approved"}
           searchMode={searchActive}
           searchQuery={searchQuery}
           onToggleSelected={handleToggleSelected}
@@ -893,6 +944,9 @@ export function ReviewWorkspace({
               <CandidateChangeDetail
                 token={token}
                 candidate={candidateQuery.data.candidate}
+                {...(candidateQuery.data.primaryCandidate
+                  ? { primaryCandidate: candidateQuery.data.primaryCandidate }
+                  : {})}
                 {...(candidateQuery.data.contentDiff
                   ? { contentDiff: candidateQuery.data.contentDiff }
                   : {})}
@@ -902,23 +956,37 @@ export function ReviewWorkspace({
                 {...(candidateQuery.data.publishVenuePreview
                   ? { publishVenuePreview: candidateQuery.data.publishVenuePreview }
                   : {})}
-                displayPriority={effectivePriority(candidateQuery.data.candidate, priorityOverrides)}
+                displayPriority={resolveDetailDisplayPriority(
+                  candidateQuery.data.candidate,
+                  candidateQuery.data.publishedEvent?.priority,
+                  priorityOverrides
+                )}
                 onAfterDecision={handleAfterDecision}
+                onOpenPrimary={handleOpenPrimary}
               />
             ) : (
               <CandidateDetail
                 token={token}
                 candidate={candidateQuery.data.candidate}
                 linkedCandidates={candidateQuery.data.linkedCandidates ?? []}
+                nearMatchCandidates={candidateQuery.data.nearMatchCandidates ?? []}
                 seriesSiblings={candidateQuery.data.seriesSiblings ?? []}
+                {...(candidateQuery.data.primaryCandidate
+                  ? { primaryCandidate: candidateQuery.data.primaryCandidate }
+                  : {})}
                 {...(candidateQuery.data.publishVenuePreview
                   ? { publishVenuePreview: candidateQuery.data.publishVenuePreview }
                   : {})}
-                displayPriority={effectivePriority(candidateQuery.data.candidate, priorityOverrides)}
+                displayPriority={resolveDetailDisplayPriority(
+                  candidateQuery.data.candidate,
+                  candidateQuery.data.publishedEvent?.priority,
+                  priorityOverrides
+                )}
                 onPriorityChange={handlePriorityChange}
                 onAfterDecision={handleAfterDecision}
                 onSeriesUpdated={handleSeriesUpdated}
                 onSelectCandidate={onSelect}
+                onOpenPrimary={handleOpenPrimary}
               />
             )
           ) : null}

@@ -1,3 +1,5 @@
+import { cn } from "@/lib/cn";
+
 import type { AdminEventFormState } from "./admin-form.types";
 import {
   applyAdminAllDayChange,
@@ -10,13 +12,22 @@ import styles from "./AdminScheduleOptions.module.css";
 export interface AdminScheduleOptionsProps {
   draft: AdminEventFormState;
   onChange: (next: AdminEventFormState) => void;
+  highlightChanged?: boolean;
 }
 
-export function AdminScheduleOptions({ draft, onChange }: AdminScheduleOptionsProps) {
+export function AdminScheduleOptions({
+  draft,
+  onChange,
+  highlightChanged = false
+}: AdminScheduleOptionsProps) {
   const hasStartTime = draft.startTime.trim().length > 0;
 
   return (
-    <div className={styles.root} role="group" aria-label="Schedule options">
+    <div
+      className={cn(styles.root, highlightChanged && styles.rootChanged)}
+      role="group"
+      aria-label="Schedule options"
+    >
       <label className={styles.option}>
         <input
           type="checkbox"

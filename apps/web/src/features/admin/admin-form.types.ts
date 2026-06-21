@@ -22,8 +22,11 @@ export interface AdminEventFormState {
   imageUrl: string;
   ticketUrl: string;
   externalUrl: string;
+  /** Public list/detail show "Free" when checked. */
+  isFree: boolean;
   priceMin: string;
   priceMax: string;
+  /** Detail-page copy when price is not numeric (not shown on list rows). */
   priceNotes: string;
   priority: number;
   /** Map pin: empty = auto; "pin" = default marker; emoji = override */

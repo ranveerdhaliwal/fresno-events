@@ -1,7 +1,24 @@
-import type { EventCandidate } from "@fresno-events/shared";
+import type { EventbriteDetailStatus, EventCandidate } from "@fresno-events/shared";
 import { clampEventPriority } from "@fresno-events/shared";
 
 import type { EventRowViewModel, RowPriority } from "@/lib/event-view-model";
+import { formatEventDate, formatMonthLong, formatShortTime } from "@/lib/event-time";
+import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
+import { resolveMediaUrl } from "@/lib/media-url";
+
+const EVENTBRITE_EVENT_PATH = /\/e\/(?:[^/?#]*-)?(\d+)/i;
+
+function isEventbriteEventUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.toLowerCase().includes("eventbrite.com")) {
+      return false;
+    }
+    return EVENTBRITE_EVENT_PATH.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
 
 /** Best URL to open the upstream event listing or detail page for manual verification. */
 export function resolveCandidateListingUrl(candidate: EventCandidate): string | null {
@@ -23,8 +40,28 @@ export function resolveCandidateTicketUrl(candidate: EventCandidate): string | n
   }
   return ticketUrl;
 }
-import { formatEventDate, formatMonthLong, formatShortTime } from "@/lib/event-time";
-import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
+
+/** Hint under Ticket URL when the value is an Eventbrite event page. */
+export function eventbriteDetailStatusHint(
+  ticketUrl: string,
+  status: EventbriteDetailStatus | null | undefined
+): string | null {
+  const trimmed = ticketUrl.trim();
+  if (!trimmed || !isEventbriteEventUrl(trimmed)) {
+    return null;
+  }
+
+  switch (status) {
+    case "fetched":
+      return "Eventbrite detail parsed (full description loaded).";
+    case "blocked":
+      return "Eventbrite detail blocked — run pnpm eventbrite:detail locally.";
+    case "error":
+      return "Eventbrite detail fetch failed — will retry on next batch.";
+    default:
+      return "Eventbrite detail not fetched yet.";
+  }
+}
 
 export function toCandidateEventRowViewModel(
   candidate: EventCandidate,
@@ -74,7 +111,10 @@ export function toCandidateEventRowViewModel(
     priority,
     paletteKey,
     paletteGradient: gradientForPalette(paletteKey),
-    imageUrl: normalized.imageUrl ?? null,
+    imageUrl:
+      resolveMediaUrl(normalized.imageUrl) ??
+      resolveMediaUrl(candidate.publishedHeroImageUrl) ??
+      null,
     ...(normalized.showVenueLogoInList ? { showVenueLogoInList: true } : {}),
     ...(normalized.listVenueLogoPadding !== undefined
       ? { listVenueLogoPadding: normalized.listVenueLogoPadding }

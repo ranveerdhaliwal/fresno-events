@@ -8,10 +8,12 @@ type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   variant?: "default" | "description";
 };
 
-export function TextArea({ className, rows = 4, variant = "default", ...props }: TextAreaProps) {
+export function TextArea({ className, rows, variant = "default", ...props }: TextAreaProps) {
+  const resolvedRows = rows ?? (variant === "description" ? 14 : 4);
+
   return (
     <textarea
-      rows={rows}
+      rows={resolvedRows}
       className={cn(
         controlStyles.control,
         controlStyles.textarea,

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import type { EventRowViewModel } from "@/lib/event-view-model";
 import { cn } from "@/lib/cn";
+import { isListTicketPriceLabel } from "@/lib/event-price.utils";
 
 import styles from "./EventCard.module.css";
 
@@ -24,7 +25,15 @@ export function EventCard({ event }: EventCardProps) {
         <div className={styles.bottom}>
           <span className={styles.cat}>{event.categoryLabel}</span>
           {event.priceLabel ? (
-            <span className={cn(styles.price, event.isFree && styles.free)}>{event.priceLabel}</span>
+            <span
+              className={cn(
+                styles.price,
+                event.isFree && styles.free,
+                isListTicketPriceLabel(event.priceLabel) && styles.priceTicketHint
+              )}
+            >
+              {event.priceLabel}
+            </span>
           ) : null}
         </div>
       </div>
