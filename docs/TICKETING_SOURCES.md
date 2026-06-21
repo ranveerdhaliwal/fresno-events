@@ -54,6 +54,8 @@ pnpm ingest:run --source=ticketmaster --force
 - `fresno_grizzlies` — MiLB venue module
 - `strummer_s_bar_grill_fresno` — Strummer's venue module
 
+**Venue skips:** `skipVenueSlugs` / `skipVenueNameIncludes` drop entire venues at scrape time (never persisted). Used for editorial exclusions (e.g. LDS wards, Westside Church of God).
+
 **URLs:** Maps upstream `website` to `externalUrl` / `ticketUrl` — not VenuNite `/api/tickets/go` affiliate redirects.
 
 **IDs:** Prefers upstream Eventbrite/Ticketmaster IDs from `website` when present (`eb:…`, `tm:…`); otherwise `vu:{id}`.
@@ -72,6 +74,17 @@ See [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md).
 ## Eventbrite
 
 The legacy `eventbrite` scraper (`manual-only`) uses a deprecated search endpoint. **Do not extend** for org/discover lanes — VenuNite covers Eventbrite-sourced Fresno events via `eventbrite_ca` module rows (with `skipModules` excluding direct-lane overlap only where we have our own scraper).
+
+### Detail-page enrichment (description)
+
+VenuNite API listings often ship a short summary (~100 chars). Full copy lives on the Eventbrite event page in `__NEXT_DATA__.structuredContent`.
+
+- **Scope:** description text only (prices stay on Venunite `priceWatch`).
+- **Columns:** `eventbrite_detail_status` (`null` | `fetched` | `blocked` | `error`), `eventbrite_detail_fetched_at` on `event_candidates`.
+- **CLI:** `pnpm eventbrite:detail` — applies by default; `--dry-run` for no writes. `--url` alone = parse preview; `--match-candidate` or `--candidate-id` to target rows; batch `--limit=N`.
+- **Series:** rows sharing `seriesId` get **one Eventbrite fetch per series**; siblings inherit description via full copy (identical copy) or suffix merge (cast-variant pages like theatre runs).
+- **Worker:** `POST /eventbrite-detail/trigger` (admin auth; same options as query params).
+- **Re-promote guard:** if `eventbrite_detail_status=fetched`, a shorter incoming description from ingest is ignored.
 
 ## Deferred (separate plan)
 

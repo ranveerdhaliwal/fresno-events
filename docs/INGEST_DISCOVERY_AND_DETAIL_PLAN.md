@@ -93,23 +93,23 @@ For each venue: **preflight** (dry-run plan, no DB writes), then **promote** (re
 ### Direct lane (API / plain HTML, no Browser Rendering on promote)
 
 ```bash
-pnpm ingest:preflight --venue=visit-fresno-county && pnpm ingest:promote --venue=visit-fresno-county
-pnpm ingest:preflight --venue=downtown-fresno && pnpm ingest:promote --venue=downtown-fresno
-pnpm ingest:preflight --venue=milb-grizzlies && pnpm ingest:promote --venue=milb-grizzlies
+pnpm ingest:preflight --source=visitfresnocounty && pnpm ingest:promote --source=visitfresnocounty
+pnpm ingest:preflight --source=downtownfresno && pnpm ingest:promote --source=downtownfresno
+pnpm ingest:preflight --source=milb && pnpm ingest:promote --source=milb
 ```
 
 ### Browser lane (listing/detail may use BR + LLM where configured)
 
 ```bash
-pnpm ingest:preflight --venue=strummers && pnpm ingest:promote --venue=strummers
-pnpm ingest:preflight --venue=fulton-55 && pnpm ingest:promote --venue=fulton-55
-pnpm ingest:preflight --venue=fresno-convention-center && pnpm ingest:promote --venue=fresno-convention-center
-pnpm ingest:preflight --venue=chaffee-zoo && pnpm ingest:promote --venue=chaffee-zoo
-pnpm ingest:preflight --venue=tower-theatre && pnpm ingest:promote --venue=tower-theatre
-pnpm ingest:preflight --venue=rainbow-ballroom && pnpm ingest:promote --venue=rainbow-ballroom
-pnpm ingest:preflight --venue=save-mart && pnpm ingest:promote --venue=save-mart
-pnpm ingest:preflight --venue=big-fresno-fair && pnpm ingest:promote --venue=big-fresno-fair
-pnpm ingest:preflight --venue=gobulldogs && pnpm ingest:promote --venue=gobulldogs
+pnpm ingest:preflight --source=strummers && pnpm ingest:promote --source=strummers
+pnpm ingest:preflight --source=fulton55 && pnpm ingest:promote --source=fulton55
+pnpm ingest:preflight --source=fresnoconventioncenter && pnpm ingest:promote --source=fresnoconventioncenter
+pnpm ingest:preflight --source=chaffeezoo && pnpm ingest:promote --source=chaffeezoo
+pnpm ingest:preflight --source=towertheatre && pnpm ingest:promote --source=towertheatre
+pnpm ingest:preflight --source=rainbowballroom && pnpm ingest:promote --source=rainbowballroom
+pnpm ingest:preflight --source=savemart && pnpm ingest:promote --source=savemart
+pnpm ingest:preflight --source=fresnofair && pnpm ingest:promote --source=fresnofair
+pnpm ingest:preflight --source=gobulldogs && pnpm ingest:promote --source=gobulldogs
 ```
 
 ### Verify after promote
