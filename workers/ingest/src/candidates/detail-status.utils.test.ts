@@ -24,7 +24,7 @@ describe("canonicalDetailPageUrl", () => {
     );
   });
 
-  it("uses Venunite public page when venunite_slug tag is present", () => {
+  it("prefers Eventbrite ticket URL for venunite EB-backed rows", () => {
     const venunite: NormalizedEvent = {
       source: "venunite",
       sourceEventId: "eb:123",
@@ -36,7 +36,7 @@ describe("canonicalDetailPageUrl", () => {
       tags: ["venunite", "venunite_slug:barrelhouse-anniversary-party"]
     };
     expect(canonicalDetailPageUrl(venunite)).toBe(
-      "https://venunite.com/events/barrelhouse-anniversary-party"
+      "https://www.eventbrite.com/e/event-1990516589703"
     );
   });
 });

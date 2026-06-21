@@ -1,6 +1,7 @@
 import type { IngestEnv } from "@/env";
 import { getJsonPromptBackend } from "@/llm/registry";
 import { runDetailBackfill } from "@/detail-backfill";
+import { runEventbriteDetailBackfill } from "@/eventbrite-detail-backfill";
 import { runOccurrenceRelink } from "@/occurrence-relink";
 import { runVenueAddressBackfill } from "@/venue-address-backfill";
 import { compactRunSummaryForLog } from "@/log-compact.utils";
@@ -92,6 +93,33 @@ export default {
         dryRun,
         ...(sourceFilter ? { sourceFilter } : {}),
         ...(limit !== undefined ? { limit } : {})
+      });
+
+      return jsonResponse({ ok: true, data: { summary, dry_run: dryRun, limit } });
+    }
+
+    if (url.pathname === "/eventbrite-detail/trigger") {
+      const auth = await checkAdminAuth(req, env);
+      if (auth) {
+        return jsonResponse({ ok: false, error: auth }, auth.status);
+      }
+
+      const dryRun = url.searchParams.get("dry_run") === "true";
+      const limitParam = url.searchParams.get("limit");
+      const parsedLimit = limitParam ? Number(limitParam) : NaN;
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.trunc(parsedLimit) : undefined;
+      const candidateId = url.searchParams.get("candidate_id") ?? undefined;
+      const detailUrl = url.searchParams.get("url") ?? undefined;
+      const matchCandidate = url.searchParams.get("match_candidate") === "true";
+      const retryBlocked = url.searchParams.get("retry_blocked") === "true";
+
+      const summary = await runEventbriteDetailBackfill(env, {
+        dryRun,
+        ...(limit !== undefined ? { limit } : {}),
+        ...(candidateId ? { candidateId } : {}),
+        ...(detailUrl ? { url: detailUrl } : {}),
+        ...(matchCandidate ? { matchCandidate: true } : {}),
+        ...(retryBlocked ? { retryBlocked: true } : {})
       });
 
       return jsonResponse({ ok: true, data: { summary, dry_run: dryRun, limit } });

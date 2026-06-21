@@ -20,6 +20,7 @@
     "ingest:promote": "bash scripts/ingest-promote.sh",
     "ingest:enrich": "bash scripts/ingest-enrich.sh",
     "ingest:detail-backfill": "bash scripts/ingest-detail-backfill.sh",
+    "eventbrite:detail": "bash scripts/eventbrite-detail.sh",
     "ingest:relink": "bash scripts/ingest-occurrence-relink.sh",
     "db:backfill-addresses": "bash scripts/backfill-venue-addresses.sh",
     "ingest:preflight-all": "bash scripts/ingest-preflight-all.sh",

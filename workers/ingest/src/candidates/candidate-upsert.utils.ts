@@ -3,6 +3,7 @@ import { formatIngestExclusionNotes } from "@fresno-events/shared";
 
 import { resolveCandidateDetailFields } from "@/candidates/detail-status.utils";
 import { applyIngestDefaults } from "@/lib/ingest-defaults.utils";
+import { preserveEventbriteEnrichedDescription } from "@/scrapers/eventbrite-detail.utils";
 import type { ExistingCandidateRow } from "@/candidates/content-fingerprint.utils";
 import type { OccurrencePersistFields } from "@/candidates/occurrence-resolve.utils";
 import type { PersistEventAuditKind } from "@/candidates/persist-analysis.utils";
@@ -87,7 +88,15 @@ async function buildFullUpsertRow(
 ): Promise<Record<string, unknown>> {
   const { auditKind, runId, event: rawEvent, fingerprint, status, existing, contentChanged, occurrence, ingestExclusion } =
     input;
-  const event = applyIngestDefaults(rawEvent);
+  let event = applyIngestDefaults(rawEvent);
+
+  if (existing) {
+    event = preserveEventbriteEnrichedDescription(
+      event,
+      existing.normalized_event,
+      existing.eventbrite_detail_status
+    );
+  }
 
   const detail = resolveCandidateDetailFields(event);
 

@@ -2,6 +2,11 @@ import type { CandidateDetailStatus, NormalizedEvent } from "@fresno-events/shar
 
 import { hasSufficientReviewData } from "@/candidates/enrichment-candidate.utils";
 import { buildVenuniteEventPublicUrl } from "@/scrapers/venunite-detail.utils";
+import {
+  isEventbriteEventUrl,
+  normalizeEventbriteEventUrl,
+  resolveEventbriteUrlFromEvent
+} from "@/scrapers/eventbrite-detail.utils";
 
 function venuniteSlugFromTags(tags: string[] | undefined): string | null {
   const tag = tags?.find((entry) => entry.startsWith("venunite_slug:"));
@@ -13,6 +18,11 @@ function venuniteSlugFromTags(tags: string[] | undefined): string | null {
 }
 
 export function canonicalDetailPageUrl(event: NormalizedEvent): string | null {
+  const eventbriteUrl = resolveEventbriteUrlFromEvent(event);
+  if (eventbriteUrl) {
+    return normalizeEventbriteEventUrl(eventbriteUrl) ?? eventbriteUrl.replace(/\/+$/, "");
+  }
+
   if (event.source === "venunite") {
     const slug = venuniteSlugFromTags(event.tags);
     if (slug) {
@@ -23,6 +33,9 @@ export function canonicalDetailPageUrl(event: NormalizedEvent): string | null {
   const raw = event.externalUrl?.trim() ?? event.ticketUrl?.trim();
   if (!raw?.startsWith("http")) {
     return null;
+  }
+  if (isEventbriteEventUrl(raw)) {
+    return normalizeEventbriteEventUrl(raw) ?? raw.replace(/\/+$/, "");
   }
   try {
     const u = new URL(raw);
