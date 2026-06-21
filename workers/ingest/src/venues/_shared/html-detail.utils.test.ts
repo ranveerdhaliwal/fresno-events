@@ -83,4 +83,14 @@ describe("parsePlainHtmlDetailPage", () => {
     const detail = parsePlainHtmlDetailPage(html, "https://example.com/e/local-show", "Example Venue");
     expect(detail?.imageUrl).toBe("https://cdn.example.com/poster.jpg");
   });
+
+  it("sanitizes HTML entities and bracketed links from JSON-LD descriptions", () => {
+    const html = `
+      <script type="application/ld+json">
+      {"@context":"http://schema.org","@type":"MusicEvent","name":"WHITNEY CUMMINGS: BIG BABY TOUR","startDate":"2026-06-05T19:00:00-07:00","location":{"@type":"Place","name":"Tower Theatre for the Performing Arts"},"description":"Doors 6PM / Show 7PM\\r&nbsp;\\rNBC&rsquo;s Whitney on Good for You [podcasts.apple.com]."}
+      </script>
+    `;
+    const detail = parsePlainHtmlDetailPage(html, "https://towertheatre.ticketsauce.com/e/whitney", "Tower Theatre");
+    expect(detail?.descriptionText).toBe("Doors 6PM / Show 7PM\n\nNBC's Whitney on Good for You.");
+  });
 });

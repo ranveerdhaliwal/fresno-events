@@ -5,6 +5,7 @@ import {
   mapVenuniteCategory,
   mapVenuniteEvents,
   resolveSourceEventId,
+  resolveVenuniteVenueName,
   shouldSkipModule,
   shouldSkipVenue
 } from "./venunite.utils";
@@ -41,6 +42,10 @@ describe("venunite.utils", () => {
     expect(mapped?.ticketUrl).not.toContain("venunite.com");
     expect(mapped?.source).toBe("venunite");
     expect(mapped?.endTs).toBe("2026-06-07T06:00:00.000Z");
+    expect(mapped?.isFree).toBe(true);
+    expect(mapped?.priceMin).toBe(0);
+    expect(mapped?.priceMax).toBe(0);
+    expect(mapped?.descriptionText).toBe("Cost: Free");
   });
 
   it("filters skipModules in batch", () => {
@@ -65,8 +70,34 @@ describe("venunite.utils", () => {
     expect(mapVenuniteEvents([baseEvent, ward])).toHaveLength(1);
   });
 
+  it("skips Westside Church of God venue events", () => {
+    const church = {
+      ...baseEvent,
+      id: 1736432,
+      title: "Community Worship Night",
+      venue: {
+        name: "Westside Church of God",
+        city: "Fresno",
+        state: "CA"
+      }
+    };
+    expect(shouldSkipVenue(church)).toBe(true);
+    expect(mapVenuniteEvents([baseEvent, church])).toHaveLength(1);
+  });
+
   it("maps categories", () => {
     expect(mapVenuniteCategory("music", ["Music"])).toBe("music");
     expect(mapVenuniteCategory("comedy", ["Comedy"])).toBe("comedy");
+  });
+
+  it("resolveVenuniteVenueName replaces street-line names with CMAC display name", () => {
+    expect(
+      resolveVenuniteVenueName("1555 Van Ness Ave #201", {
+        venueAddress: "1555 Van Ness Avenue #201",
+        venueCity: "Fresno",
+        venueLat: 36.7402201,
+        venueLng: -119.795774
+      })
+    ).toBe("CMAC - Community Media Access Collaborative");
   });
 });

@@ -2,6 +2,8 @@ import { load, type CheerioAPI, type Element } from "cheerio";
 
 import { resolveVenueLocationFields, type NormalizedEvent } from "@fresno-events/shared";
 
+import { decodeHtmlEntities as decodeSharedHtmlEntities } from "@fresno-events/shared";
+
 import { getPacificDateTimeParts, instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 
 function normalizeInlineWhitespace(text: string): string {
@@ -9,15 +11,7 @@ function normalizeInlineWhitespace(text: string): string {
 }
 
 function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+  return decodeSharedHtmlEntities(text);
 }
 
 function formatSimpleVisitFresnoDescriptionHtml(html: string): string {
@@ -225,6 +219,39 @@ function applyVisitFresnoTimeRange(
   };
 }
 
+/** Visit Fresno price info-list values that mean no admission charge. */
+export function isVisitFresnoFreeAdmissionPriceText(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  if (/^free(?:\s+(?:entry|admission|event))?\s*\.?$/i.test(normalized)) {
+    return true;
+  }
+
+  if (/^(?:no\s+(?:charge|admission(?:\s+fee)?)|complimentary(?:\s+admission)?)\s*\.?$/i.test(normalized)) {
+    return true;
+  }
+
+  return /^\$0(?:\.00)?$/.test(normalized);
+}
+
+export function applyVisitFresnoFreeAdmissionFields(
+  event: Pick<NormalizedEvent, "isFree" | "priceNotes" | "priceMin" | "priceMax">
+): Pick<NormalizedEvent, "isFree" | "priceMin" | "priceMax"> {
+  if (event.isFree === true) {
+    return {};
+  }
+
+  const notes = event.priceNotes?.trim();
+  if (!notes || !isVisitFresnoFreeAdmissionPriceText(notes)) {
+    return {};
+  }
+
+  return { isFree: true, priceMin: 0, priceMax: 0 };
+}
+
 export function parseVisitFresnoPriceText(raw: string): Pick<
   NormalizedEvent,
   "isFree" | "priceMin" | "priceMax" | "priceNotes" | "currency"
@@ -234,8 +261,8 @@ export function parseVisitFresnoPriceText(raw: string): Pick<
     return {};
   }
 
-  if (/^free$/i.test(text)) {
-    return { isFree: true, currency: "USD" };
+  if (isVisitFresnoFreeAdmissionPriceText(text)) {
+    return { isFree: true, priceMin: 0, priceMax: 0, priceNotes: text, currency: "USD" };
   }
 
   const range = text.match(/\$(\d+(?:\.\d{2})?)\s*[-–]\s*\$(\d+(?:\.\d{2})?)/);
@@ -306,7 +333,7 @@ export function mergeVisitFresnoDetail(
     return listing;
   }
 
-  return {
+  const merged: NormalizedEvent = {
     ...listing,
     ...(detail.timeRange ? applyVisitFresnoTimeRange(listing, detail.timeRange) : {}),
     ...(detail.descriptionText?.trim() && !listing.descriptionText?.trim()
@@ -335,6 +362,8 @@ export function mergeVisitFresnoDetail(
     ...(detail.currency ? { currency: detail.currency } : {}),
     ...(detail.priceNotes?.trim() ? { priceNotes: detail.priceNotes.trim() } : {})
   };
+
+  return { ...merged, ...applyVisitFresnoFreeAdmissionFields(merged) };
 }
 
 /** After a successful detail-page fetch, ensure price fields exist so detail_status can complete. */

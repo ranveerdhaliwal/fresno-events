@@ -3,26 +3,28 @@ import { z } from "zod";
 
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 
+import { applyFresnoFairPricePolicy } from "./fresno-fair-price.utils";
+
 const FairLocationSchema = z.object({
-  Name: z.string().optional(),
-  AddressLine1: z.string().optional(),
-  Latitude: z.number().optional(),
-  Longitude: z.number().optional()
+  Name: z.string().nullish(),
+  AddressLine1: z.string().nullish(),
+  Latitude: z.number().nullish(),
+  Longitude: z.number().nullish()
 });
 
 const FairItemSchema = z.object({
   EventID: z.number(),
   Name: z.string(),
-  Date: z.string().optional(),
-  Time: z.number().optional(),
-  TimeIsSpecified: z.boolean().optional(),
-  TimeDisplay: z.string().optional(),
-  EventTimeRangeString: z.string().optional(),
-  DetailURL: z.string().optional(),
-  ImageOrVideoThumbnailWithPath: z.string().optional(),
-  ShortDescription: z.string().optional(),
-  LongDescription: z.string().optional(),
-  ExternalLink: z.string().nullable().optional(),
+  Date: z.string().nullish(),
+  Time: z.number().nullish(),
+  TimeIsSpecified: z.boolean().nullish(),
+  TimeDisplay: z.string().nullish(),
+  EventTimeRangeString: z.string().nullish(),
+  DetailURL: z.string().nullish(),
+  ImageOrVideoThumbnailWithPath: z.string().nullish(),
+  ShortDescription: z.string().nullish(),
+  LongDescription: z.string().nullish(),
+  ExternalLink: z.string().nullish(),
   Locations: z.array(FairLocationSchema).optional()
 });
 
@@ -45,6 +47,46 @@ const FairResponseSchema = z.object({
 
 export const FRESNO_FAIR_API_URL =
   "https://www.fresnofair.com/services/eventsservice.asmx/GetEventDaysByList";
+
+/** Fair season month (October) in Pacific local calendar. */
+export const FRESNO_FAIR_SEASON_MONTH = 10;
+
+/** October day count used for `GetEventDaysByList` date windows. */
+export const FRESNO_FAIR_SEASON_DAY_COUNT = 31;
+
+export function parseSeriesSeasonYear(seriesId: string | undefined): number | null {
+  const match = seriesId?.match(/:(\d{4})$/);
+  if (!match?.[1]) {
+    return null;
+  }
+  const year = Number(match[1]);
+  return Number.isFinite(year) ? year : null;
+}
+
+/**
+ * Fair listings are keyed to the season year (e.g. Oct 2026), not always the clock year.
+ * Prefer an explicit `seriesId` suffix when configured on the venue.
+ */
+export function resolveFresnoFairScheduleYear(now: Date, seriesId?: string): number {
+  const fromSeries = parseSeriesSeasonYear(seriesId);
+  if (fromSeries !== null) {
+    return fromSeries;
+  }
+  return now.getFullYear();
+}
+
+/** Years to query when the primary season window is empty (stale seriesId, pre-season). */
+export function fresnoFairScheduleYearsToTry(primaryYear: number): number[] {
+  return [primaryYear, primaryYear + 1];
+}
+
+export function seriesIdForFresnoFairSeasonYear(year: number, configuredSeriesId?: string): string {
+  const configuredYear = parseSeriesSeasonYear(configuredSeriesId);
+  if (configuredYear === year && configuredSeriesId) {
+    return configuredSeriesId;
+  }
+  return `series:bigfresnofair:${year}`;
+}
 
 /** Fairgrounds mailing address when the API omits `AddressLine1`. */
 export const FRESNO_FAIR_DEFAULT_VENUE_ADDRESS = "1121 S. Chance Avenue, Fresno, CA 93702";
@@ -269,24 +311,26 @@ export function fresnoFairResponseToEvents(
         const imageUrl = item.ImageOrVideoThumbnailWithPath?.trim();
         const ticketUrl = item.ExternalLink?.trim();
 
-        events.push({
-          source: "scrape:www.fresnofair.com",
-          sourceEventId: `venue:big-fresno-fair:${item.EventID}:${itemDate}`,
-          title: item.Name.trim(),
-          venueName: "Big Fresno Fair",
-          venueCity: venueCity ?? "Fresno",
-          startTs,
-          ...(endTs ? { endTs } : {}),
-          category: "festival",
-          externalUrl: item.DetailURL ?? opts.listingUrl,
-          ...(descriptionText ? { descriptionText } : {}),
-          ...(imageUrl?.startsWith("http") ? { imageUrl } : {}),
-          ...(ticketUrl?.startsWith("http") ? { ticketUrl } : {}),
-          ...(venueAddress ? { venueAddress } : {}),
-          ...(location?.Latitude != null ? { venueLat: location.Latitude } : {}),
-          ...(location?.Longitude != null ? { venueLng: location.Longitude } : {}),
-          ...(opts.seriesId ? { seriesId: opts.seriesId, seriesName: "Big Fresno Fair" } : {})
-        });
+        events.push(
+          applyFresnoFairPricePolicy({
+            source: "scrape:www.fresnofair.com",
+            sourceEventId: `venue:big-fresno-fair:${item.EventID}:${itemDate}`,
+            title: item.Name.trim(),
+            venueName: "Big Fresno Fair",
+            venueCity: venueCity ?? "Fresno",
+            startTs,
+            ...(endTs ? { endTs } : {}),
+            category: "festival",
+            externalUrl: item.DetailURL ?? opts.listingUrl,
+            ...(descriptionText ? { descriptionText } : {}),
+            ...(imageUrl?.startsWith("http") ? { imageUrl } : {}),
+            ...(ticketUrl?.startsWith("http") ? { ticketUrl } : {}),
+            ...(venueAddress ? { venueAddress } : {}),
+            ...(location?.Latitude != null ? { venueLat: location.Latitude } : {}),
+            ...(location?.Longitude != null ? { venueLng: location.Longitude } : {}),
+            ...(opts.seriesId ? { seriesId: opts.seriesId, seriesName: "Big Fresno Fair" } : {})
+          })
+        );
       }
     }
   }

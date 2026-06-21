@@ -2,6 +2,7 @@ import {
   type EventCategory,
   isValidCoordinate,
   type NormalizedEvent,
+  normalizeVenue,
   parseStreetFromFullAddress
 } from "@fresno-events/shared";
 
@@ -12,6 +13,7 @@ import {
   mergeVenuniteDetailFields,
   resolveVenuniteDescriptionText
 } from "./venunite-detail.utils";
+import { resolveVenunitePriceFields } from "./venunite-price.utils";
 import type {
   VenuniteConfig,
   VenuniteEvent,
@@ -76,6 +78,34 @@ export function resolveSourceEventId(event: VenuniteEvent): string {
   return `vu:${event.id}`;
 }
 
+function looksLikeStreetVenueName(venueName: string): boolean {
+  return /^\d+\s+\S/.test(venueName.trim());
+}
+
+const VENUE_SLUG_DISPLAY_NAMES: Record<string, string> = {
+  cmac: "CMAC - Community Media Access Collaborative"
+};
+
+/** Venunite sometimes uses a street line as venue name — prefer a known display name when we can. */
+export function resolveVenuniteVenueName(
+  venueName: string,
+  location: Pick<NormalizedEvent, "venueAddress" | "venueCity" | "venueLat" | "venueLng">
+): string {
+  const trimmed = venueName.trim();
+  if (!trimmed || !looksLikeStreetVenueName(trimmed)) {
+    return trimmed;
+  }
+
+  for (const probe of [trimmed, location.venueAddress?.trim()].filter(Boolean)) {
+    const display = VENUE_SLUG_DISPLAY_NAMES[normalizeVenue(probe!)];
+    if (display) {
+      return display;
+    }
+  }
+
+  return trimmed;
+}
+
 export function resolveVenuniteVenueLocation(
   event: VenuniteEvent,
   venueDetail?: VenuniteVenueDetail | null
@@ -111,29 +141,34 @@ export function toNormalizedEvent(
   }
 
   const listingUrl = event.website?.trim() || undefined;
-  const minCents = event.priceWatch?.minPriceCents;
-  const maxCents = event.priceWatch?.maxPriceCents;
+  const priceFields = resolveVenunitePriceFields(
+    eventDetail?.priceWatch ?? event.priceWatch,
+    eventDetail?.cost ?? event.cost
+  );
   const embeddedVenue = eventDetail ? detailVenueToVenueDetail(eventDetail) : undefined;
   const venueDetail =
     embeddedVenue ?? (event.venueId != null ? venueDetails.get(event.venueId) : undefined);
   const descriptionText = resolveVenuniteDescriptionText(event, eventDetail);
+  const venueLocation = resolveVenuniteVenueLocation(event, venueDetail);
+  const resolvedVenueName = resolveVenuniteVenueName(
+    embeddedVenue?.name?.trim() || venueName,
+    venueLocation
+  );
 
   const listing: NormalizedEvent = {
     source: "venunite",
     sourceEventId: resolveSourceEventId(event),
     title: event.title.trim(),
-    venueName: embeddedVenue?.name?.trim() || venueName,
+    venueName: resolvedVenueName,
     startTs: event.startDate,
     timezone: eventDetail?.timezone ?? event.timezone ?? "America/Los_Angeles",
     category: mapVenuniteCategory(eventDetail?.category ?? event.category, eventDetail?.categories ?? event.categories),
     subcategories: eventDetail?.categories ?? event.categories ?? [],
     tags: buildVenuniteTags(event, eventDetail),
-    currency: eventDetail?.priceWatch?.currency ?? event.priceWatch?.currency ?? "USD",
-    ...resolveVenuniteVenueLocation(event, venueDetail),
+    ...venueLocation,
     ...(eventDetail?.endDate || event.endDate ? { endTs: eventDetail?.endDate ?? event.endDate } : {}),
     ...(descriptionText ? { descriptionText } : {}),
-    ...(minCents != null && minCents > 0 ? { priceMin: minCents / 100 } : {}),
-    ...(maxCents != null && maxCents > 0 ? { priceMax: maxCents / 100 } : {}),
+    ...priceFields,
     ...(listingUrl ? { externalUrl: listingUrl, ticketUrl: listingUrl } : {}),
     ...(event.imageUrl ? { imageUrl: event.imageUrl } : {})
   };

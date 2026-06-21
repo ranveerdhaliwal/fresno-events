@@ -5,7 +5,11 @@ import {
   FRESNO_FAIR_DEFAULT_VENUE_ADDRESS,
   fairTimeToClock,
   fresnoFairResponseToEvents,
-  parseFairTimeRangeFromText
+  fresnoFairScheduleYearsToTry,
+  parseFairTimeRangeFromText,
+  parseSeriesSeasonYear,
+  resolveFresnoFairScheduleYear,
+  seriesIdForFresnoFairSeasonYear
 } from "./fresno-fair-api.utils";
 
 describe("fresno-fair-api.utils", () => {
@@ -16,6 +20,53 @@ describe("fresno-fair-api.utils", () => {
 
   it("builds comma-separated fair dates", () => {
     expect(buildFresnoFairDateList(2026, 10, 3)).toBe("10/01/2026,10/02/2026,10/03/2026");
+  });
+
+  it("resolves fair season year from seriesId instead of clock year", () => {
+    expect(parseSeriesSeasonYear("series:bigfresnofair:2026")).toBe(2026);
+    expect(resolveFresnoFairScheduleYear(new Date("2025-06-13"), "series:bigfresnofair:2026")).toBe(
+      2026
+    );
+    expect(resolveFresnoFairScheduleYear(new Date("2025-06-13"))).toBe(2025);
+    expect(fresnoFairScheduleYearsToTry(2026)).toEqual([2026, 2027]);
+    expect(seriesIdForFresnoFairSeasonYear(2026, "series:bigfresnofair:2026")).toBe(
+      "series:bigfresnofair:2026"
+    );
+    expect(seriesIdForFresnoFairSeasonYear(2027, "series:bigfresnofair:2026")).toBe(
+      "series:bigfresnofair:2027"
+    );
+  });
+
+  it("accepts API items with null LongDescription", () => {
+    const events = fresnoFairResponseToEvents(
+      {
+        d: {
+          Days: [
+            {
+              DateString: "10/07/2026",
+              Times: [
+                {
+                  Items: [
+                    {
+                      EventID: 58,
+                      Name: "4.0 & Above",
+                      Date: "/Date(1791349200000)/",
+                      Time: 1830,
+                      TimeIsSpecified: true,
+                      LongDescription: null,
+                      DetailURL: "https://www.fresnofair.com/events/2026/40--above"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      { listingUrl: "https://www.fresnofair.com/events", seriesId: "series:bigfresnofair:2026" }
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0]?.title).toBe("4.0 & Above");
   });
 
   it("maps API days to normalized events", () => {
@@ -50,6 +101,9 @@ describe("fresno-fair-api.utils", () => {
     expect(events[0]?.seriesId).toBe("series:bigfresnofair:2026");
     expect(events[0]?.venueAddress).toBe("1121 S. Chance Avenue");
     expect(events[0]?.venueCity).toBe("Fresno");
+    expect(events[0]?.isFree).toBe(true);
+    expect(events[0]?.priceMin).toBe(0);
+    expect(events[0]?.priceMax).toBe(0);
   });
 
   it("parses time ranges from fair CMS copy", () => {

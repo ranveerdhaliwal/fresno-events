@@ -10,7 +10,12 @@ const config = configJson as VenueConfig;
 const sourceKey = `venue-ingest:${config.key}`;
 
 export async function run(env: IngestEnv, ctx: VenueRunContext): Promise<VenueRunResult> {
-  const base = await runApiVenue(env, config, ctx, runFresnoFairApi);
+  const base = await runApiVenue(env, config, ctx, (scrapeCtx) =>
+    runFresnoFairApi(scrapeCtx, {
+      seriesId: config.seriesId,
+      listingUrl: config.listingUrl
+    })
+  );
 
   const detailUrlsPlanned = new Set(
     base.events

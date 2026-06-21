@@ -196,6 +196,42 @@ describe("downtown-fresno-api.utils", () => {
     );
   });
 
+  it("parseDowntownDetailDescription joins multiple Details paragraphs", () => {
+    const html = `
+      <h2 class="on-detail">Details</h2>
+      <p>Join Fresno Ideaworks for Makerfest on Broadway, a community fundraiser celebrating art and making.</p>
+      <p>This year's fundraiser supports critical roof repairs and preservation efforts following recent winter storm damage.</p>`;
+    const $ = load(html);
+    expect(parseDowntownDetailDescription($, "Makerfest on Broadway Presented by Fresno Ideaworks")).toBe(
+      "Join Fresno Ideaworks for Makerfest on Broadway, a community fundraiser celebrating art and making.\n\nThis year's fundraiser supports critical roof repairs and preservation efforts following recent winter storm damage."
+    );
+  });
+
+  it("parseDowntownDetailDescription includes participating businesses and FAQ sections", () => {
+    const html = `
+      <h2 class="on-detail">Details</h2>
+      <p>Participating bars and restaurants in Downtown Fresno want you to feel welcome.</p>
+      <ul><li>Free trolley rides around the route starting at 6pm.</li></ul>
+      <h3>Mezcal Lounge Official Afterparty</h3>
+      <p>1310 Van Ness Ave | 9PM - 2AM</p>
+      <h2><strong>Participating Businesses</strong></h2>
+      <ul><li>Mezcal Lounge</li><li>Procreations</li></ul>
+      <h2>Ride the FresnoHop Crawly Trolley starting at 6pm for FREE!</h2>
+      <p>Thanks to Fresno HOP, the Trolley will follow the map of the crawl until midnight.</p>
+      <p><strong>FAQ</strong></p>
+      <ul><li>Event is 21+ only</li></ul>
+      <p>Subscribe to Our Newsletter</p>`;
+    const $ = load(html);
+    const description = parseDowntownDetailDescription($, "Crawl Downtown Fresno: Pride Crawl");
+    expect(description).toContain("Participating bars");
+    expect(description).toContain("Mezcal Lounge Official Afterparty");
+    expect(description).toContain("Participating Businesses");
+    expect(description).toContain("• Mezcal Lounge");
+    expect(description).toContain("Ride the FresnoHop Crawly Trolley");
+    expect(description).toContain("• Event is 21+ only");
+    expect(description).not.toContain("Subscribe to Our Newsletter");
+  });
+
   it("parseDowntownDetailHtml uses the Details paragraph for descriptionText", () => {
     const listing: NormalizedEvent = {
       source: "api:downtownfresno",

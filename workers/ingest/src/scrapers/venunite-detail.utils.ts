@@ -2,6 +2,10 @@ import type { NormalizedEvent, ScrapeError } from "@fresno-events/shared";
 
 import type { VenuniteEvent, VenuniteEventDetail, VenuniteVenueDetail } from "./venunite.types";
 import { VenuniteEventDetailSchema } from "./venunite.types";
+import {
+  applyVenuniteFreeAdmissionFields,
+  resolveVenunitePriceFields
+} from "./venunite-price.utils";
 import { shouldSkipModule, shouldSkipVenue, sleep } from "./venunite.utils";
 
 const VENUNITE_EVENT_DETAIL_API = "https://venunite.com/api/events";
@@ -181,7 +185,7 @@ export function mergeVenuniteDetailFields(
   detail?: VenuniteEventDetail | null
 ): NormalizedEvent {
   if (!detail) {
-    return listing;
+    return { ...listing, ...applyVenuniteFreeAdmissionFields(listing) };
   }
 
   const descriptionText = resolveVenuniteDescriptionText(event, detail);
@@ -204,16 +208,27 @@ export function mergeVenuniteDetailFields(
     next.imageUrl = detailImage;
   }
 
-  const minCents = detail.priceWatch?.minPriceCents;
-  const maxCents = detail.priceWatch?.maxPriceCents;
-  if (minCents != null && minCents > 0 && listing.priceMin == null) {
-    next.priceMin = minCents / 100;
+  const priceFields = resolveVenunitePriceFields(
+    detail.priceWatch ?? event.priceWatch,
+    detail.cost ?? event.cost
+  );
+  if (priceFields.isFree) {
+    next.isFree = true;
+    next.priceMin = 0;
+    next.priceMax = 0;
+    if (priceFields.priceNotes) {
+      next.priceNotes = priceFields.priceNotes;
+    }
+  } else {
+    if (priceFields.priceMin != null && next.priceMin == null) {
+      next.priceMin = priceFields.priceMin;
+    }
+    if (priceFields.priceMax != null && next.priceMax == null) {
+      next.priceMax = priceFields.priceMax;
+    }
   }
-  if (maxCents != null && maxCents > 0 && listing.priceMax == null) {
-    next.priceMax = maxCents / 100;
-  }
-  if (detail.priceWatch?.currency && !listing.currency) {
-    next.currency = detail.priceWatch.currency;
+  if (priceFields.currency) {
+    next.currency = priceFields.currency;
   }
 
   const doorTime = detail.doorTime?.trim();
@@ -232,5 +247,5 @@ export function mergeVenuniteDetailFields(
     next.ticketUrl = upstreamWebsite;
   }
 
-  return next;
+  return { ...next, ...applyVenuniteFreeAdmissionFields(next) };
 }

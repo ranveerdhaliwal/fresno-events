@@ -15,6 +15,7 @@
     "the-church-of-jesus-christ-of-latter-day-saints-fresno-ca"
   ],
   "skipVenueNameIncludes": [
-    "church of jesus christ of latter-day saints"
+    "church of jesus christ of latter-day saints",
+    "westside church of god"
   ]
 }

@@ -82,14 +82,19 @@ export function parseStrummersListingHtml(html: string, config: VenueConfig): No
 
     const time12hr =
       article.find("time.event-time-12hr-start").first().text().trim() ||
+      article.find(".eventlist-meta-time time.event-time-12hr").first().text().trim() ||
       article.find(".eventlist-datetag-time .event-time-12hr").first().text().trim();
     const startTs = parseStrummersEventStartTs(dateYmd, time12hr);
     if (!startTs) {
       return;
     }
 
-    const endTime12hr = article.find("time.event-time-12hr-end").first().text().trim();
-    const endTs = endTime12hr ? parseStrummersEventStartTs(dateYmd, endTime12hr) : null;
+    const endTime12hr =
+      article.find("time.event-time-12hr-end").first().text().trim() ||
+      article.find(".eventlist-meta-time time.event-time-12hr").eq(1).text().trim();
+    const endDateYmd =
+      article.find(".eventlist-meta-time time.event-time-12hr").eq(1).attr("datetime")?.trim() || dateYmd;
+    const endTs = endTime12hr ? parseStrummersEventStartTs(endDateYmd, endTime12hr) : null;
 
     const imageRaw =
       article.find("img.eventlist-thumbnail").first().attr("src")?.trim() ||

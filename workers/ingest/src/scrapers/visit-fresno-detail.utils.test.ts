@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyVisitFresnoFreeAdmissionFields,
   finalizeVisitFresnoDetailMerge,
   formatVisitFresnoDescriptionHtml,
+  isVisitFresnoFreeAdmissionPriceText,
   mergeVisitFresnoDetail,
   parseVisitFresnoDetailPage,
   parseVisitFresnoPriceText,
@@ -71,8 +73,32 @@ describe("formatVisitFresnoDescriptionHtml", () => {
 });
 
 describe("parseVisitFresnoPriceText", () => {
-  it("parses Free", () => {
-    expect(parseVisitFresnoPriceText("Free")).toEqual({ isFree: true, currency: "USD" });
+  it("parses Free and Free Entry as free admission", () => {
+    expect(parseVisitFresnoPriceText("Free")).toEqual({
+      isFree: true,
+      priceMin: 0,
+      priceMax: 0,
+      priceNotes: "Free",
+      currency: "USD"
+    });
+    expect(parseVisitFresnoPriceText("Free Entry")).toEqual({
+      isFree: true,
+      priceMin: 0,
+      priceMax: 0,
+      priceNotes: "Free Entry",
+      currency: "USD"
+    });
+    expect(parseVisitFresnoPriceText("Free Admission")).toMatchObject({
+      isFree: true,
+      priceMin: 0,
+      priceMax: 0
+    });
+  });
+
+  it("does not treat conditional free copy as free admission", () => {
+    expect(parseVisitFresnoPriceText("Trivia is free, must purchase food/drink")).toEqual({
+      priceNotes: "Trivia is free, must purchase food/drink"
+    });
   });
 
   it("parses dollar amounts", () => {
@@ -87,6 +113,24 @@ describe("parseVisitFresnoPriceText", () => {
     expect(parseVisitFresnoPriceText("see website for details")).toEqual({
       priceNotes: "see website for details"
     });
+  });
+});
+
+describe("isVisitFresnoFreeAdmissionPriceText", () => {
+  it("recognizes short free-admission labels", () => {
+    expect(isVisitFresnoFreeAdmissionPriceText("Free Entry")).toBe(true);
+    expect(isVisitFresnoFreeAdmissionPriceText("$0")).toBe(true);
+    expect(isVisitFresnoFreeAdmissionPriceText("Trivia is free")).toBe(false);
+  });
+});
+
+describe("applyVisitFresnoFreeAdmissionFields", () => {
+  it("backfills isFree from priceNotes on older rows", () => {
+    expect(
+      applyVisitFresnoFreeAdmissionFields({
+        priceNotes: "Free Entry"
+      })
+    ).toEqual({ isFree: true, priceMin: 0, priceMax: 0 });
   });
 });
 
@@ -123,6 +167,19 @@ const FARMERS_MARKET_HTML = `
 </body></html>
 `;
 
+const INTELLECTUAL_DISABILITY_DANCE_HTML = `
+<html><body>
+<h1>INTELLECTUAL DISABILITY COMMUNITY DANCE</h1>
+<ul>
+  <li data-name="time"><span class="info-list-value">11:00 AM to 1:00 PM</span></li>
+  <li data-name="location"><span class="info-list-value">The Rosé</span></li>
+  <li data-name="price"><span class="info-list-value">Free Entry</span></li>
+</ul>
+<h2>Description</h2>
+<p>A care-free safe zone for adults with intellectual disabilities.</p>
+</body></html>
+`;
+
 describe("parseVisitFresnoDetailPage", () => {
   it("extracts info-list fields and description", () => {
     const parsed = parseVisitFresnoDetailPage(SAMPLE_HTML);
@@ -150,6 +207,17 @@ describe("parseVisitFresnoDetailPage", () => {
     expect(parsed?.descriptionText).not.toContain("&amp;");
     expect(parsed?.descriptionText?.split("\n")).toContain("July 12th - Giant Bubbles");
     expect(parsed?.descriptionText?.split("\n\n").length).toBeGreaterThanOrEqual(3);
+    expect(parsed?.isFree).toBe(true);
+    expect(parsed?.priceMin).toBe(0);
+    expect(parsed?.priceMax).toBe(0);
+  });
+
+  it("marks Free Entry detail pages as free admission", () => {
+    const parsed = parseVisitFresnoDetailPage(INTELLECTUAL_DISABILITY_DANCE_HTML);
+    expect(parsed?.isFree).toBe(true);
+    expect(parsed?.priceMin).toBe(0);
+    expect(parsed?.priceMax).toBe(0);
+    expect(parsed?.priceNotes).toBe("Free Entry");
   });
 });
 

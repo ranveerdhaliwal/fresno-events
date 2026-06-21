@@ -7,6 +7,7 @@ import type { IngestEnv } from "@/env";
 import { renderUrlToHtml, renderUrlToMarkdown } from "@/browser-rendering/render-page";
 import type { VenueConfig } from "@/venues/venue.types";
 import { parseConventionDetailPage } from "@/venues/fresno-convention-center/convention-detail.utils";
+import { enrichEventWithTicketSiteDetail } from "@/scrapers/ticket-site-detail.utils";
 import { parsePlainHtmlDetailPage } from "@/venues/_shared/html-detail.utils";
 import { isDetailHostBlocked, resolveDetailMode, resolveListingDiscovery } from "@/venues/venue-profile.utils";
 import { toNormalizedEventFromDiscovery } from "@/normalized-event";
@@ -53,11 +54,12 @@ export function mergeListingWithDetail(
   listing: NormalizedEvent,
   detail: AiDiscoveryItem | null
 ): NormalizedEvent {
-  if (!detail?.title?.trim() || !detail.venueName?.trim() || !detail.startTs) {
+  if (!detail?.title?.trim() || !detail.venueName?.trim()) {
     return listing;
   }
 
-  const start = new Date(detail.startTs);
+  const startTs = detail.startTs ?? listing.startTs;
+  const start = new Date(startTs);
   if (Number.isNaN(start.getTime())) {
     return listing;
   }
@@ -193,7 +195,9 @@ export async function enrichListingsWithDetails(input: EnrichDetailsInput): Prom
       try {
         const html = await fetchListingHtml(url, userAgent, signal);
         const parsed = parseDetailPage(html, url, config);
-        bySourceEventId.set(listing.sourceEventId, mergeListingWithDetail(listing, parsed));
+        let merged = mergeListingWithDetail(listing, parsed);
+        merged = await enrichEventWithTicketSiteDetail(merged, userAgent, { signal });
+        bySourceEventId.set(listing.sourceEventId, merged);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           throw error;

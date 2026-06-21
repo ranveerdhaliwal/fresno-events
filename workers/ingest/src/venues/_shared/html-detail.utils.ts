@@ -1,4 +1,4 @@
-import { resolveVenueLocationFields } from "@fresno-events/shared";
+import { resolveVenueLocationFields, roundDisplayPriceUp, sanitizeIngestDescriptionText } from "@fresno-events/shared";
 import { load } from "cheerio";
 
 import type { AiDiscoveryItem } from "@/ai";
@@ -86,7 +86,12 @@ function readJsonLdOffers(
 
   return {
     ...(ticketUrl ? { ticketUrl } : {}),
-    ...(prices.length > 0 ? { priceMin: Math.min(...prices), priceMax: Math.max(...prices) } : {})
+    ...(prices.length > 0
+      ? {
+          priceMin: roundDisplayPriceUp(Math.min(...prices)),
+          priceMax: roundDisplayPriceUp(Math.max(...prices))
+        }
+      : {})
   };
 }
 
@@ -111,7 +116,9 @@ function readJsonLdEvent($: CheerioRoot): AiDiscoveryItem | null {
               ? String((record.startDate as { "@value"?: string })["@value"] ?? "")
               : "";
         const descriptionText =
-          typeof record.description === "string" ? record.description.trim() : undefined;
+          typeof record.description === "string"
+            ? sanitizeIngestDescriptionText(record.description)
+            : undefined;
         const location = record.location;
         let venueName = "";
         if (location && typeof location === "object") {
@@ -224,11 +231,12 @@ function readMetaFallbackDetail(
     $('meta[property="og:title"]').attr("content")?.trim() ||
     $("h1").first().text().trim() ||
     $("title").text().trim();
-  const descriptionText =
+  const descriptionText = sanitizeIngestDescriptionText(
     $('meta[property="og:description"]').attr("content")?.trim() ||
-    $('meta[name="description"]').attr("content")?.trim() ||
-    $("article").first().text().trim().slice(0, 4000) ||
-    undefined;
+      $('meta[name="description"]').attr("content")?.trim() ||
+      $("article").first().text().trim().slice(0, 4000) ||
+      ""
+  ) || undefined;
 
   const timeMeta =
     $('meta[property="event:start_time"]').attr("content")?.trim() ||

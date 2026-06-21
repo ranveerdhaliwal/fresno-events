@@ -70,6 +70,23 @@ export function parseConventionDateTimeLine(line: string): { dateYmd: string; ti
   return { dateYmd, timeHHmm };
 }
 
+/** e.g. "SAT - OCT 3, 2026" when the venue omits show time on the detail page. */
+export function parseConventionDateOnlyLine(line: string): { dateYmd: string } | null {
+  const match = line.match(
+    /(?:MON|TUE|WED|THU|FRI|SAT|SUN)[,\s-]*([A-Za-z]+)\s+(\d{1,2}),?\s*(\d{4})\s*$/i
+  );
+  if (!match?.[1] || !match[2] || !match[3]) {
+    return null;
+  }
+  const month = MONTH[match[1].toLowerCase()];
+  const day = Number(match[2]);
+  const year = Number(match[3]);
+  if (!month || day < 1 || day > 31) {
+    return null;
+  }
+  return { dateYmd: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` };
+}
+
 function pickTicketUrl($: ReturnType<typeof load>): string | undefined {
   let ticketUrl: string | undefined;
   $("a[href]").each((_, el) => {
@@ -136,10 +153,9 @@ export function parseConventionDetailPage(html: string, pageUrl: string): AiDisc
       .find((line) => /(?:MON|TUE|WED|THU|FRI|SAT|SUN)/i.test(line) && /\d{4}/.test(line)) ?? "";
 
   const parsedWhen = dateLine ? parseConventionDateTimeLine(dateLine) : null;
-  const startTs = parsedWhen ? instantFromPacificLocal(parsedWhen.dateYmd, parsedWhen.timeHHmm) : null;
-  if (!startTs) {
-    return null;
-  }
+  const startTs = parsedWhen
+    ? instantFromPacificLocal(parsedWhen.dateYmd, parsedWhen.timeHHmm)
+    : null;
 
   const venueName =
     $("h2")
@@ -158,7 +174,7 @@ export function parseConventionDetailPage(html: string, pageUrl: string): AiDisc
     title,
     venueName,
     venueCity: venueLocation.venueCity ?? "Fresno",
-    startTs,
+    ...(startTs ? { startTs } : {}),
     externalUrl: pageUrl.replace(/\/+$/, ""),
     ...venueLocation,
     ...(descriptionText ? { descriptionText } : {}),

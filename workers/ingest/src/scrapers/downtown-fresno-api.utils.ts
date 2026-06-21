@@ -1,6 +1,7 @@
 import { eventCategories, resolveVenueLocationFields, type EventCategory, type NormalizedEvent } from "@fresno-events/shared";
 import type { CheerioAPI } from "cheerio";
 import { load } from "cheerio";
+import type { Element } from "domhandler";
 
 import type { AiDiscoveryItem } from "@/ai";
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
@@ -212,16 +213,64 @@ function isGenericDowntownMetaDescription(text: string, title: string): boolean 
   return false;
 }
 
-/** Prefer the on-page Details paragraph over generic `Title | Downtown Fresno` meta tags. */
+function downtownDetailBlockText($: CheerioAPI, el: Element): string | null {
+  const tag = el.tagName?.toLowerCase();
+  if (tag === "p") {
+    const text = $(el).text().replace(/\s+/g, " ").trim();
+    return text || null;
+  }
+  if (tag === "h3") {
+    const text = $(el).text().replace(/\s+/g, " ").trim();
+    return text || null;
+  }
+  if (tag === "h2") {
+    const $el = $(el);
+    if ($el.hasClass("on-detail")) {
+      return null;
+    }
+    const text = $el.text().replace(/\s+/g, " ").trim();
+    return text || null;
+  }
+  if (tag === "ul" || tag === "ol") {
+    const items: string[] = [];
+    $(el)
+      .children("li")
+      .each((_, li) => {
+        const text = $(li).text().replace(/\s+/g, " ").trim();
+        if (text) {
+          items.push(`• ${text}`);
+        }
+      });
+    return items.length > 0 ? items.join("\n") : null;
+  }
+  return null;
+}
+
+/** Prefer the on-page Details block over generic `Title | Downtown Fresno` meta tags. */
 export function parseDowntownDetailDescription($: CheerioAPI, title: string): string | null {
   const detailsHeading = $("h2.on-detail").filter(
     (_, el) => $(el).text().trim().toLowerCase() === "details"
   );
   if (detailsHeading.length > 0) {
-    const paragraph = detailsHeading.first().next("p");
-    const text = paragraph.text().replace(/\s+/g, " ").trim();
-    if (text) {
-      return text.slice(0, 4000);
+    const blocks: string[] = [];
+    let sibling = detailsHeading.first().next();
+    while (sibling.length > 0) {
+      const plain = sibling.text().replace(/\s+/g, " ").trim();
+      if (plain.toLowerCase().includes("subscribe to our newsletter")) {
+        break;
+      }
+
+      for (const el of sibling.toArray()) {
+        const block = downtownDetailBlockText($, el);
+        if (block) {
+          blocks.push(block);
+        }
+      }
+
+      sibling = sibling.next();
+    }
+    if (blocks.length > 0) {
+      return blocks.join("\n\n").slice(0, 4000);
     }
   }
 

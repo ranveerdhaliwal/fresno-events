@@ -5,6 +5,11 @@ import { sleep } from "@/lib/sleep";
 import { fetchListingHtml } from "@/venues/_shared/listing-detail.utils";
 import { DETAIL_DELAY_MS } from "@/venues/_shared/listing-detail.utils";
 
+import {
+  applyFresnoFairPricePolicy,
+  parseFresnoFairFreeAdmissionFromHtml
+} from "./fresno-fair-price.utils";
+
 export interface FresnoFairDetailFields {
   priceMin?: number;
   priceMax?: number;
@@ -12,6 +17,7 @@ export interface FresnoFairDetailFields {
   ticketUrl?: string;
   currency?: string;
   descriptionText?: string;
+  isFree?: boolean;
 }
 
 const BOX_OFFICE_PRICES_RE =
@@ -239,19 +245,21 @@ export function pickFresnoFairDescription(
 export function parseFresnoFairDetailPage(html: string): FresnoFairDetailFields | null {
   const pricing = parseFresnoFairPricing(html);
   const descriptionText = parseFresnoFairDescription(html);
+  const isFree = parseFresnoFairFreeAdmissionFromHtml(html);
 
   const hasPricing =
     typeof pricing.priceMin === "number" ||
     Boolean(pricing.priceNotes?.trim()) ||
     Boolean(pricing.ticketUrl?.trim());
 
-  if (!hasPricing && !descriptionText) {
+  if (!hasPricing && !descriptionText && !isFree) {
     return null;
   }
 
   return {
     ...pricing,
-    ...(descriptionText ? { descriptionText } : {})
+    ...(descriptionText ? { descriptionText } : {}),
+    ...(isFree ? { isFree: true, priceMin: 0, priceMax: 0 } : {})
   };
 }
 
@@ -283,12 +291,19 @@ export function mergeFresnoFairDetail(
   detail: FresnoFairDetailFields | null
 ): NormalizedEvent {
   if (!detail) {
-    return listing;
+    return applyFresnoFairPricePolicy(listing);
   }
 
   const descriptionText = pickFresnoFairDescription(listing.descriptionText, detail.descriptionText);
 
-  return {
+  if (detail.isFree === true) {
+    return applyFresnoFairPricePolicy({
+      ...listing,
+      ...(descriptionText ? { descriptionText } : {})
+    });
+  }
+
+  return applyFresnoFairPricePolicy({
     ...listing,
     ...(typeof detail.priceMin === "number" ? { priceMin: detail.priceMin } : {}),
     ...(typeof detail.priceMax === "number" ? { priceMax: detail.priceMax } : {}),
@@ -296,7 +311,7 @@ export function mergeFresnoFairDetail(
     ...(detail.priceNotes?.trim() ? { priceNotes: detail.priceNotes.trim() } : {}),
     ...(detail.ticketUrl?.trim() ? { ticketUrl: detail.ticketUrl.trim() } : {}),
     ...(descriptionText ? { descriptionText } : {})
-  };
+  });
 }
 
 function applyDescriptionPriceFallback(event: NormalizedEvent): NormalizedEvent {
@@ -331,7 +346,7 @@ export async function enrichFresnoFairEventsWithDetails(
 
   if (dryRun) {
     return {
-      events: events.map(applyDescriptionPriceFallback),
+      events: events.map((event) => applyFresnoFairPricePolicy(applyDescriptionPriceFallback(event))),
       errors: [],
       detailUrlsVisited: 0,
       fetchUrls: []
@@ -405,7 +420,9 @@ export async function enrichFresnoFairEventsWithDetails(
     await sleep(DETAIL_DELAY_MS);
   }
 
-  const enriched = [...bySourceEventId.values()].map(applyDescriptionPriceFallback);
+  const enriched = [...bySourceEventId.values()].map((event) =>
+    applyFresnoFairPricePolicy(applyDescriptionPriceFallback(event))
+  );
 
   console.log(
     JSON.stringify({

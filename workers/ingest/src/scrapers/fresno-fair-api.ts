@@ -4,56 +4,91 @@ import {
   buildFresnoFairApiPayload,
   buildFresnoFairDateList,
   FRESNO_FAIR_API_URL,
-  fresnoFairResponseToEvents
+  FRESNO_FAIR_SEASON_DAY_COUNT,
+  FRESNO_FAIR_SEASON_MONTH,
+  fresnoFairResponseToEvents,
+  fresnoFairScheduleYearsToTry,
+  resolveFresnoFairScheduleYear,
+  seriesIdForFresnoFairSeasonYear
 } from "@/scrapers/fresno-fair-api.utils";
 
 const log = (payload: Record<string, unknown>) =>
   console.log(JSON.stringify({ event: "fresno_fair_api", ...payload }));
 
-export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
+export interface FresnoFairApiRunOptions {
+  seriesId?: string;
+  listingUrl?: string;
+}
+
+export async function run(
+  ctx: ScrapeContext,
+  options: FresnoFairApiRunOptions = {}
+): Promise<ScrapeResult> {
   const started = performance.now();
-  const year = ctx.now.getFullYear();
-  const datesCsv = buildFresnoFairDateList(year, 10, 31);
-  const payload = buildFresnoFairApiPayload(datesCsv);
+  const listingUrl = options.listingUrl ?? "https://www.fresnofair.com/events";
+  const primaryYear = resolveFresnoFairScheduleYear(ctx.now, options.seriesId);
+  const yearsToTry = fresnoFairScheduleYearsToTry(primaryYear);
+
+  let events: ScrapeResult["events"] = [];
+  const errors: ScrapeError[] = [];
+  let resolvedYear = primaryYear;
+  let datesQueried = 0;
 
   try {
-    const response = await fetch(FRESNO_FAIR_API_URL, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": ctx.userAgent
-      },
-      body: JSON.stringify(payload),
-      ...(ctx.signal ? { signal: ctx.signal } : {})
-    });
+    for (const year of yearsToTry) {
+      const datesCsv = buildFresnoFairDateList(year, FRESNO_FAIR_SEASON_MONTH, FRESNO_FAIR_SEASON_DAY_COUNT);
+      const payload = buildFresnoFairApiPayload(datesCsv);
+      datesQueried = datesCsv.split(",").length;
 
-    if (!response.ok) {
-      return finish(ctx, started, [], [
-        {
+      const response = await fetch(FRESNO_FAIR_API_URL, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "User-Agent": ctx.userAgent
+        },
+        body: JSON.stringify(payload),
+        ...(ctx.signal ? { signal: ctx.signal } : {})
+      });
+
+      if (!response.ok) {
+        errors.push({
           source: "fresno-fair-api",
           url: FRESNO_FAIR_API_URL,
-          message: `HTTP ${response.status}`,
+          message: `HTTP ${response.status} (season year ${year})`,
           recoverable: response.status >= 500 || response.status === 429
-        }
-      ]);
+        });
+        continue;
+      }
+
+      const json: unknown = await response.json();
+      const yearEvents = fresnoFairResponseToEvents(json, {
+        seriesId: seriesIdForFresnoFairSeasonYear(year, options.seriesId),
+        listingUrl
+      });
+      if (yearEvents.length > 0) {
+        events = yearEvents;
+        resolvedYear = year;
+        break;
+      }
     }
 
-    const json: unknown = await response.json();
-    const events = fresnoFairResponseToEvents(json, {
-      seriesId: "series:bigfresnofair:2026",
-      listingUrl: "https://www.fresnofair.com/events"
+    log({
+      step: "run_end",
+      eventsFound: events.length,
+      dates: datesQueried,
+      seasonYear: resolvedYear,
+      yearsTried: yearsToTry
     });
 
-    log({ step: "run_end", eventsFound: events.length, dates: datesCsv.split(",").length });
-
-    return finish(ctx, started, events, []);
+    return finish(ctx, started, events, errors);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error;
     }
 
     return finish(ctx, started, [], [
+      ...errors,
       {
         source: "fresno-fair-api",
         url: FRESNO_FAIR_API_URL,

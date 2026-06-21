@@ -5,6 +5,8 @@ import { sleep } from "@/lib/sleep";
 import type { VenueConfig } from "@/venues/venue.types";
 import { resolveDetailMode } from "@/venues/venue-profile.utils";
 
+import { enrichEventWithTicketSiteDetail } from "@/scrapers/ticket-site-detail.utils";
+
 import { DETAIL_DELAY_MS, fetchListingHtml, hostAllowed, mergeListingWithDetail } from "./listing-detail.utils";
 import { parsePlainHtmlDetailPage } from "./html-detail.utils";
 
@@ -60,7 +62,8 @@ export async function enrichApiVenueEventsWithDetailPrices(
       if (!parsed) {
         continue;
       }
-      const merged = mergeListingWithDetail(listing, parsed);
+      let merged = mergeListingWithDetail(listing, parsed);
+      merged = await enrichEventWithTicketSiteDetail(merged, userAgent, { signal: opts.signal });
       if (!hasUsablePrice(merged)) {
         continue;
       }
