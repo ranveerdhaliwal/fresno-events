@@ -5,6 +5,7 @@ import {
   buildNextPacificMonths,
   daysFromIsoThroughSunday,
   isoDateInPacificMonth,
+  resolvePacificDateWindow,
   upcomingSundayIso
 } from "./pacific-date-ranges.js";
 
@@ -36,5 +37,11 @@ describe("pacific-date-ranges", () => {
   it("checks iso date in month", () => {
     expect(isoDateInPacificMonth("2026-06-15", 2026, 6)).toBe(true);
     expect(isoDateInPacificMonth("2026-07-01", 2026, 6)).toBe(false);
+  });
+
+  it("covers a rolling 7-day thisWeek window on Sunday", () => {
+    const window = resolvePacificDateWindow("thisWeek", new Date("2026-06-07T18:00:00-07:00"));
+    expect(window.fromIso).toBe("2026-06-07");
+    expect(window.untilIso).toBe("2026-06-13");
   });
 });

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { resolveEndTs } from "./default-end-ts.js";
 
 describe("resolveEndTs", () => {
-  it("defaults to start + 2 hours", () => {
+  it("defaults to start + 2 hours for runtime scheduling fallbacks", () => {
     const end = resolveEndTs("2026-06-05T20:00:00.000Z");
     expect(end).toBe("2026-06-05T22:00:00.000Z");
   });

@@ -141,12 +141,12 @@ export function resolvePacificDateWindow(preset: DateWindowPreset, now = new Dat
         until: pacificEndOfDay(todayIso)
       };
     case "thisWeek": {
-      const sundayIso = upcomingSundayIso(todayIso);
+      const untilIso = addDaysToIsoDate(todayIso, 6);
       return {
         fromIso: todayIso,
-        untilIso: sundayIso,
+        untilIso,
         from: now,
-        until: pacificEndOfDay(sundayIso)
+        until: pacificEndOfDay(untilIso)
       };
     }
     case "thisWeekend": {

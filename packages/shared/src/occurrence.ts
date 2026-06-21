@@ -38,7 +38,13 @@ const VENUE_ALIASES: Record<string, string> = {
   "paul-paul-theatre": "big-fresno-fair",
   "paul-paul-theater": "big-fresno-fair",
   "fresno-fairgrounds": "big-fresno-fair",
-  "big-fresno-fairgrounds": "big-fresno-fair"
+  "big-fresno-fairgrounds": "big-fresno-fair",
+  "cmac-community-media-access-collaborative": "cmac",
+  "community-media-access-collaborative": "cmac",
+  "1555-van-ness-ave": "cmac",
+  "1555-van-ness-ave-201": "cmac",
+  "1555-van-ness-avenue": "cmac",
+  "1555-van-ness-avenue-201": "cmac"
 };
 
 /** Strip trailing promo/venue noise after normalizeTitle (occurrence matching only). */

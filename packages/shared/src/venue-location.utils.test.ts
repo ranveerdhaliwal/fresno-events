@@ -44,6 +44,15 @@ describe("venue-location.utils", () => {
     );
   });
 
+  it("strips trailing commas and punctuation from street lines", () => {
+    expect(normalizeVenueStreetAddress("326 N Irwin St,", "Hanford")).toBe("326 N Irwin St");
+    expect(normalizeVenueStreetAddress("2650 East Shaw Ave.", "Clovis")).toBe("2650 East Shaw Ave");
+    expect(resolveVenueLocationFields("326 N Irwin St,", "Hanford")).toEqual({
+      venueAddress: "326 N Irwin St",
+      venueCity: "Hanford"
+    });
+  });
+
   it("resolveVenueLocationFields fills city from the mailing line when absent", () => {
     expect(resolveVenueLocationFields("808 4th Street, Clovis, CA 93612")).toEqual({
       venueAddress: "808 4th Street",

@@ -62,6 +62,22 @@ export {
   type OccurrenceFingerprints
 } from "./occurrence.js";
 export {
+  formatTitleSimilarityLabel,
+  isNearCrossSourceTitleMatch,
+  isStrongCrossSourceTitleMatch,
+  sameNormalizedVenue,
+  samePacificShowDate,
+  scoreTitleSimilarity,
+  significantTitleTokens,
+  startTsLookupWindow,
+  venueDateLookupKey,
+  type TitleSimilarityScore
+} from "./title-similarity.utils.js";
+export {
+  applyDisplayPriceRounding,
+  roundDisplayPriceUp
+} from "./price-display.utils.js";
+export {
   isRecurringSeries,
   venueScope,
   listingUrlSeriesAnchor,
@@ -132,6 +148,11 @@ export {
   resolveMapPinEmoji,
   type MapPinEmojiInput
 } from "./map-pin-emoji.js";
+export {
+  decodeHtmlEntities,
+  sanitizeIngestDescriptionText,
+  stripBracketedLinkPlaceholders
+} from "./description-text.utils.js";
 export {
   buildGoogleMapsSearchUrl,
   buildMapsSearchQuery,
@@ -593,6 +614,14 @@ export interface LinkedEventCandidate {
   ticketUrl?: string;
 }
 
+/** Same night + venue, high title overlap, but not linked as duplicate yet. */
+export interface NearMatchCandidate extends LinkedEventCandidate {
+  titleSimilarityScore: number;
+  sharedWordCount: number;
+  similarityLabel: string;
+  sharedWords: string[];
+}
+
 export interface SeriesSiblingCandidate {
   id: string;
   source: EventSource;
@@ -607,6 +636,9 @@ export interface SeriesSiblingCandidate {
 /** Whether ingest has enough structured fields, or detail_page_url still needs a fetch. */
 export type CandidateDetailStatus = "complete" | "pending";
 
+/** Eventbrite ticket-page detail enrichment state (description from __NEXT_DATA__). */
+export type EventbriteDetailStatus = "fetched" | "blocked" | "error";
+
 export interface EventCandidate {
   id: string;
   runId?: string;
@@ -620,6 +652,8 @@ export interface EventCandidate {
   detailStatus: CandidateDetailStatus;
   /** Canonical show/detail URL for backfill when detailStatus is pending. */
   detailPageUrl?: string;
+  /** Set when ticket/external URL is Eventbrite; null = detail page not yet fetched. */
+  eventbriteDetailStatus?: EventbriteDetailStatus | null;
   normalizedEvent: NormalizedEvent;
   rawPayload: Record<string, unknown>;
   dedupeHash: string;
@@ -631,6 +665,10 @@ export interface EventCandidate {
   reviewedAt?: string;
   reviewedBy?: string;
   matchedEventId?: string;
+  /** Live calendar priority when linked to a published event (admin approved tab). */
+  publishedPriority?: number;
+  /** Mirrored hero from the linked published event when candidate imageUrl is empty. */
+  publishedHeroImageUrl?: string;
   occurrenceId: string;
   /** Same-show fingerprint; filters false-positive occurrence_id siblings in admin. */
   occurrenceKey?: string;
@@ -692,6 +730,10 @@ export interface PublishVenuePreview {
 export interface EventCandidateDetailResponse {
   candidate: EventCandidate;
   linkedCandidates?: LinkedEventCandidate[];
+  /** High title overlap at same venue/date but different occurrence — not auto-linked. */
+  nearMatchCandidates?: NearMatchCandidate[];
+  /** When candidate is linked to a canonical row, the primary ingest row for this occurrence. */
+  primaryCandidate?: LinkedEventCandidate;
   seriesSiblings?: SeriesSiblingCandidate[];
   publishedEvent?: Event;
   contentDiff?: ContentDiffSummary;

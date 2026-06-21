@@ -93,16 +93,25 @@ export function parseStreetFromFullAddress(
     );
     const match = suffix.exec(trimmed);
     if (match?.index !== undefined && match.index > 0) {
-      return trimmed.slice(0, match.index).trim();
+      return cleanStreetAddressLine(trimmed.slice(0, match.index).trim());
     }
   }
 
   const mailing = parseMailingAddress(trimmed);
   if (mailing?.street && mailing.street !== trimmed) {
-    return mailing.street;
+    return cleanStreetAddressLine(mailing.street);
   }
 
-  return trimmed;
+  return cleanStreetAddressLine(trimmed);
+}
+
+/** Trim whitespace and decorative trailing punctuation (e.g. `326 N Irwin St,`). */
+export function cleanStreetAddressLine(street: string): string {
+  let value = street.replace(/\s+/g, " ").trim();
+  while (/[,;.\u00a0]$/.test(value)) {
+    value = value.slice(0, -1).trimEnd();
+  }
+  return value;
 }
 
 export function normalizeVenueStreetAddress(
@@ -115,11 +124,16 @@ export function normalizeVenueStreetAddress(
     return null;
   }
 
-  const street = parseStreetFromFullAddress(
+  let street = parseStreetFromFullAddress(
     trimmed,
     city || state ? { ...(city ? { city } : {}), ...(state ? { state } : {}) } : {}
   );
-  return street || null;
+  const mailing = parseMailingAddress(street);
+  if (mailing?.street) {
+    street = mailing.street;
+  }
+  const cleaned = cleanStreetAddressLine(street);
+  return cleaned || null;
 }
 
 /** Split a mailing line into street + city; prefers explicit city, then parsed city from the line. */
@@ -138,7 +152,7 @@ export function resolveVenueLocationFields(
 
   const hintedStreet = normalizeVenueStreetAddress(trimmed, explicitCity, explicitState);
   const mailing = parseMailingAddress(trimmed);
-  const street = hintedStreet ?? mailing?.street ?? trimmed;
+  const street = cleanStreetAddressLine(hintedStreet ?? mailing?.street ?? trimmed);
   const resolvedCity = explicitCity ?? mailing?.city ?? null;
 
   return {
