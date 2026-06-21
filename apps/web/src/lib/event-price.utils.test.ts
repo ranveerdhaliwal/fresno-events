@@ -25,8 +25,8 @@ describe("event-price.utils", () => {
     expect(formatDetailPrice({ ...base, isFree: false, priceMin: 100, priceMax: 110 })).toBe("$100-110");
     expect(formatListPrice({ ...base, isFree: false, priceMin: 77, priceMax: 77 })).toBe("$77");
     expect(formatDetailPrice({ ...base, isFree: false, priceMin: 77, priceMax: 77 })).toBe("$77");
-    expect(formatListPrice({ ...base, isFree: false, priceMin: 40, priceMax: undefined })).toBe("$40");
-    expect(formatDetailPrice({ ...base, isFree: false, priceMin: 40, priceMax: undefined })).toBe("$40");
+    expect(formatListPrice({ ...base, isFree: false, priceMin: 40 })).toBe("$40");
+    expect(formatDetailPrice({ ...base, isFree: false, priceMin: 40 })).toBe("$40");
     const { priceMin: _min, priceMax: _max, isFree: _free, ...noPrice } = base;
     expect(
       formatListPrice({

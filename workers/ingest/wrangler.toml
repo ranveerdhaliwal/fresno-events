@@ -1,9 +1,7 @@
 name = "fresno-events-ingest"
 main = "src/index.ts"
 compatibility_date = "2026-04-24"
-
-[limits]
-cpu_ms = 300_000
+account_id = "b8c559487d24af4a208be0a5584512a9"
 
 # Top-level config = the implicit "local" profile used by `wrangler dev` /
 # `wrangler deploy` without --env. Per-env overrides live below.
@@ -57,6 +55,9 @@ head_sampling_rate = 1
 # No [env.prod.triggers]: prod must not auto-scrape.
 [env.prod]
 name = "fresno-events-ingest"
+
+[env.prod.limits]
+cpu_ms = 300_000
 
 [env.prod.vars]
 APP_ENV = "production"

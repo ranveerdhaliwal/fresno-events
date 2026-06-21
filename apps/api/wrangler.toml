@@ -1,6 +1,7 @@
 name = "fresno-events-api"
 main = "src/index.ts"
 compatibility_date = "2026-04-24"
+account_id = "b8c559487d24af4a208be0a5584512a9"
 
 # Top-level = the implicit "local" profile (used by `wrangler dev` /
 # `wrangler deploy` without --env). Per-env overrides live below.

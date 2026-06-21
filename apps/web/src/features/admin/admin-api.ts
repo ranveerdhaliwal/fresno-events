@@ -59,7 +59,7 @@ export async function verifyAdminToken(token: string): Promise<void> {
   await listCandidates(token, "pending_review", { limit: 1 });
 }
 
-export function reviewTabToStatus(tab: ReviewQueueTab): CandidateStatusFilter {
+export function reviewTabToStatus(tab: ReviewQueueTab): keyof EventCandidateTabCounts {
   switch (tab) {
     case "new":
       return "pending_review";

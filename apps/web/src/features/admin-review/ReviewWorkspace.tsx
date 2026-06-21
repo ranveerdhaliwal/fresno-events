@@ -29,6 +29,7 @@ import {
   listCandidates,
   reviewTabToStatus
 } from "../admin/admin-api";
+import type { BulkApproveBody } from "../admin/admin-api";
 import { adminKeys } from "../admin/admin.queryKeys";
 import {
   buildBulkApprovePriorityById,
@@ -319,13 +320,14 @@ export function ReviewWorkspace({
   });
 
   const approveSelectedMutation = useMutation({
-    mutationFn: (ids: string[]) =>
-      bulkApproveCandidates(token, ids, {
-        reviewedBy: "admin-bulk-ui",
-        ...(buildBulkApprovePriorityById(ids, priorityOverrides)
-          ? { priorityById: buildBulkApprovePriorityById(ids, priorityOverrides) }
-          : {})
-      }),
+    mutationFn: (ids: string[]) => {
+      const body: Omit<BulkApproveBody, "ids"> = { reviewedBy: "admin-bulk-ui" };
+      const priorityById = buildBulkApprovePriorityById(ids, priorityOverrides);
+      if (priorityById) {
+        body.priorityById = priorityById;
+      }
+      return bulkApproveCandidates(token, ids, body);
+    },
     onSuccess: (result) => {
       setApproveMessage(formatBulkApproveMessage(result));
       setSelectedIds(new Set());

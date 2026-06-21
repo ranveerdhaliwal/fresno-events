@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import type { EventCandidate, NormalizedEvent } from "@fresno-events/shared";
+import type { EventCandidate, EventSource, NormalizedEvent } from "@fresno-events/shared";
 
 import {
   buildSeriesDisplayPriorities,
@@ -24,7 +24,7 @@ function makeCandidate(
   startTs: string,
   suggestedPriority: number | undefined,
   externalUrl: string = LISTING_URL,
-  source: string = "api:visitfresnocounty",
+  source: EventSource = "api:visitfresnocounty",
   confidenceScore = 0.7
 ): EventCandidate {
   const normalizedEvent: NormalizedEvent = {
