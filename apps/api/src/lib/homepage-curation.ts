@@ -1,4 +1,9 @@
 import {
+  addDaysToIsoDate,
+  compareEventsByPriorityStart,
+  pacificEndOfDay,
+  pacificStartOfDay,
+  pacificTodayIso,
   resolvePacificDateWindow,
   type EventListItem,
   type EventStatus,
@@ -14,6 +19,7 @@ import { listEventsByIds, listEventsFromSupabase } from "@/lib/supabase-events";
 import { supabaseRequest } from "@/lib/supabase-client";
 
 const HOMEPAGE_LIST_FROM_MS = 6 * 60 * 60 * 1000;
+const HOMEPAGE_FEATURED_LOOKAHEAD_DAYS = 7;
 const SCHEDULED_STATUSES = new Set<EventStatus>(["scheduled", "sold_out", "postponed"]);
 const SLOTS_PER_SECTION = 5;
 
@@ -70,13 +76,46 @@ function slotMap(rows: HomepageSlotDbRow[]): Map<string, string | null> {
   return map;
 }
 
+async function loadFeaturedAutoPool(env: Env, now: Date): Promise<EventListItem[]> {
+  const todayIso = pacificTodayIso(now);
+  const todayWindow = resolvePacificDateWindow("today", now);
+  const tomorrowIso = addDaysToIsoDate(todayIso, 1);
+  const aheadUntilIso = addDaysToIsoDate(todayIso, HOMEPAGE_FEATURED_LOOKAHEAD_DAYS);
+
+  const [todayPool, aheadPool] = await Promise.all([
+    listEventsFromSupabase(env, {
+      from: homepageListFrom(now),
+      until: todayWindow.until,
+      limit: 50
+    }),
+    listEventsFromSupabase(env, {
+      from: pacificStartOfDay(tomorrowIso),
+      until: pacificEndOfDay(aheadUntilIso),
+      limit: 50
+    })
+  ]);
+
+  const seen = new Set<string>();
+  const merged: EventListItem[] = [];
+  for (const item of [...todayPool.items, ...aheadPool.items]) {
+    if (seen.has(item.event.id)) {
+      continue;
+    }
+    seen.add(item.event.id);
+    merged.push(item);
+  }
+
+  return merged
+    .filter((item) => isEventEligibleForHomepage(item.event, now))
+    .sort(compareEventsByPriorityStart);
+}
+
 async function resolveSection(
   env: Env,
   section: HomepageSection,
   pins: Map<string, string | null>,
   placedIds: Set<string>,
-  from: Date,
-  until: Date
+  autoPool: EventListItem[]
 ): Promise<HomepageSlotItem[]> {
   const items: HomepageSlotItem[] = [];
   const pinnedIds: Array<string | null> = [];
@@ -100,31 +139,21 @@ async function resolveSection(
     }
   }
 
+  let autoIndex = 0;
   while (items.length < SLOTS_PER_SECTION) {
-    const auto = await nextAutoEvent(env, from, until, placedIds);
+    while (autoIndex < autoPool.length && placedIds.has(autoPool[autoIndex]!.event.id)) {
+      autoIndex += 1;
+    }
+    const auto = autoPool[autoIndex];
     if (!auto) {
       break;
     }
+    autoIndex += 1;
     items.push({ position: items.length + 1, source: "auto", item: auto });
     placedIds.add(auto.event.id);
   }
 
   return items.map((entry, index) => ({ ...entry, position: index + 1 }));
-}
-
-async function nextAutoEvent(
-  env: Env,
-  from: Date,
-  until: Date,
-  exclude: Set<string>
-): Promise<EventListItem | null> {
-  const pool = await listEventsFromSupabase(env, { from, until, limit: 50 });
-  for (const item of pool.items) {
-    if (!exclude.has(item.event.id) && isEventEligibleForHomepage(item.event)) {
-      return item;
-    }
-  }
-  return null;
 }
 
 async function resolveBiggestMonth(env: Env, now: Date): Promise<EventListItem[]> {
@@ -139,13 +168,12 @@ async function resolveBiggestMonth(env: Env, now: Date): Promise<EventListItem[]
 
 export async function resolveHomepageCuration(env: Env): Promise<HomepageCurationResponse> {
   const now = new Date();
-  const from = homepageListFrom(now);
-  const weekWindow = resolvePacificDateWindow("thisWeek", now);
   const rows = await loadSlotRows(env);
   const pins = slotMap(rows);
   const placedIds = new Set<string>();
+  const autoPool = await loadFeaturedAutoPool(env, now);
 
-  const featured = await resolveSection(env, "featured", pins, placedIds, from, weekWindow.until);
+  const featured = await resolveSection(env, "featured", pins, placedIds, autoPool);
   const biggestMonth = await resolveBiggestMonth(env, now);
 
   return {
