@@ -14,7 +14,8 @@ import { mirrorImageToR2 } from "@/lib/images";
 import { logError, logStructured } from "@/lib/structured-log";
 import {
   partitionCandidatesForApprove,
-  resolveBulkApprovePriority
+  resolveBulkApprovePriority,
+  resolveBulkApprovePriorityForCandidate
 } from "@/routes/review-approve.utils";
 import {
   partitionCandidatesForApproveChanges
@@ -311,8 +312,10 @@ export async function approveCandidatesByIds(
     }
 
     try {
-      const priority =
-        options.priority !== undefined ? options.priority : resolveBulkApprovePriority(candidate);
+      const priority = resolveBulkApprovePriorityForCandidate(candidate, {
+        ...(options.priority !== undefined ? { explicit: options.priority } : {}),
+        ...(options.priorityById !== undefined ? { priorityById: options.priorityById } : {})
+      });
       await approveCandidateCore(env, candidate, {
         priority,
         notes: options.notes,

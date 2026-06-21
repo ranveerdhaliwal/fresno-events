@@ -2,8 +2,10 @@ import {
   EVENT_PRIORITY_DEFAULT,
   EVENT_PRIORITY_MAX,
   EVENT_PRIORITY_MIN,
+  applyDisplayPriceRounding,
   eventCategories,
   pacificTimeBucketKey,
+  resolveVenueLocationFields,
   type EventCandidateStatus,
   type EventCategory,
   type NormalizedEvent
@@ -17,12 +19,29 @@ export function mergeNormalizedEvent(current: NormalizedEvent, override: unknown
     return current;
   }
 
-  return {
+  const merged = {
     ...current,
     ...override,
     source: current.source,
     sourceEventId: current.sourceEventId
   } as NormalizedEvent;
+
+  const withVenue = !merged.venueAddress?.trim()
+    ? merged
+    : (() => {
+        const { venueAddress, venueCity } = resolveVenueLocationFields(
+          merged.venueAddress,
+          merged.venueCity,
+          "CA"
+        );
+        return {
+          ...merged,
+          ...(venueAddress ? { venueAddress } : {}),
+          ...(venueCity ? { venueCity } : {})
+        };
+      })();
+
+  return applyDisplayPriceRounding(withVenue);
 }
 
 export function toCandidateStatus(value: string | undefined | null) {

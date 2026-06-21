@@ -21,6 +21,7 @@ export const candidateSelect = [
   "ticket_url",
   "detail_status",
   "detail_page_url",
+  "eventbrite_detail_status",
   "normalized_event",
   "raw_payload",
   "dedupe_hash",

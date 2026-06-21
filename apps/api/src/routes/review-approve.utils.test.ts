@@ -6,8 +6,10 @@ import {
   mergeBulkApproveResults,
   parseBulkApproveAllLimit,
   parseBulkApproveIds,
+  parseBulkApprovePriorityById,
   partitionCandidatesForApprove,
   resolveBulkApprovePriority,
+  resolveBulkApprovePriorityForCandidate,
   validateBulkApproveIdCount
 } from "@/routes/review-approve.utils";
 
@@ -44,6 +46,30 @@ describe("resolveBulkApprovePriority", () => {
   it("clamps suggested or explicit P0 to default for organic candidates", () => {
     expect(resolveBulkApprovePriority({ suggestedPriority: 0 })).toBe(5);
     expect(resolveBulkApprovePriority({ suggestedPriority: 2 }, 0)).toBe(5);
+  });
+});
+
+describe("parseBulkApprovePriorityById", () => {
+  it("parses per-id overrides and clamps invalid values", () => {
+    expect(
+      parseBulkApprovePriorityById({
+        a: 3,
+        b: 0,
+        c: "nope"
+      })
+    ).toEqual({ a: 3, b: 5 });
+  });
+});
+
+describe("resolveBulkApprovePriorityForCandidate", () => {
+  it("prefers per-id override over batch default and suggested", () => {
+    const candidate = { id: "x", suggestedPriority: 2 };
+    expect(
+      resolveBulkApprovePriorityForCandidate(candidate, {
+        explicit: 4,
+        priorityById: { x: 3 }
+      })
+    ).toBe(3);
   });
 });
 

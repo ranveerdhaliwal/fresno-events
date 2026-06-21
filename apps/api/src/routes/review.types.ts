@@ -23,6 +23,7 @@ export interface SupabaseCandidateRow {
   ticket_url: string | null;
   detail_status: string;
   detail_page_url: string | null;
+  eventbrite_detail_status: string | null;
   normalized_event: unknown;
   raw_payload: unknown;
   dedupe_hash: string;
@@ -118,6 +119,7 @@ export interface BulkApproveChangesRunOptions {
 
 export interface BulkApproveRunOptions {
   priority?: number | undefined;
+  priorityById?: Record<string, number> | undefined;
   notes?: string | undefined;
   reviewedBy?: string | undefined;
   prefetched?: EventCandidate[] | undefined;

@@ -5,6 +5,7 @@ import {
   type EventCandidateDetailResponse,
   type EventCandidateListResponse,
   type EventCandidateTabCounts,
+  type LinkedEventCandidate,
   type CandidateBulkApproveResponse,
   type CandidateBulkApproveChangesResponse,
   type CandidateBulkDeleteResponse,
@@ -25,15 +26,19 @@ import {
   mergeBulkApproveResults,
   parseBulkApproveAllLimit,
   parseBulkApproveIds,
-  validateBulkApproveIdCount
+  parseBulkApprovePriorityById
 } from "@/routes/review-approve.utils";
 import { requireReviewAuth } from "@/routes/review-auth.utils";
 import {
   deleteCandidates,
   bulkRejectCandidates,
   bulkUpdateSuggestedPriority,
+  attachPublishedPriorities,
+  attachPublishedHeroImages,
+  applyReviewQueueListFilters,
   countCandidateTabTotals,
   fetchCandidatesByOccurrenceId,
+  fetchCandidatesNearStartTs,
   getCandidate,
   listAllCandidatesByStatus,
   mapCandidateRow,
@@ -55,6 +60,7 @@ import {
   toCandidateStatus
 } from "@/routes/review-mappers.utils";
 import { toLinkedCandidate } from "@/routes/review-occurrence.utils";
+import { rankNearMatchCandidates } from "@/routes/review-near-match.utils";
 import { resolvePublishVenuePreview } from "@/routes/review-venue-preview.utils";
 import {
   linkCandidatesAsSeries,
@@ -71,8 +77,7 @@ import {
 import {
   chunkApproveChangesIds,
   mergeBulkApproveChangesResults,
-  parseBulkApproveChangesIds,
-  validateBulkApproveChangesIdCount
+  parseBulkApproveChangesIds
 } from "@/routes/review-approve-changes.utils";
 import { getPublishedEventForReview } from "@/routes/review-event.service";
 import { geocodeAddress } from "@/lib/geocode";
@@ -110,17 +115,20 @@ reviewRoute
       limit: String(limit),
       offset: String(offset)
     });
-    if (status === "pending_review") {
-      params.set("canonical_candidate_id", "is.null");
-    }
+    applyReviewQueueListFilters(params, status);
 
     try {
       const rows = await supabaseReviewRequest<SupabaseCandidateRow[]>(
         c.env,
         `/rest/v1/event_candidates?${params}`
       );
+      let items = rows.map(mapCandidateRow);
+      items = await attachPublishedHeroImages(c.env, items);
+      if (status === "approved") {
+        items = await attachPublishedPriorities(c.env, items);
+      }
       return ok<EventCandidateListResponse>(c, {
-        items: rows.map(mapCandidateRow),
+        items,
         generatedAt: new Date().toISOString(),
         offset,
         limit
@@ -251,12 +259,29 @@ reviewRoute
         .filter((row) => row.status !== "duplicate")
         .map(toLinkedCandidate);
 
+      const nearMatchPool = await fetchCandidatesNearStartTs(c.env, candidate.startTs, candidate.id);
+      const nearMatchCandidates = rankNearMatchCandidates(
+        candidate,
+        nearMatchPool,
+        new Set(linkedCandidates.map((row) => row.id))
+      );
+
       const seriesSiblings = await resolveSeriesSiblingsForCandidate(c.env, candidate);
       const publishVenuePreview = await resolvePublishVenuePreview(c.env, candidate.normalizedEvent);
+
+      let primaryCandidate: LinkedEventCandidate | undefined;
+      if (candidate.canonicalCandidateId) {
+        const primary = await getCandidate(c.env, candidate.canonicalCandidateId);
+        if (primary) {
+          primaryCandidate = toLinkedCandidate(primary);
+        }
+      }
 
       return ok<EventCandidateDetailResponse>(c, {
         candidate,
         ...(linkedCandidates.length > 0 ? { linkedCandidates } : {}),
+        ...(nearMatchCandidates.length > 0 ? { nearMatchCandidates } : {}),
+        ...(primaryCandidate ? { primaryCandidate } : {}),
         ...(seriesSiblings.length > 0 ? { seriesSiblings } : {}),
         ...(publishedEvent ? { publishedEvent } : {}),
         ...(contentDiff ? { contentDiff } : {}),
@@ -363,19 +388,23 @@ reviewRoute
       return fail(c, "invalid_request", "ids must be a non-empty array.", 400);
     }
 
-    const countError = validateBulkApproveIdCount(ids);
-    if (countError) {
-      return fail(c, "invalid_request", countError, 400);
-    }
-
     try {
       const explicitPriority = parseOptionalApprovePriority(body.priority);
-      const result = await approveCandidatesByIds(c.env, ids, {
+      const priorityById = parseBulkApprovePriorityById(body.priorityById);
+      const approveOptions = {
         priority: explicitPriority,
+        priorityById,
         notes: typeof body.notes === "string" ? body.notes : undefined,
         reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin"
-      });
-      return ok<CandidateBulkApproveResponse>(c, result);
+      };
+      const chunks = chunkIds(ids);
+      const parts: CandidateBulkApproveResponse[] = [];
+
+      for (const chunk of chunks) {
+        parts.push(await approveCandidatesByIds(c.env, chunk, approveOptions));
+      }
+
+      return ok<CandidateBulkApproveResponse>(c, mergeBulkApproveResults(parts));
     } catch (error) {
       return handleReviewError(c, error, "Candidates could not be approved.");
     }
@@ -390,6 +419,7 @@ reviewRoute
 
     try {
       const explicitPriority = parseOptionalApprovePriority(body.priority);
+      const priorityById = parseBulkApprovePriorityById(body.priorityById);
       const limit = parseBulkApproveAllLimit(body.limit);
       const candidates = await listAllCandidatesByStatus(c.env, status, limit);
       const ids = candidates.map((candidate) => candidate.id);
@@ -400,6 +430,7 @@ reviewRoute
         parts.push(
           await approveCandidatesByIds(c.env, chunk, {
             priority: explicitPriority,
+            priorityById,
             notes: typeof body.notes === "string" ? body.notes : undefined,
             reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin",
             prefetched: candidates
@@ -446,19 +477,21 @@ reviewRoute
       return fail(c, "invalid_request", "ids must be a non-empty array.", 400);
     }
 
-    const countError = validateBulkApproveChangesIdCount(ids);
-    if (countError) {
-      return fail(c, "invalid_request", countError, 400);
-    }
-
     try {
       const explicitPriority = parseOptionalApprovePriority(body.priority);
-      const result = await approveChangesByIds(c.env, ids, {
+      const approveOptions = {
         priority: explicitPriority,
         notes: typeof body.notes === "string" ? body.notes : undefined,
         reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin"
-      });
-      return ok<CandidateBulkApproveChangesResponse>(c, result);
+      };
+      const chunks = chunkApproveChangesIds(ids);
+      const parts: CandidateBulkApproveChangesResponse[] = [];
+
+      for (const chunk of chunks) {
+        parts.push(await approveChangesByIds(c.env, chunk, approveOptions));
+      }
+
+      return ok<CandidateBulkApproveChangesResponse>(c, mergeBulkApproveChangesResults(parts));
     } catch (error) {
       return handleReviewError(c, error, "Candidate changes could not be approved.");
     }

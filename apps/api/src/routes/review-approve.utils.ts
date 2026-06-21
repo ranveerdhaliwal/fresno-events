@@ -44,6 +44,38 @@ export function resolveBulkApprovePriority(
   return EVENT_PRIORITY_DEFAULT;
 }
 
+export function parseBulkApprovePriorityById(value: unknown): Record<string, number> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const out: Record<string, number> = {};
+  for (const [id, rawPriority] of Object.entries(value)) {
+    if (typeof id !== "string" || id.length === 0 || typeof rawPriority !== "number") {
+      continue;
+    }
+    out[id] = resolveBulkApprovePriority({}, rawPriority);
+  }
+
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+export function resolveBulkApprovePriorityForCandidate(
+  candidate: Pick<EventCandidate, "id" | "suggestedPriority">,
+  options: { explicit?: number; priorityById?: Record<string, number> }
+): number {
+  const perId = options.priorityById?.[candidate.id];
+  if (perId !== undefined) {
+    return resolveBulkApprovePriority(candidate, perId);
+  }
+
+  if (options.explicit !== undefined) {
+    return resolveBulkApprovePriority(candidate, options.explicit);
+  }
+
+  return resolveBulkApprovePriority(candidate);
+}
+
 /** Ingest candidates are organic; P0 is for manually published sponsored events only. */
 function clampOrganicApprovePriority(value: number): number {
   if (!Number.isInteger(value) || value < EVENT_PRIORITY_MIN || value > EVENT_PRIORITY_MAX) {

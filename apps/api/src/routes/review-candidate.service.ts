@@ -3,6 +3,7 @@ import type {
   CandidateBulkPriorityResponse,
   CandidateBulkRejectResponse,
   CandidateDetailStatus,
+  EventbriteDetailStatus,
   EventCandidate,
   EventCandidateStatus,
   EventCandidateTabCounts,
@@ -11,7 +12,7 @@ import type {
 
 import type { Env } from "@/env";
 import { toEventSource } from "@/lib/event-source";
-import { clampSuggestedPriorityForOrganicEvent } from "@fresno-events/shared";
+import { clampSuggestedPriorityForOrganicEvent, EVENT_PRIORITY_DEFAULT } from "@fresno-events/shared";
 import { partitionCandidatesForDelete } from "@/routes/review-delete.utils";
 import { candidateSelect } from "@/routes/review.constants";
 import { parseContentRangeTotal, toCandidateStatus, toRecord } from "@/routes/review-mappers.utils";
@@ -20,6 +21,13 @@ import type { CandidatePatch, SupabaseCandidateRow } from "@/routes/review.types
 
 function toDetailStatus(raw: string): CandidateDetailStatus {
   return raw === "complete" ? "complete" : "pending";
+}
+
+function toEventbriteDetailStatus(raw: string | null): EventbriteDetailStatus | null {
+  if (raw === "fetched" || raw === "blocked" || raw === "error") {
+    return raw;
+  }
+  return null;
 }
 
 export function mapCandidateRow(row: SupabaseCandidateRow): EventCandidate {
@@ -43,6 +51,7 @@ export function mapCandidateRow(row: SupabaseCandidateRow): EventCandidate {
     ...(row.ticket_url ? { ticketUrl: row.ticket_url } : {}),
     detailStatus: toDetailStatus(row.detail_status),
     ...(row.detail_page_url ? { detailPageUrl: row.detail_page_url } : {}),
+    eventbriteDetailStatus: toEventbriteDetailStatus(row.eventbrite_detail_status),
     ...(row.review_notes ? { reviewNotes: row.review_notes } : {}),
     ...(row.reviewed_at ? { reviewedAt: row.reviewed_at } : {}),
     ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
@@ -51,6 +60,88 @@ export function mapCandidateRow(row: SupabaseCandidateRow): EventCandidate {
     ...(row.occurrence_key ? { occurrenceKey: row.occurrence_key } : {}),
     ...(row.canonical_candidate_id ? { canonicalCandidateId: row.canonical_candidate_id } : {})
   };
+}
+
+export async function attachPublishedPriorities(
+  env: Env,
+  candidates: EventCandidate[]
+): Promise<EventCandidate[]> {
+  const eventIds = [
+    ...new Set(
+      candidates
+        .map((candidate) => candidate.matchedEventId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+    )
+  ];
+
+  if (eventIds.length === 0) {
+    return candidates;
+  }
+
+  const params = new URLSearchParams({
+    select: "id,priority",
+    id: `in.(${eventIds.join(",")})`
+  });
+  const rows = await supabaseReviewRequest<Array<{ id: string; priority: number | null }>>(
+    env,
+    `/rest/v1/events?${params}`
+  );
+  const priorityByEventId = new Map(
+    rows.map((row) => [row.id, row.priority ?? EVENT_PRIORITY_DEFAULT] as const)
+  );
+
+  return candidates.map((candidate) => {
+    if (!candidate.matchedEventId) {
+      return candidate;
+    }
+    const publishedPriority = priorityByEventId.get(candidate.matchedEventId);
+    return publishedPriority !== undefined ? { ...candidate, publishedPriority } : candidate;
+  });
+}
+
+export async function attachPublishedHeroImages(
+  env: Env,
+  candidates: EventCandidate[]
+): Promise<EventCandidate[]> {
+  const needsFallback = candidates.filter(
+    (candidate) =>
+      candidate.matchedEventId &&
+      !candidate.normalizedEvent.imageUrl?.trim()
+  );
+  if (needsFallback.length === 0) {
+    return candidates;
+  }
+
+  const eventIds = [
+    ...new Set(
+      needsFallback
+        .map((candidate) => candidate.matchedEventId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+    )
+  ];
+
+  const params = new URLSearchParams({
+    select: "id,hero_image:images(cdn_url)",
+    id: `in.(${eventIds.join(",")})`
+  });
+  const rows = await supabaseReviewRequest<
+    Array<{ id: string; hero_image: { cdn_url: string } | null }>
+  >(env, `/rest/v1/events?${params}`);
+  const heroByEventId = new Map(
+    rows
+      .map((row) => [row.id, row.hero_image?.cdn_url?.trim() ?? ""] as const)
+      .filter((entry): entry is [string, string] => entry[1].length > 0)
+  );
+
+  return candidates.map((candidate) => {
+    if (!candidate.matchedEventId || candidate.normalizedEvent.imageUrl?.trim()) {
+      return candidate;
+    }
+    const publishedHeroImageUrl = heroByEventId.get(candidate.matchedEventId);
+    return publishedHeroImageUrl
+      ? { ...candidate, publishedHeroImageUrl }
+      : candidate;
+  });
 }
 
 export async function getCandidate(env: Env, id: string) {
@@ -146,6 +237,34 @@ export async function fetchCandidatesByListingUrl(
   return rows.map(mapCandidateRow);
 }
 
+export async function fetchCandidatesNearStartTs(
+  env: Env,
+  startTs: string,
+  excludeId: string
+): Promise<EventCandidate[]> {
+  const instant = new Date(startTs);
+  if (Number.isNaN(instant.getTime())) {
+    return [];
+  }
+
+  const windowMs = 36 * 60 * 60 * 1000;
+  const from = new Date(instant.getTime() - windowMs).toISOString();
+  const to = new Date(instant.getTime() + windowMs).toISOString();
+  const params = new URLSearchParams({
+    select: candidateSelect,
+    and: `(start_ts.gte.${from},start_ts.lte.${to})`,
+    status: "in.(awaiting_enrichment,pending_review,needs_changes,approved)",
+    id: `neq.${excludeId}`,
+    limit: "200"
+  });
+
+  const rows = await supabaseReviewRequest<SupabaseCandidateRow[]>(
+    env,
+    `/rest/v1/event_candidates?${params}`
+  );
+  return rows.map(mapCandidateRow);
+}
+
 export async function fetchCandidatesBySeriesId(
   env: Env,
   seriesId: string,
@@ -176,15 +295,20 @@ const REVIEW_TAB_COUNT_STATUSES = [
   "rejected"
 ] as const satisfies readonly EventCandidateStatus[];
 
+/** Primaries only — linked secondaries are not actionable in New/Updates queues. */
+export function applyReviewQueueListFilters(params: URLSearchParams, status: EventCandidateStatus): void {
+  if (status === "pending_review" || status === "needs_changes") {
+    params.set("canonical_candidate_id", "is.null");
+  }
+}
+
 export async function countCandidatesByStatus(env: Env, status: EventCandidateStatus): Promise<number> {
   const params = new URLSearchParams({
     select: "id",
     status: `eq.${status}`,
     limit: "0"
   });
-  if (status === "pending_review") {
-    params.set("canonical_candidate_id", "is.null");
-  }
+  applyReviewQueueListFilters(params, status);
 
   const { url, key } = getSupabaseServiceConfigOrThrow(env);
   const response = await fetch(`${url}/rest/v1/event_candidates?${params}`, {
@@ -228,9 +352,7 @@ export async function listAllCandidatesByStatus(
       limit: String(pageSize),
       offset: String(offset)
     });
-    if (status === "pending_review") {
-      params.set("canonical_candidate_id", "is.null");
-    }
+    applyReviewQueueListFilters(params, status);
     const rows = await supabaseReviewRequest<SupabaseCandidateRow[]>(
       env,
       `/rest/v1/event_candidates?${params}`
