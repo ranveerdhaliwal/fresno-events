@@ -109,8 +109,11 @@ resolve_ipv4() {
 build_cloud_pg_uri() {
   local host="$1"
   local user="$2"
-  local ipv4
-  ipv4="$(resolve_ipv4 "$host")"
+  local use_hostaddr="${3:-true}"
+  local ipv4=""
+  if [[ "$use_hostaddr" == "true" ]]; then
+    ipv4="$(resolve_ipv4 "$host")"
+  fi
   if [[ -n "$ipv4" ]]; then
     echo "postgresql://${user}:${DB_PASSWORD}@${host}:5432/postgres?sslmode=require&hostaddr=${ipv4}"
   else
@@ -134,7 +137,7 @@ elif [[ -f "$POOLER_URL_FILE" ]]; then
 fi
 
 if [[ "$CLOUD_CONNECT_MODE" == "pooler" && -n "$CLOUD_DB_HOST" ]]; then
-  CLOUD_PG="$(build_cloud_pg_uri "$CLOUD_DB_HOST" "postgres.${PROJECT_REF}")"
+  CLOUD_PG="$(build_cloud_pg_uri "$CLOUD_DB_HOST" "postgres.${PROJECT_REF}" "false")"
   CLOUD_DB_IPV4="$(resolve_ipv4 "$CLOUD_DB_HOST")"
 else
   CLOUD_DB_HOST="db.${PROJECT_REF}.supabase.co"

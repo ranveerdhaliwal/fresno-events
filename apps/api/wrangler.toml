@@ -27,7 +27,7 @@ name = "fresno-events-api-dev"
 [env.dev.vars]
 APP_ENV = "dev"
 # Dev preview Pages URL goes here once you create the Pages project.
-ALLOWED_ORIGINS = "http://localhost:5182"
+ALLOWED_ORIGINS = "http://localhost:5182,https://whatupfresno.com,https://www.whatupfresno.com"
 
 [[env.dev.r2_buckets]]
 binding = "EVENT_IMAGES"
