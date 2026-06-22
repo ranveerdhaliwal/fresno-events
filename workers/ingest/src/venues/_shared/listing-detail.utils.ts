@@ -196,7 +196,9 @@ export async function enrichListingsWithDetails(input: EnrichDetailsInput): Prom
         const html = await fetchListingHtml(url, userAgent, signal);
         const parsed = parseDetailPage(html, url, config);
         let merged = mergeListingWithDetail(listing, parsed);
-        merged = await enrichEventWithTicketSiteDetail(merged, userAgent, { signal });
+        merged = await enrichEventWithTicketSiteDetail(merged, userAgent, {
+          ...(signal ? { signal } : {})
+        });
         bySourceEventId.set(listing.sourceEventId, merged);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {

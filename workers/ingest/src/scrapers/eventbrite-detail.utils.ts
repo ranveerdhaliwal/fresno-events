@@ -337,7 +337,10 @@ export function preserveEventbriteEnrichedDescription(
   const existingDesc = existing.descriptionText?.trim() ?? "";
   const incomingDesc = result.descriptionText?.trim() ?? "";
   if (shouldReplaceEventbriteDescription(incomingDesc, existingDesc)) {
-    result = { ...result, descriptionText: existing.descriptionText };
+    const preservedDesc = existing.descriptionText;
+    if (preservedDesc !== undefined) {
+      result = { ...result, descriptionText: preservedDesc };
+    }
   }
 
   const existingImage = existing.imageUrl?.trim();

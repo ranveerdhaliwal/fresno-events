@@ -63,7 +63,9 @@ export async function enrichApiVenueEventsWithDetailPrices(
         continue;
       }
       let merged = mergeListingWithDetail(listing, parsed);
-      merged = await enrichEventWithTicketSiteDetail(merged, userAgent, { signal: opts.signal });
+      merged = await enrichEventWithTicketSiteDetail(merged, userAgent, {
+        ...(opts.signal ? { signal: opts.signal } : {})
+      });
       if (!hasUsablePrice(merged)) {
         continue;
       }

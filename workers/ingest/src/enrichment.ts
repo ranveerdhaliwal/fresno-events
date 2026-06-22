@@ -599,7 +599,7 @@ async function rejectIngestExcludedCandidate(
   }
   const exclusion = getIngestExclusion({
     title: row.normalized_event.title,
-    descriptionText: row.normalized_event.descriptionText
+    descriptionText: row.normalized_event.descriptionText ?? null
   });
   if (!exclusion) {
     return false;

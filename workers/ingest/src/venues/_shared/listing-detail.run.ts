@@ -1,4 +1,4 @@
-import type { NormalizedEvent, ScrapeError } from "@fresno-events/shared";
+import type { EventSource, NormalizedEvent, ScrapeError } from "@fresno-events/shared";
 
 import { extractEventsFromMarkdown, type ExtractorVariant } from "@/ai/extractor";
 import { buildTicketsauceRangeUrl } from "@/browser-rendering/crawl-targets.utils";
@@ -366,7 +366,7 @@ export async function runListingThenDetailPipeline(
   }
 
   const listings: NormalizedEvent[] = [];
-  const scrapeSource = `scrape:${config.sourceHostname?.replace(/^www\./, "") ?? new URL(seedUrl).hostname.replace(/^www\./, "")}`;
+  const scrapeSource = `scrape:${config.sourceHostname?.replace(/^www\./, "") ?? new URL(seedUrl).hostname.replace(/^www\./, "")}` as EventSource;
 
   if (useBrListing) {
     for (const listingUrl of listingUrls) {

@@ -1,4 +1,5 @@
 import type { NormalizedEvent, ScrapeError } from "@fresno-events/shared";
+import type { AnyNode } from "domhandler";
 import { load } from "cheerio";
 
 import { sleep } from "@/lib/sleep";
@@ -137,7 +138,7 @@ export function cleanFresnoFairDescriptionText(text: string): string {
   return lines.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function textMediaBlockToPlainText($: ReturnType<typeof load>, el: unknown): string {
+function textMediaBlockToPlainText($: ReturnType<typeof load>, el: AnyNode): string {
   const block = $(el).clone();
   block.find("script, style, noscript").remove();
   block.find("br").replaceWith("\n");
@@ -157,7 +158,7 @@ function textMediaBlockToPlainText($: ReturnType<typeof load>, el: unknown): str
     .trim();
 }
 
-function blockHasParagraphCopy($: ReturnType<typeof load>, el: unknown): boolean {
+function blockHasParagraphCopy($: ReturnType<typeof load>, el: AnyNode): boolean {
   return $(el)
     .find("p")
     .toArray()
@@ -166,7 +167,7 @@ function blockHasParagraphCopy($: ReturnType<typeof load>, el: unknown): boolean
 
 function pickPrimaryDescriptionBlock(
   $: ReturnType<typeof load>,
-  candidates: Array<{ el: unknown; text: string }>
+  candidates: Array<{ el: AnyNode; text: string }>
 ): string | undefined {
   const scored = candidates
     .map(({ el, text }) => {
@@ -197,15 +198,15 @@ function pickPrimaryDescriptionBlock(
  */
 export function parseFresnoFairDescription(html: string): string | undefined {
   const $ = load(html);
-  const candidates: Array<{ el: unknown; text: string }> = [];
+  const candidates: Array<{ el: AnyNode; text: string }> = [];
 
   $(".entityContainerModule.TextMediaModule .modulePageTextMedia").each((_, el) => {
-    const text = textMediaBlockToPlainText($, el);
+    const text = textMediaBlockToPlainText($, el as AnyNode);
     const cleaned = cleanFresnoFairDescriptionText(text);
     if (cleaned.length < 40) {
       return;
     }
-    candidates.push({ el, text });
+    candidates.push({ el: el as AnyNode, text });
   });
 
   let primary = pickPrimaryDescriptionBlock($, candidates);

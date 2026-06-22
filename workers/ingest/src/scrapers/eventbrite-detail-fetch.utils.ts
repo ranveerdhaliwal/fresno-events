@@ -1,7 +1,8 @@
 import { sleep } from "@/lib/sleep";
 import {
   looksLikeEventbriteBlockPage,
-  parseEventbriteDetailHtml
+  parseEventbriteDetailHtml,
+  type EventbriteDetailFields
 } from "@/scrapers/eventbrite-detail.utils";
 
 export const DEFAULT_EVENTBRITE_DETAIL_USER_AGENT =
@@ -15,7 +16,7 @@ const FETCH_RETRIES = 1;
 const RETRY_BASE_MS = 1500;
 
 export type EventbriteDetailFetchOutcome =
-  | { kind: "ok"; html: string; detail: ReturnType<typeof parseEventbriteDetailHtml> }
+  | { kind: "ok"; html: string; detail: EventbriteDetailFields }
   | { kind: "blocked"; message: string }
   | { kind: "error"; message: string };
 

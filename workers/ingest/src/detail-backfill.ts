@@ -117,7 +117,7 @@ export async function runDetailBackfill(
   }
 
   const limit = Math.min(Math.max(options.limit ?? 50, 1), MAX_LIMIT);
-  const userAgent = options.userAgent ?? env.INGEST_USER_AGENT ?? DEFAULT_USER_AGENT;
+  const userAgent = options.userAgent ?? env.USER_AGENT ?? DEFAULT_USER_AGENT;
   const summary: DetailBackfillSummary = {
     fetched_urls: 0,
     updated_candidates: 0,

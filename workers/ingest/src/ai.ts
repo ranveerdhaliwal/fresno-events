@@ -21,7 +21,7 @@ export interface AiEnrichment {
 
 export interface AiDiscoveryItem {
   title: string;
-  startTs: string;
+  startTs?: string;
   venueName: string;
   venueAddress?: string;
   venueCity?: string;

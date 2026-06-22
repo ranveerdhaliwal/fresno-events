@@ -119,7 +119,11 @@ export function resolveVenuniteVenueLocation(
 
   const fullAddress = venueDetail?.address?.trim();
   const venueAddress = fullAddress
-    ? parseStreetFromFullAddress(fullAddress, { city, state, zip })
+    ? parseStreetFromFullAddress(fullAddress, {
+        city,
+        ...(state ? { state } : {}),
+        ...(zip ? { zip } : {})
+      })
     : undefined;
 
   return {
@@ -155,6 +159,8 @@ export function toNormalizedEvent(
     venueLocation
   );
 
+  const endTs = eventDetail?.endDate ?? event.endDate;
+
   const listing: NormalizedEvent = {
     source: "venunite",
     sourceEventId: resolveSourceEventId(event),
@@ -166,7 +172,7 @@ export function toNormalizedEvent(
     subcategories: eventDetail?.categories ?? event.categories ?? [],
     tags: buildVenuniteTags(event, eventDetail),
     ...venueLocation,
-    ...(eventDetail?.endDate || event.endDate ? { endTs: eventDetail?.endDate ?? event.endDate } : {}),
+    ...(endTs ? { endTs } : {}),
     ...(descriptionText ? { descriptionText } : {}),
     ...priceFields,
     ...(listingUrl ? { externalUrl: listingUrl, ticketUrl: listingUrl } : {}),

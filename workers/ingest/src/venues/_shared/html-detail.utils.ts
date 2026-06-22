@@ -190,7 +190,9 @@ function readEventImageFromHtml($: CheerioRoot): string | undefined {
   return undefined;
 }
 
-function readVenueFieldsFromHtml($: CheerioRoot): Pick<AiDiscoveryItem, "venueName" | "venueAddress" | "venueCity"> {
+function readVenueFieldsFromHtml(
+  $: CheerioRoot
+): Partial<Pick<AiDiscoveryItem, "venueName" | "venueAddress" | "venueCity">> {
   let venueName: string | undefined;
   let venueAddress: string | undefined;
   let venueCity: string | undefined;

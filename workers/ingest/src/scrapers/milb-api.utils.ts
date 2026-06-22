@@ -42,7 +42,7 @@ export const GRIZZLIES_TICKETS_ORG_URL = "https://mlb.tickets.com/?orgId=57456&a
 
 const GRIZZLIES_TEAM_ID = 259;
 
-function teamSlug(team: { teamName?: string; name: string }): string {
+function teamSlug(team: { teamName?: string | undefined; name: string }): string {
   const raw = team.teamName?.trim() || team.name.split(/\s+/).pop() || team.name;
   return raw
     .toLowerCase()

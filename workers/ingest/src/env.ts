@@ -22,6 +22,8 @@ export interface IngestEnv {
   CLOUDFLARE_API_TOKEN?: string;
   MAX_PAGES_PER_SEED?: string;
   MAX_CRAWL_DEPTH?: string;
+  /** Max Ticketmaster Discovery API pages per ingest run (default 5). */
+  TICKETMASTER_MAX_PAGES?: string;
   VISIT_FRESNO_API_TOKEN?: string;
   /** Save Mart Saffire REST token (optional; scraped from listing page when omitted). */
   SAVE_MART_EVENTS_TOKEN?: string;

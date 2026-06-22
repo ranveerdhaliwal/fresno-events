@@ -17,6 +17,7 @@ import {
   pickSeriesRepresentativeRow,
   rowSeriesId,
   splitEventbriteSeriesDescription,
+  type EventbriteBackfillRowLike,
   type EventbriteFetchUnit
 } from "@/scrapers/eventbrite-detail-series.utils";
 import {
@@ -48,12 +49,8 @@ export interface EventbriteDetailBackfillSummary {
   errors: number;
 }
 
-interface EventbriteBackfillRow {
-  id: string;
+interface EventbriteBackfillRow extends EventbriteBackfillRowLike {
   source: string;
-  title: string;
-  normalized_event: NormalizedEvent;
-  eventbrite_detail_status: string | null;
 }
 
 export interface EventbriteDetailBackfillOptions {
@@ -70,7 +67,7 @@ export interface EventbriteDetailBackfillOptions {
   sourceFilter?: string;
 }
 
-function rowEventbriteUrl(row: EventbriteBackfillRow): string | null {
+function rowEventbriteUrl(row: EventbriteBackfillRowLike): string | null {
   const raw = resolveEventbriteUrlFromEvent(row.normalized_event);
   if (!raw) {
     return null;
@@ -263,7 +260,7 @@ async function buildSeriesMemberCounts(
 
 async function patchCandidate(
   config: NonNullable<ReturnType<typeof getSupabaseConfig>>,
-  row: EventbriteBackfillRow,
+  row: EventbriteBackfillRowLike,
   merged: NormalizedEvent,
   status: EventbriteDetailStatus | null,
   dryRun: boolean

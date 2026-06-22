@@ -9,6 +9,9 @@ export interface SaveMartApiMonthRange {
 
 function addDaysYmd(ymd: string, days: number): string {
   const [year, month, day] = ymd.split("-").map(Number);
+  if (year === undefined || month === undefined || day === undefined) {
+    return ymd;
+  }
   const dt = new Date(Date.UTC(year, month - 1, day + days));
   return dt.toISOString().slice(0, 10);
 }

@@ -27,6 +27,7 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
   const endDateTime = typeof ctx.config.endDateTime === "string" ? ctx.config.endDateTime : undefined;
 
   try {
+    const maxPages = readNumber(ctx.config.maxPages) ?? readNumber(ctx.secrets.TICKETMASTER_MAX_PAGES) ?? undefined;
     const { events, pagesVisited } = await fetchAllTicketmasterEvents({
       apiKey,
       lat: fresnoSearchArea.lat,
@@ -35,7 +36,8 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
       startDateTime,
       ...(endDateTime ? { endDateTime } : {}),
       userAgent: ctx.userAgent,
-      ...(ctx.signal ? { signal: ctx.signal } : {})
+      ...(ctx.signal ? { signal: ctx.signal } : {}),
+      ...(maxPages !== undefined ? { maxPages } : {})
     });
 
     return createResult(ctx, events, [], pagesVisited, started);

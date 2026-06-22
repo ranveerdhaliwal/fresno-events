@@ -76,7 +76,10 @@ export async function analyzeEventsForPersist(
     const normalized = eventForPersistAnalysis(event);
     const existing = resolveExistingCandidate(event, existingByKey);
     const fingerprint = await contentFingerprint(normalized);
-    const exclusion = getIngestExclusion({ title: event.title, descriptionText: event.descriptionText });
+    const exclusion = getIngestExclusion({
+      title: event.title,
+      descriptionText: event.descriptionText ?? null
+    });
     const status = exclusion ? "rejected" : resolveStatusOnRescrape(existing, fingerprint);
     const contentChanged = existing ? fingerprintChanged(existing, fingerprint) : true;
     const exclusionFields = exclusion ? { ingestExclusion: exclusion } : {};
