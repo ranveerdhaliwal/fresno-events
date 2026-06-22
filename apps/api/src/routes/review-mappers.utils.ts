@@ -241,7 +241,7 @@ export function buildEventSlug(
   const dateSuffix = `-${dateTimePart}`;
   const maxTitleLength = maxLength - dateSuffix.length;
   if (maxTitleLength < 8) {
-    return slugify(datePart, maxLength);
+    return slugify(dateTimePart, maxLength);
   }
 
   const titleSlug = slugify(title, maxTitleLength * 4);

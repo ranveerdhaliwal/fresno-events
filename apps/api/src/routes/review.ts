@@ -609,10 +609,13 @@ reviewRoute
     }
 
     try {
-      const result = await bulkRejectCandidates(c.env, ids, {
-        notes: typeof body.notes === "string" ? body.notes : undefined,
+      const rejectOptions: { notes?: string; reviewedBy?: string } = {
         reviewedBy: typeof body.reviewedBy === "string" ? body.reviewedBy : "admin-bulk-ui"
-      });
+      };
+      if (typeof body.notes === "string") {
+        rejectOptions.notes = body.notes;
+      }
+      const result = await bulkRejectCandidates(c.env, ids, rejectOptions);
       return ok<CandidateBulkRejectResponse>(c, result);
     } catch (error) {
       return handleReviewError(c, error, "Candidates could not be rejected.");

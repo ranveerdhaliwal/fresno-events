@@ -54,7 +54,7 @@ function addSummaries(
   total: ReviewVenueGeocodeSummary,
   batch: ReviewVenueGeocodeSummary
 ): ReviewVenueGeocodeSummary {
-  return {
+  const merged: ReviewVenueGeocodeSummary = {
     scanned: total.scanned + batch.scanned,
     geocoded: total.geocoded + batch.geocoded,
     skipped: total.skipped + batch.skipped,
@@ -62,11 +62,18 @@ function addSummaries(
     venueScanned: total.venueScanned + batch.venueScanned,
     candidateScanned: total.candidateScanned + batch.candidateScanned,
     candidateGeocoded: total.candidateGeocoded + batch.candidateGeocoded,
-    batchesRun: (total.batchesRun ?? 0) + (batch.batchesRun ?? 0),
-    remaining: total.remaining,
-    remainingVenues: total.remainingVenues,
-    remainingCandidates: total.remainingCandidates
+    batchesRun: (total.batchesRun ?? 0) + (batch.batchesRun ?? 0)
   };
+  if (total.remaining !== undefined) {
+    merged.remaining = total.remaining;
+  }
+  if (total.remainingVenues !== undefined) {
+    merged.remainingVenues = total.remainingVenues;
+  }
+  if (total.remainingCandidates !== undefined) {
+    merged.remainingCandidates = total.remainingCandidates;
+  }
+  return merged;
 }
 
 function hasCandidateCoords(event: NormalizedEvent): boolean {

@@ -21,7 +21,7 @@ describe("buildContentDiff", () => {
         {
           title: proposed.title,
           startTs: proposed.startTs,
-          category: proposed.category ?? "other",
+          category: proposed.category ?? "community",
           venueName: proposed.venueName,
           ...(proposed.descriptionText ? { descriptionText: proposed.descriptionText } : {})
         },
@@ -35,7 +35,7 @@ describe("buildContentDiff", () => {
       {
         title: "Old title",
         startTs: proposed.startTs,
-        category: "other",
+        category: "community",
         venueName: proposed.venueName,
         descriptionText: "Old description"
       },
@@ -55,7 +55,6 @@ describe("buildContentDiff", () => {
         startTs: proposed.startTs,
         category: proposed.category ?? "other",
         venueName: proposed.venueName,
-        descriptionText: proposed.descriptionText,
         priceMin: 20,
         priceMax: 40
       },

@@ -44,7 +44,7 @@ function readAuditEnv(): {
         title: row.title,
         venueName: "Venue",
         startTs: row.startTs,
-        category: "other"
+        category: "community"
       },
       rawPayload: {},
       dedupeHash: "hash",

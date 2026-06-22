@@ -17,7 +17,7 @@ function primary(
       title: patch.title,
       venueName: "Save Mart Center",
       startTs: patch.startTs,
-      category: "other"
+      category: "community"
     },
     rawPayload: {},
     dedupeHash: "hash",
@@ -65,8 +65,7 @@ describe("buildReviewQueueAudit", () => {
         primary({
           id: "tm-1",
           title: "Headliner",
-          startTs: "2026-08-01T02:00:00.000Z",
-          reviewNotes: null
+          startTs: "2026-08-01T02:00:00.000Z"
         })
       ],
       linkedDuplicates: [{ id: "dup-1", title: "Duplicate row", canonicalCandidateId: "primary-1" }],

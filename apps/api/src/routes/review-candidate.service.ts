@@ -288,14 +288,6 @@ export async function fetchCandidatesBySeriesId(
   return rows.map(mapCandidateRow);
 }
 
-const REVIEW_TAB_COUNT_STATUSES = [
-  "pending_review",
-  "needs_changes",
-  "approved",
-  "rejected"
-] as const satisfies readonly EventCandidateStatus[];
-
-/** Primaries only — linked secondaries are not actionable in New/Updates queues. */
 export function applyReviewQueueListFilters(params: URLSearchParams, status: EventCandidateStatus): void {
   if (status === "pending_review" || status === "needs_changes") {
     params.set("canonical_candidate_id", "is.null");
@@ -329,9 +321,12 @@ export async function countCandidatesByStatus(env: Env, status: EventCandidateSt
 }
 
 export async function countCandidateTabTotals(env: Env): Promise<EventCandidateTabCounts> {
-  const [pending_review, needs_changes, approved, rejected] = await Promise.all(
-    REVIEW_TAB_COUNT_STATUSES.map((status) => countCandidatesByStatus(env, status))
-  );
+  const [pending_review, needs_changes, approved, rejected] = await Promise.all([
+    countCandidatesByStatus(env, "pending_review"),
+    countCandidatesByStatus(env, "needs_changes"),
+    countCandidatesByStatus(env, "approved"),
+    countCandidatesByStatus(env, "rejected")
+  ]);
   return { pending_review, needs_changes, approved, rejected };
 }
 
