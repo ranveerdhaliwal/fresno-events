@@ -172,7 +172,7 @@ export async function enrichEventWithTicketSiteDetail(
 
   const enriched = await fetchAndMergeTicketSiteDetail(event, {
     userAgent,
-    signal: opts.signal
+    ...(opts.signal ? { signal: opts.signal } : {})
   });
 
   const delayMs = opts.delayMs ?? DEFAULT_TICKET_SITE_DELAY_MS;

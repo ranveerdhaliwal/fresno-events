@@ -53,8 +53,9 @@ describe("buildContentDiff", () => {
       {
         title: proposed.title,
         startTs: proposed.startTs,
-        category: proposed.category ?? "other",
+        category: proposed.category ?? "community",
         venueName: proposed.venueName,
+        descriptionText: proposed.descriptionText,
         priceMin: 20,
         priceMax: 40
       },

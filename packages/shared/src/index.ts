@@ -487,6 +487,10 @@ export interface NormalizedEvent {
   venueLng?: number;
   startTs: string;
   endTs?: string;
+  /** Door time when distinct from show start (e.g. VenuNite doorTime). */
+  doorsTs?: string;
+  /** Age restriction label from upstream (e.g. "21+"). */
+  ageRestriction?: string;
   /** Source gave a calendar date but no wall-clock start (not the same as all-day). */
   timeUnknown?: boolean;
   timezone?: string;

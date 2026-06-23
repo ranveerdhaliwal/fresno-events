@@ -185,11 +185,15 @@ function parseDowntownDetailLocation($: CheerioAPI): { venueName: string | null;
   const firstLine = lines[0] ?? "";
   const dashSplit = firstLine.match(/^(.+?)\s*[–—-]\s*(.+,\s*[A-Za-z]{2}(?:\s+\d{5}(?:-\d{4})?)?)\s*$/);
   if (dashSplit) {
-    const venueName = dashSplit[1].trim();
-    return {
-      venueName: isPlausibleVenueName(venueName) ? venueName : null,
-      venueAddress: dashSplit[2].trim()
-    };
+    const venuePart = dashSplit[1];
+    const addressPart = dashSplit[2];
+    if (venuePart && addressPart) {
+      const venueName = venuePart.trim();
+      return {
+        venueName: isPlausibleVenueName(venueName) ? venueName : null,
+        venueAddress: addressPart.trim()
+      };
+    }
   }
 
   return {
@@ -295,7 +299,12 @@ function parseDowntownDetailDateIso(dateText: string, ref: Date): string | null 
   if (!match) {
     return null;
   }
-  return parseMonthDay(match[1], match[2], ref);
+  const month = match[1];
+  const day = match[2];
+  if (!month || !day) {
+    return null;
+  }
+  return parseMonthDay(month, day, ref);
 }
 
 function parseTimeOnDate(dateIso: string, timePart: string): string | null {

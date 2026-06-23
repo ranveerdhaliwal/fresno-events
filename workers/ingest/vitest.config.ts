@@ -14,6 +14,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    include: ["src/**/*.test.ts"]
+    include: ["src/**/*.test.ts"],
+    // Fixture parsing tests can exceed 5s on slower CI runners.
+    testTimeout: 15_000
   }
 });

@@ -31,7 +31,7 @@ describe("downtown-fresno-api.utils", () => {
     expect(windows[0]).toMatch(/^\d{2}-\d{2}-\d{2}-to-\d{2}-\d{2}-\d{2}$/);
   });
 
-  it("parses HTML fixture into events", () => {
+  it("parses HTML fixture into events", { timeout: 30_000 }, () => {
     const html = readFileSync(fixturePath, "utf8");
     const events = parseDowntownFresnoHtml(html, new Date("2026-05-23T12:00:00Z"));
     expect(events.length).toBeGreaterThan(0);

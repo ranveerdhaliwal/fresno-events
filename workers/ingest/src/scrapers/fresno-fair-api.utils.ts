@@ -285,7 +285,7 @@ export function fresnoFairResponseToEvents(
 
     for (const slot of day.Times ?? []) {
       for (const item of slot.Items ?? []) {
-        const itemDate = parseDotNetDate(item.Date) ?? dateYmd;
+        const itemDate = parseDotNetDate(item.Date ?? undefined) ?? dateYmd;
         if (!itemDate) {
           continue;
         }

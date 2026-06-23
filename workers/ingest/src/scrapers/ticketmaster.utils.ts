@@ -14,6 +14,8 @@ import {
 const TM_API = "https://app.ticketmaster.com/discovery/v2/events.json";
 const PAGE_SIZE = 200;
 const DEEP_PAGING_CAP = 1000;
+/** Cloudflare Workers subrequest budget — cap TM pages per invocation. */
+const DEFAULT_MAX_PAGES = 5;
 const RATE_LIMIT_RETRY_MS = 1_000;
 
 export interface TicketmasterFetchOptions {
@@ -25,6 +27,8 @@ export interface TicketmasterFetchOptions {
   endDateTime?: string;
   userAgent: string;
   signal?: AbortSignal;
+  /** Max Discovery API pages per run (default 5). */
+  maxPages?: number;
 }
 
 export class TicketmasterFetchError extends Error {
@@ -129,8 +133,9 @@ export async function fetchAllTicketmasterEvents(
   let page = 0;
   let totalPages = 1;
   let pagesVisited = 0;
+  const maxPages = Math.max(1, opts.maxPages ?? DEFAULT_MAX_PAGES);
 
-  while (page < totalPages) {
+  while (page < totalPages && pagesVisited < maxPages) {
     const url = buildPageUrl(opts, page);
     const response = await fetchTicketmasterPage(url, opts.userAgent, opts.signal);
 
@@ -145,12 +150,33 @@ export async function fetchAllTicketmasterEvents(
     all.push(...raw.flatMap(toNormalizedEvent));
 
     const pageMeta = payload.page;
-    totalPages = pageMeta?.totalPages ?? page + 1;
+    if (pageMeta?.totalPages !== undefined) {
+      totalPages = pageMeta.totalPages;
+    } else if (raw.length < PAGE_SIZE) {
+      totalPages = page + 1;
+    } else {
+      totalPages = Math.max(totalPages, page + 2);
+    }
     page += 1;
+
+    if (raw.length < PAGE_SIZE) {
+      break;
+    }
 
     if (PAGE_SIZE * page >= DEEP_PAGING_CAP) {
       break;
     }
+  }
+
+  if (pagesVisited >= maxPages && page < totalPages) {
+    console.log(
+      JSON.stringify({
+        event: "ticketmaster_pages_capped",
+        pages_fetched: pagesVisited,
+        max_pages: maxPages,
+        reported_total_pages: totalPages
+      })
+    );
   }
 
   return { events: all, pagesVisited };

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "pnpm --filter @fresno-events/shared build && tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "tsc -b --noEmit",
     "test": "vitest run",

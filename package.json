@@ -47,7 +47,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test",
+    "test": "pnpm --filter @fresno-events/shared build && pnpm -r test",
     "format": "prettier --write ."
   },
   "devDependencies": {

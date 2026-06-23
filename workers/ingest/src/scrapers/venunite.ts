@@ -118,7 +118,6 @@ export async function run(ctx: ScrapeContext): Promise<ScrapeResult> {
     errors,
     metrics: {
       pagesVisited,
-      eventDetailsFetched,
       durationMs: Math.round(performance.now() - started)
     }
   };

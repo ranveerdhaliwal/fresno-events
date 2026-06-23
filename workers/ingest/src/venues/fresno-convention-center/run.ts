@@ -1,4 +1,4 @@
-import type { NormalizedEvent, ScrapeError } from "@fresno-events/shared";
+import type { EventSource, NormalizedEvent, ScrapeError } from "@fresno-events/shared";
 
 import type { IngestEnv } from "@/env";
 import {
@@ -24,7 +24,7 @@ function finalizeConventionEvent(event: NormalizedEvent): NormalizedEvent {
   };
 }
 
-function stubListing(url: string, venueConfig: VenueConfig, scrapeSource: string): NormalizedEvent {
+function stubListing(url: string, venueConfig: VenueConfig, scrapeSource: EventSource): NormalizedEvent {
   const slug = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "event";
   return {
     source: scrapeSource,
@@ -41,7 +41,7 @@ function stubListing(url: string, venueConfig: VenueConfig, scrapeSource: string
 export async function run(env: IngestEnv, ctx: VenueRunContext): Promise<VenueRunResult> {
   const sourceKey = `venue-ingest:${config.key}`;
   const errors: ScrapeError[] = [];
-  const scrapeSource = `scrape:${config.sourceHostname?.replace(/^www\./, "") ?? "events.fresnoconventioncenter.com"}`;
+  const scrapeSource = `scrape:${config.sourceHostname?.replace(/^www\./, "") ?? "events.fresnoconventioncenter.com"}` as EventSource;
   const now = new Date();
 
   let html = "";

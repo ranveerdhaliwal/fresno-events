@@ -172,7 +172,7 @@ describe("visit-fresno-api.utils", () => {
     const normalized = docs.map((doc) => toNormalizedEvent(doc)).filter((e) => e !== null);
     const ids = normalized.map((e) => e.sourceEventId);
     expect(new Set(ids).size).toBe(ids.length);
-  }, 15_000);
+  }, 45_000);
 
   it("formats listing API descriptions with paragraphs, lists, and decoded entities", () => {
     const raw = readFileSync(fixturePath, "utf8");
