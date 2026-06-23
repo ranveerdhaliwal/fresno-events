@@ -207,12 +207,15 @@ export async function buildOccurrenceMatchIndex(
     [...occurrenceKeys],
     [...urlKeys],
     startTsWindows,
-    { maxWindowFetches, maxInFilterBatches: compactFetch ? MAX_IN_FILTER_BATCHES_COMPACT : undefined }
+    {
+      maxWindowFetches,
+      ...(compactFetch ? { maxInFilterBatches: MAX_IN_FILTER_BATCHES_COMPACT } : {})
+    }
   );
   const occurrenceIds = [...new Set(candidates.map((row) => row.occurrence_id).filter(Boolean))];
   const publishedEvents = await fetchPublishedEvents(config, [...occurrenceKeys], occurrenceIds, {
     includeOccurrenceKeyLookup: !compactFetch,
-    maxInFilterBatches: compactFetch ? MAX_IN_FILTER_BATCHES_COMPACT : undefined
+    ...(compactFetch ? { maxInFilterBatches: MAX_IN_FILTER_BATCHES_COMPACT } : {})
   });
 
   const candidatesByOccurrenceKey = new Map<string, OccurrenceMatchCandidate[]>();
