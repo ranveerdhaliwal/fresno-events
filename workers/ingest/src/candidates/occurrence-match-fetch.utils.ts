@@ -17,6 +17,9 @@ export const MAX_START_TS_WINDOW_FETCHES = 6;
 /** Above this event count, use primary occurrence keys only and skip redundant published-key lookups (Workers free tier: 50 external subrequests). */
 export const COMPACT_OCCURRENCE_FETCH_EVENT_THRESHOLD = 40;
 
+/** Max PostgREST `in.(...)` batches per column during compact fetch. */
+export const MAX_IN_FILTER_BATCHES_COMPACT = 3;
+
 const START_TS_WINDOW_CANDIDATE_LIMIT = "2000";
 
 const CANDIDATE_SELECT =
@@ -137,6 +140,14 @@ export function collectOccurrenceKeysForFetch(
   return fingerprints.occurrenceKeysForLookup;
 }
 
+export function capInFilterBatches<T>(values: T[], batchSize: number, maxBatches: number): T[][] {
+  const chunks = chunkValues(values, batchSize);
+  if (chunks.length <= maxBatches) {
+    return chunks;
+  }
+  return chunks.slice(0, maxBatches);
+}
+
 function dedupeById<T extends { id: string }>(rows: T[]): T[] {
   const seen = new Set<string>();
   const out: T[] = [];
@@ -190,17 +201,18 @@ export async function buildOccurrenceMatchIndex(
     );
   }
 
-  const maxWindowFetches = compactFetch ? 4 : MAX_START_TS_WINDOW_FETCHES;
+  const maxWindowFetches = compactFetch ? 2 : MAX_START_TS_WINDOW_FETCHES;
   const candidates = await fetchCandidatesByKeys(
     config,
     [...occurrenceKeys],
     [...urlKeys],
     startTsWindows,
-    maxWindowFetches
+    { maxWindowFetches, maxInFilterBatches: compactFetch ? MAX_IN_FILTER_BATCHES_COMPACT : undefined }
   );
   const occurrenceIds = [...new Set(candidates.map((row) => row.occurrence_id).filter(Boolean))];
   const publishedEvents = await fetchPublishedEvents(config, [...occurrenceKeys], occurrenceIds, {
-    includeOccurrenceKeyLookup: !compactFetch
+    includeOccurrenceKeyLookup: !compactFetch,
+    maxInFilterBatches: compactFetch ? MAX_IN_FILTER_BATCHES_COMPACT : undefined
   });
 
   const candidatesByOccurrenceKey = new Map<string, OccurrenceMatchCandidate[]>();
@@ -248,18 +260,26 @@ async function fetchCandidatesByKeys(
   occurrenceKeys: string[],
   urlKeys: string[],
   startTsWindows: Array<{ from: string; to: string }>,
-  maxWindowFetches = MAX_START_TS_WINDOW_FETCHES
+  options?: { maxWindowFetches?: number; maxInFilterBatches?: number }
 ): Promise<OccurrenceMatchCandidate[]> {
+  const maxWindowFetches = options?.maxWindowFetches ?? MAX_START_TS_WINDOW_FETCHES;
+  const batchOccurrence = options?.maxInFilterBatches
+    ? capInFilterBatches(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE, options.maxInFilterBatches)
+    : chunkValues(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE);
+  const batchUrl = options?.maxInFilterBatches
+    ? capInFilterBatches(urlKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE, options.maxInFilterBatches)
+    : chunkValues(urlKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE);
+
   if (occurrenceKeys.length === 0 && urlKeys.length === 0 && startTsWindows.length === 0) {
     return [];
   }
 
   const merged: OccurrenceMatchCandidate[] = [];
 
-  for (const batch of chunkValues(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE)) {
+  for (const batch of batchOccurrence) {
     merged.push(...(await fetchCandidatesInFilter(config, "occurrence_key", batch)));
   }
-  for (const batch of chunkValues(urlKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE)) {
+  for (const batch of batchUrl) {
     merged.push(...(await fetchCandidatesInFilter(config, "url_key", batch)));
   }
 
@@ -353,7 +373,7 @@ async function fetchPublishedEvents(
   config: SupabaseConfig,
   occurrenceKeys: string[],
   occurrenceIds: string[],
-  options?: { includeOccurrenceKeyLookup?: boolean }
+  options?: { includeOccurrenceKeyLookup?: boolean; maxInFilterBatches?: number }
 ): Promise<OccurrenceMatchEvent[]> {
   if (occurrenceKeys.length === 0 && occurrenceIds.length === 0) {
     return [];
@@ -361,13 +381,19 @@ async function fetchPublishedEvents(
 
   const merged: OccurrenceMatchEvent[] = [];
   const includeOccurrenceKeyLookup = options?.includeOccurrenceKeyLookup ?? true;
+  const batchIds = options?.maxInFilterBatches
+    ? capInFilterBatches(occurrenceIds, OCCURRENCE_IN_FILTER_BATCH_SIZE, options.maxInFilterBatches)
+    : chunkValues(occurrenceIds, OCCURRENCE_IN_FILTER_BATCH_SIZE);
 
   if (includeOccurrenceKeyLookup) {
-    for (const batch of chunkValues(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE)) {
+    const batchKeys = options?.maxInFilterBatches
+      ? capInFilterBatches(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE, options.maxInFilterBatches)
+      : chunkValues(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE);
+    for (const batch of batchKeys) {
       merged.push(...(await fetchPublishedEventsInFilter(config, "occurrence_key", batch)));
     }
   }
-  for (const batch of chunkValues(occurrenceIds, OCCURRENCE_IN_FILTER_BATCH_SIZE)) {
+  for (const batch of batchIds) {
     merged.push(...(await fetchPublishedEventsInFilter(config, "occurrence_id", batch)));
   }
 

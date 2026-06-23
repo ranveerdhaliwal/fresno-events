@@ -7,7 +7,10 @@ import {
 import {
   type ExistingCandidateRow
 } from "@/candidates/content-fingerprint.utils";
-import { buildOccurrenceMatchIndex } from "@/candidates/occurrence-match-fetch.utils";
+import {
+  buildOccurrenceMatchIndex,
+  COMPACT_OCCURRENCE_FETCH_EVENT_THRESHOLD
+} from "@/candidates/occurrence-match-fetch.utils";
 import { resolveOccurrenceForPersist } from "@/candidates/occurrence-resolve.utils";
 import { analyzeEventsForPersist } from "@/candidates/persist-analysis.utils";
 import {
@@ -31,6 +34,14 @@ export type PersistenceResult =
 export type { PersistAuditSummary };
 
 const CANDIDATE_UPSERT_BATCH_SIZE = 40;
+const MAX_PRICE_HARMONIZE_OCCURRENCES_COMPACT = 5;
+
+function capOccurrenceIdsForPriceHarmonize(eventCount: number, occurrenceIds: string[]): string[] {
+  if (eventCount < COMPACT_OCCURRENCE_FETCH_EVENT_THRESHOLD) {
+    return occurrenceIds;
+  }
+  return occurrenceIds.slice(0, MAX_PRICE_HARMONIZE_OCCURRENCES_COMPACT);
+}
 
 export async function previewPersistScrapeResult(
   env: IngestEnv,
@@ -129,6 +140,7 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
   const existingByKey = await fetchExistingCandidatesForEvents(config, validEvents);
   const matchIndex = await buildOccurrenceMatchIndex(config, validEvents);
   const crossSourceDedupe = isCrossSourceDedupeEnabled(env);
+  const skipPublishedEventSync = validEvents.length >= COMPACT_OCCURRENCE_FETCH_EVENT_THRESHOLD;
   const persistStarted = performance.now();
   let publishedSynced = 0;
   const auditNew: PersistAuditItemNew[] = [];
@@ -143,7 +155,8 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       runId: result.runId,
       candidates: validEvents.length,
       invalid_events: invalidEvents,
-      batches: Math.ceil(validEvents.length / CANDIDATE_UPSERT_BATCH_SIZE)
+      batches: Math.ceil(validEvents.length / CANDIDATE_UPSERT_BATCH_SIZE),
+      skip_published_event_sync: skipPublishedEventSync
     })
   );
 
@@ -224,7 +237,7 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
       }
 
       const syncEventId = occurrence.matchedEventId ?? existing?.matched_event_id ?? null;
-      if (syncEventId) {
+      if (syncEventId && !skipPublishedEventSync) {
         const synced = await syncPublishedEvent(config, syncEventId, event, {
           contentChanged,
           applyContentPatch: false
@@ -296,9 +309,10 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
     unchangedCount: unchanged
   });
 
-  const priceHarmonize = await harmonizeLinkedOccurrencePricingBatch(config, [
-    ...occurrenceIdsForPricing
-  ]);
+  const priceHarmonize = await harmonizeLinkedOccurrencePricingBatch(
+    config,
+    capOccurrenceIdsForPriceHarmonize(validEvents.length, [...occurrenceIdsForPricing])
+  );
   if (priceHarmonize.rowsUpdated > 0) {
     console.log(
       JSON.stringify({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  capInFilterBatches,
   capStartTsWindows,
   chunkValues,
   collectOccurrenceKeysForFetch,
@@ -56,6 +57,14 @@ describe("capStartTsWindows", () => {
     }));
 
     expect(capStartTsWindows(windows, 3)).toHaveLength(3);
+  });
+});
+
+describe("capInFilterBatches", () => {
+  it("limits the number of PostgREST in batches", () => {
+    const values = Array.from({ length: 200 }, (_, i) => `k${i}`);
+    expect(capInFilterBatches(values, 48, 3)).toHaveLength(3);
+    expect(capInFilterBatches(values, 48, 3)[0]).toHaveLength(48);
   });
 });
 
