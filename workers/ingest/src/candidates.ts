@@ -8,9 +8,10 @@ import {
   type ExistingCandidateRow
 } from "@/candidates/content-fingerprint.utils";
 import {
-  buildOccurrenceMatchIndex,
-  COMPACT_OCCURRENCE_FETCH_EVENT_THRESHOLD
-} from "@/candidates/occurrence-match-fetch.utils";
+  capOccurrenceIdsForPriceHarmonize,
+  shouldSkipPublishedEventSync
+} from "@/candidates/candidates-persist-budget.utils";
+import { buildOccurrenceMatchIndex } from "@/candidates/occurrence-match-fetch.utils";
 import { resolveOccurrenceForPersist } from "@/candidates/occurrence-resolve.utils";
 import { analyzeEventsForPersist } from "@/candidates/persist-analysis.utils";
 import {
@@ -34,14 +35,6 @@ export type PersistenceResult =
 export type { PersistAuditSummary };
 
 const CANDIDATE_UPSERT_BATCH_SIZE = 40;
-const MAX_PRICE_HARMONIZE_OCCURRENCES_COMPACT = 5;
-
-function capOccurrenceIdsForPriceHarmonize(eventCount: number, occurrenceIds: string[]): string[] {
-  if (eventCount < COMPACT_OCCURRENCE_FETCH_EVENT_THRESHOLD) {
-    return occurrenceIds;
-  }
-  return occurrenceIds.slice(0, MAX_PRICE_HARMONIZE_OCCURRENCES_COMPACT);
-}
 
 export async function previewPersistScrapeResult(
   env: IngestEnv,
@@ -140,7 +133,7 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
   const existingByKey = await fetchExistingCandidatesForEvents(config, validEvents);
   const matchIndex = await buildOccurrenceMatchIndex(config, validEvents);
   const crossSourceDedupe = isCrossSourceDedupeEnabled(env);
-  const skipPublishedEventSync = validEvents.length >= COMPACT_OCCURRENCE_FETCH_EVENT_THRESHOLD;
+  const skipPublishedEventSync = shouldSkipPublishedEventSync(validEvents.length);
   const persistStarted = performance.now();
   let publishedSynced = 0;
   const auditNew: PersistAuditItemNew[] = [];

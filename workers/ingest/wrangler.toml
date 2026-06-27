@@ -30,11 +30,15 @@ head_sampling_rate = 1
 [env.dev]
 name = "fresno-events-ingest-dev"
 
+# Cloud cron DISABLED — Workers free tier cannot run full ingest reliably.
+# Local schedule: pnpm ingest:scheduled-local (see docs/INGEST_LOCAL_OPS.md).
+# Re-enable on paid Workers: uncomment crons below and deploy.
 [env.dev.triggers]
-crons = [
-  "0 14 * * 1",  # Monday ~6am PT (7am PDT) — wrangler uses UTC only
-  "0 14 * * 4"   # Thursday ~6am PT
-]
+crons = []
+# crons = [
+#   "0 14 * * 1",  # Monday ~6am PT (7am PDT) — wrangler uses UTC only
+#   "0 14 * * 4"   # Thursday ~6am PT
+# ]
 
 [env.dev.vars]
 APP_ENV = "dev"

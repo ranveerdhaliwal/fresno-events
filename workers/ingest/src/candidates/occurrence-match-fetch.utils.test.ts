@@ -98,4 +98,16 @@ describe("compressStartTsWindowsForFetch", () => {
     expect(compressed.length).toBeLessThanOrEqual(MAX_START_TS_WINDOW_FETCHES);
     expect(compressed.length).toBeGreaterThan(0);
   });
+
+  it("uses a tighter cap in compact fetch mode (2 windows)", () => {
+    const windows = Array.from({ length: 20 }, (_, i) => {
+      const day = 1 + i * 10;
+      return {
+        from: new Date(Date.UTC(2026, 5, day)).toISOString(),
+        to: new Date(Date.UTC(2026, 5, day + 1)).toISOString()
+      };
+    });
+
+    expect(compressStartTsWindowsForFetch(windows, 2)).toHaveLength(2);
+  });
 });
