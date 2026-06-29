@@ -608,3 +608,63 @@ function toStringRecord(value: unknown): Record<string, string> {
 function toNumber(value: number | string) {
   return typeof value === "number" ? value : Number(value);
 }
+
+export interface SitemapEntry {
+  loc: string;
+  lastmod: string;
+}
+
+const SITEMAP_SITE_ORIGIN = "https://whatupfresno.com";
+
+type SitemapEventRow = {
+  slug: string;
+  updated_at: string;
+  venue: { slug: string; updated_at: string } | null;
+};
+
+export async function listSitemapEntries(env: Env): Promise<SitemapEntry[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = new Map<string, string>([
+    [`${SITEMAP_SITE_ORIGIN}/`, today],
+    [`${SITEMAP_SITE_ORIGIN}/calendar`, today],
+    [`${SITEMAP_SITE_ORIGIN}/map`, today],
+    [`${SITEMAP_SITE_ORIGIN}/privacy`, today]
+  ]);
+
+  const { url, key } = getSupabaseConfig(env);
+  const params = new URLSearchParams({
+    select: "slug,updated_at,venue:venues(slug,updated_at)",
+    status: `in.(${scheduledStatuses.join(",")})`,
+    start_ts: `gte.${new Date().toISOString()}`,
+    order: "start_ts.asc",
+    limit: "5000"
+  });
+
+  const response = await fetch(`${url}/rest/v1/events?${params}`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new SupabaseEventsError(`Supabase sitemap query failed with ${response.status}: ${body}`);
+  }
+
+  const rows = (await response.json()) as SitemapEventRow[];
+  for (const row of rows) {
+    entries.set(`${SITEMAP_SITE_ORIGIN}/event/${row.slug}`, row.updated_at.slice(0, 10));
+    if (row.venue?.slug) {
+      const venueLoc = `${SITEMAP_SITE_ORIGIN}/venue/${row.venue.slug}`;
+      const venueLastmod = row.venue.updated_at.slice(0, 10);
+      const existing = entries.get(venueLoc);
+      if (!existing || venueLastmod > existing) {
+        entries.set(venueLoc, venueLastmod);
+      }
+    }
+  }
+
+  return [...entries.entries()].map(([loc, lastmod]) => ({ loc, lastmod }));
+}
