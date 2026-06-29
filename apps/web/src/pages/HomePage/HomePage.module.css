@@ -12,11 +12,22 @@
   margin: 0 auto;
 }
 
+.pageTitle {
+  margin: 0;
+  padding: 24px 32px 0;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  line-height: 1.15;
+}
+
 .upcomingSection {
   padding: 0 32px 48px;
 }
 
 @media (max-width: 600px) {
+  .pageTitle {
+    padding: 16px 16px 0;
+  }
+
   .upcomingSection {
     padding: 0 16px 32px;
   }

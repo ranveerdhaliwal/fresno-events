@@ -9,6 +9,8 @@ import { PageChrome } from "@/components/PageChrome";
 import { EventRow } from "@/components/EventRow";
 import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
 import { toEventRowViewModel } from "@/lib/event-view-model";
+import { buildCalendarSeo } from "@/lib/seo/page-seo";
+import { useSeoHead } from "@/lib/seo/useSeoHead";
 import { getCalendarMonth } from "@/services/events.service";
 import { eventsKeys } from "@/services/events.queryKeys";
 
@@ -24,6 +26,7 @@ export interface CalendarPageProps {
 export function CalendarPage({ year, month }: CalendarPageProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const todayIso = pacificTodayIso();
+  useSeoHead(useMemo(() => buildCalendarSeo(year, month), [year, month]));
   const { data, isLoading } = useQuery({
     queryKey: eventsKeys.calendar(year, month),
     queryFn: ({ signal }) => getCalendarMonth(year, month, signal)

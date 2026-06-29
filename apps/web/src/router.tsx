@@ -94,6 +94,7 @@ const artistRoute = createRoute({
       eyebrow="Artist"
       title="Fresno dates, genres, and context."
       description="Artist pages will connect upcoming local appearances with bios, genre metadata, and music embeds."
+      canonicalPath="/artist"
     />
   )
 });
@@ -115,6 +116,7 @@ const savedRoute = createRoute({
       eyebrow="Saved"
       title="Your Fresno calendar."
       description="Saved events start device-local for anonymous users and later sync with Supabase Auth accounts."
+      canonicalPath="/saved"
     />
   )
 });
@@ -127,6 +129,7 @@ const settingsRoute = createRoute({
       eyebrow="Settings"
       title="Notifications, digest, and appearance."
       description="Users will manage category, venue, artist, weekly digest, and notification preferences here."
+      canonicalPath="/settings"
     />
   )
 });

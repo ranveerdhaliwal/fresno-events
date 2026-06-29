@@ -10,6 +10,8 @@ import { useTodayEvents } from "@/features/featured-events/useTodayEvents";
 import { toPopularViewModels } from "@/lib/event-view-model";
 import { dayBoundsPacific, parseDayParam } from "@/lib/parse-day-param";
 import { formatEventDate, toIsoDateLocal } from "@/lib/event-time";
+import { buildDaySeo } from "@/lib/seo/page-seo";
+import { useSeoHead } from "@/lib/seo/useSeoHead";
 
 import styles from "./DayPage.module.css";
 
@@ -82,6 +84,8 @@ export function DayPage() {
   }, [viewDate, weekData]);
 
   const eventCount = popular.length > 0 ? popular.length : weekData?.items.length ?? 0;
+
+  useSeoHead(useMemo(() => buildDaySeo(viewDate, eventCount), [viewDate, eventCount]));
 
   return (
     <PageChrome mobileNav={{ variant: "day", title: dayTitle.toUpperCase() }}>

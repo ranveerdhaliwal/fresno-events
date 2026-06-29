@@ -6,6 +6,8 @@ import type { ApiResponse, EventListResponse } from "@fresno-events/shared";
 import { EventRow } from "@/components/EventRow";
 import { PageChrome } from "@/components/PageChrome";
 import { toEventRowViewModel } from "@/lib/event-view-model";
+import { buildMapSeo } from "@/lib/seo/page-seo";
+import { useSeoHead } from "@/lib/seo/useSeoHead";
 
 import { EventMap } from "./EventMap";
 import styles from "./EventMap.module.css";
@@ -42,6 +44,7 @@ async function fetchMapEvents(): Promise<EventListResponse> {
 
 export function EventMapPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useSeoHead(buildMapSeo());
   const query = useQuery({
     queryKey: ["event-map"],
     queryFn: fetchMapEvents,
