@@ -881,6 +881,7 @@ export type {
   ReviewPriorityTriageSummary,
   ReviewPublishedOrphanOpsResponse,
   ReviewPublishedOrphanSummary,
+  ReviewPublishedOrphanDeletion,
   ReviewVenueAddressBackfillOpsResponse,
   ReviewVenueAddressBackfillSummary,
   ReviewVenueGeocodeOpsResponse,
