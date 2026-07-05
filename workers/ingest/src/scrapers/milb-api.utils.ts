@@ -34,8 +34,8 @@ const ScheduleSchema = z.object({
 
 export type MilbSchedule = z.infer<typeof ScheduleSchema>;
 
-/** Official Grizzlies team spot PNG on MLB CDN. */
-export const GRIZZLIES_DEFAULT_IMAGE_URL = "https://midfield.mlbstatic.com/v1/team/259/spots/120";
+/** Official Grizzlies primary logo on MLB CDN (same asset as milb.com/fresno). */
+export const GRIZZLIES_DEFAULT_IMAGE_URL = "https://www.mlbstatic.com/team-logos/259.svg";
 
 /** Org-level MiLB tickets portal (statsapi does not expose per-game tickets.com event ids). */
 export const GRIZZLIES_TICKETS_ORG_URL = "https://mlb.tickets.com/?orgId=57456&agency=MILB_MPV";
@@ -97,7 +97,9 @@ export function toNormalizedEvents(schedule: MilbSchedule): NormalizedEvent[] {
         category: "sports",
         externalUrl: buildMilbGamedayUrl(game),
         ticketUrl: GRIZZLIES_TICKETS_ORG_URL,
-        imageUrl: GRIZZLIES_DEFAULT_IMAGE_URL
+        imageUrl: GRIZZLIES_DEFAULT_IMAGE_URL,
+        showVenueLogoInList: true,
+        listVenueLogoPadding: 10
       });
     }
   }
