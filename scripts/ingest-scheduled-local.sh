@@ -11,6 +11,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${INGEST_PORT:-8788}"
 INGEST_PID=""
+SCHEDULED_API_PID=""
+SCHEDULED_REVIEW_STEPS=()
 LOG_DIR="${INGEST_SCHEDULED_LOG_DIR:-/tmp/fresno-ingest-scheduled}"
 mkdir -p "$LOG_DIR"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -24,6 +26,11 @@ cleanup() {
     kill "$INGEST_PID" 2>/dev/null || true
     wait "$INGEST_PID" 2>/dev/null || true
   fi
+  if [[ -n "${SCHEDULED_API_PID:-}" ]] && kill -0 "$SCHEDULED_API_PID" 2>/dev/null; then
+    echo "[scheduled] Stopping API worker (pid $SCHEDULED_API_PID)"
+    kill "$SCHEDULED_API_PID" 2>/dev/null || true
+    wait "$SCHEDULED_API_PID" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -32,6 +39,10 @@ echo "DEV_TARGET from dev-target.env; log: $LOG"
 
 cd "$REPO_ROOT"
 pnpm env:status || true
+if [[ -f "$REPO_ROOT/dev-target.env" ]]; then
+  DEV_TARGET="$(grep -E '^DEV_TARGET=' "$REPO_ROOT/dev-target.env" | head -1 | cut -d= -f2-)"
+  export DEV_TARGET
+fi
 
 if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
   echo "[scheduled] Reusing ingest worker on port ${PORT}"
@@ -64,6 +75,26 @@ run_step pnpm ingest:promote-all --no-enrich
 run_step pnpm ingest:detail-backfill --all
 run_step pnpm ingest:enrich --all
 run_step pnpm db:backfill-addresses
+
+# shellcheck source=scripts/ingest-scheduled-maintenance.sh
+source "$REPO_ROOT/scripts/ingest-scheduled-maintenance.sh"
+# shellcheck source=scripts/ingest-lib.sh
+source "$REPO_ROOT/scripts/ingest-lib.sh"
+
+if [[ "${INGEST_SCHEDULED_SKIP_MAINTENANCE:-}" != "1" ]]; then
+  scheduled_run_relink_maintenance || true
+  scheduled_run_orphan_maintenance || true
+else
+  echo "[scheduled] Skipping relink + orphan maintenance (INGEST_SCHEDULED_SKIP_MAINTENANCE=1)"
+  scheduled_record_step "maintenance" "skipped" "INGEST_SCHEDULED_SKIP_MAINTENANCE=1"
+fi
+
+scheduled_emit_cursor_review
+
+if scheduled_maintenance_had_failure; then
+  echo "[scheduled] Maintenance had failures — read cursor review manifest before bulk approve." >&2
+  exit 1
+fi
 
 echo ""
 echo "=== Scheduled run complete $STAMP ==="

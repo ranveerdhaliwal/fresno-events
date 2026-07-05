@@ -30,6 +30,7 @@
     "db:push-cloud-dev": "bash scripts/db-push-review-to-cloud.sh",
     "db:pull-cloud-dev": "bash scripts/db-pull-cloud-dev.sh",
     "review:bulk-approve": "bash scripts/review-bulk-approve.sh",
+    "review:orphan-cleanup": "bash scripts/review-published-orphan-cleanup.sh",
     "priority:rerank": "bash scripts/priority-rerank.sh",
     "env:status": "bash scripts/env-status.sh",
     "env:local": "bash scripts/env-use.sh local",

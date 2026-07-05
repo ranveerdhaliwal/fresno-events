@@ -15,7 +15,8 @@ Cloud dev Studio: [event_candidates table](https://supabase.com/dashboard/projec
 | `pnpm ingest:promote --source=<key>` | **Real** persist one source |
 | `pnpm ingest:detail-backfill` | Visit Fresno HTML detail prices (when still pending) |
 | `pnpm ingest:enrich` | AI enrichment backlog (usually automatic after promote) |
-| `pnpm ingest:relink` | Occurrence relink maintenance |
+| `pnpm ingest:relink` | Occurrence relink maintenance (after full promote) |
+| `POST /review/ops/published-orphan-cleanup` | Remove duplicate published events (API; `/admin` → Queue maintenance; `pnpm review:orphan-cleanup`) |
 | `pnpm review:bulk-approve` | Approve all `pending_review` locally |
 
 **Preflight vs promote:** separate commands. Preflight = dry-run (no `event_candidates`; venue runs write `venue_ingest_runs` debug).
@@ -26,10 +27,12 @@ Cloud dev Studio: [event_candidates table](https://supabase.com/dashboard/projec
 
 1. `pnpm ingest:preflight-all` then `pnpm ingest:promote-all` (all venue sources)
 2. `pnpm ingest:preflight --source=ticketmaster` then `pnpm ingest:promote --source=ticketmaster`
-3. Studio: filter `event_candidates` by `source`
-4. `/admin` — **New** tab for `pending_review`, **Updates** tab for `needs_changes`
-5. Visit Fresno preflight: batch duplicate section when dupes exist; ~239 events after within-batch dedupe
-6. Recurring rows: `normalized_event->>'seriesId'` matches `/^series:[^:]+:[a-f0-9]{64}$/`
+3. `pnpm ingest:relink --dry-run` then `pnpm ingest:relink` (after promote; requires `pnpm ingest:dev`)
+4. Published orphan cleanup — preview then apply via `/admin` → Queue maintenance, or `POST /review/ops/published-orphan-cleanup` (requires `pnpm dev:api`). See [INGEST_LOCAL_OPS.md](INGEST_LOCAL_OPS.md) and [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md).
+5. Studio: filter `event_candidates` by `source`
+6. `/admin` — **New** tab for `pending_review`, **Updates** tab for `needs_changes`
+7. Visit Fresno preflight: batch duplicate section when dupes exist; ~239 events after within-batch dedupe
+8. Recurring rows: `normalized_event->>'seriesId'` matches `/^series:[^:]+:[a-f0-9]{64}$/`
 
 ## Expected counts (soft warnings)
 

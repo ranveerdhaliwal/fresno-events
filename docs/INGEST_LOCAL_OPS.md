@@ -45,7 +45,13 @@ Secrets live in `dev-target.env` (gitignored). Regenerate worker env after edits
 pnpm ingest:dev
 ```
 
-**Terminal 2 — run in order:**
+**Terminal 2 — API (needed for orphan cleanup step 8):** start once before that step, or keep it running:
+
+```bash
+pnpm dev:api
+```
+
+**Terminal 2 (or 3) — run in order:**
 
 | Step | Command | What it does |
 | --- | --- | --- |
@@ -55,14 +61,47 @@ pnpm ingest:dev
 | 4 | `pnpm ingest:detail-backfill --all` | Visit Fresno / ticket-site detail pages → price & address |
 | 5 | `pnpm ingest:enrich --all` | AI enrich backlog → `pending_review` |
 | 6 | `pnpm db:backfill-addresses` | Normalize venue addresses / geocode gaps |
+| 7 | `pnpm ingest:relink --dry-run` then `pnpm ingest:relink` | Recompute `occurrence_key` / `occurrence_id` and cross-source duplicate links on **all** candidates (requires `pnpm ingest:dev`) |
+| 8 | Orphan cleanup — preview then apply (requires `pnpm dev:api`) | Remove duplicate **published** `events` rows (same title, venue, start); see below |
+
+**Step 8 — orphan cleanup (pick one):**
+
+```bash
+# CLI (preview)
+curl -X POST "http://127.0.0.1:8790/review/ops/published-orphan-cleanup?dry_run=true" \
+  -H "x-admin-token: $ADMIN_REVIEW_TOKEN"
+
+# CLI (apply)
+curl -X POST "http://127.0.0.1:8790/review/ops/published-orphan-cleanup" \
+  -H "x-admin-token: $ADMIN_REVIEW_TOKEN"
+```
+
+Or in **`/admin` → Queue maintenance → Published orphan cleanup** → **Preview**, then **Clean up**.
+
+Run step 7 after every full promote (re-promote alone does not refresh stale `occurrence_id` on existing rows). Run step 8 after relink and **before** bulk approve when sources were approved in different orders — otherwise pre-approve audit may flag `published_content_duplicate`. See [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md).
 
 **Then:** review queue (see **Cursor review** below) → `pnpm review:bulk-approve` or `/admin`.
 
-Or one command for promote + enrich + address backfill:
+### One command (`pnpm ingest:scheduled-local`)
+
+Runs the full table above (steps 1–8), starts ingest + API workers if needed, and writes a **Cursor review manifest** next to the log:
 
 ```bash
 pnpm ingest:scheduled-local
+# Log:     /tmp/fresno-ingest-scheduled/run-<stamp>.log
+# Review:  /tmp/fresno-ingest-scheduled/run-<stamp>-cursor-review.txt
 ```
+
+**Maintenance safety (steps 7–8):**
+
+| Step | Preview | Apply |
+| --- | --- | --- |
+| Relink | `pnpm ingest:relink --dry-run` — abort apply if errors > 0 | `pnpm ingest:relink` |
+| Orphan cleanup | `pnpm review:orphan-cleanup --dry-run` | Only when `wouldDelete > 0`; aborted when over `INGEST_SCHEDULED_MAX_ORPHAN_DELETE` (default **50**) unless `INGEST_SCHEDULED_FORCE_ORPHAN=1` |
+
+Skip maintenance: `INGEST_SCHEDULED_SKIP_MAINTENANCE=1 pnpm ingest:scheduled-local`
+
+The script exits non-zero if maintenance preview/apply fails — read the cursor review manifest before bulk approve.
 
 ---
 
@@ -70,9 +109,13 @@ pnpm ingest:scheduled-local
 
 After ingest finishes, use **Cursor Agent** on the Mac mini (or dev machine) to vet the queue before bulk approve. The agent can query cloud-dev via Supabase MCP and apply rejects/fixes you’d do by hand.
 
-**Prerequisites:** `pnpm env:cloud-dev`, optional `pnpm dev:api` if using review API scripts.
+**Prerequisites:** `pnpm env:cloud-dev`. `ingest:scheduled-local` starts ingest + API workers automatically.
 
-**Example prompt in Cursor chat:**
+**After `pnpm ingest:scheduled-local` — read the review manifest first:**
+
+> Open `/tmp/fresno-ingest-scheduled/run-<stamp>-cursor-review.txt` and the matching `.log`. For each `>>>` step, confirm preflight/validation ok, relink `errors=0`, orphan `wouldDelete` matches expectations (and is under the max), no `ingest_runs` stuck `running`. Then query cloud-dev `event_candidates` where `status = 'pending_review'`. Reject out-of-area away games (Go Bulldogs with venue `"City, CA"`). Fix home Fresno State games to Bulldog Soccer Stadium. If maintenance and queue look good, run `pnpm review:bulk-approve`.
+
+**Manual pipeline — example prompt:**
 
 > Query cloud-dev `event_candidates` where `status = 'pending_review'`. Reject out-of-area away games (Go Bulldogs with venue `"City, CA"`). Fix home Fresno State games to Bulldog Soccer Stadium with address `5250 N Barton Ave`. Flag rows missing coords, price, or images. Then run `pnpm review:bulk-approve` if the rest looks good.
 
@@ -151,7 +194,8 @@ Load: `launchctl load ~/Library/LaunchAgents/com.whatupfresno.ingest.plist`
 | --- | --- |
 | `pnpm ingest:preflight --source=<key>` | Dry-run before first time on a source |
 | `pnpm ingest:preflight-all` | Dry-run all venues |
-| `pnpm ingest:relink` | After changing occurrence matching rules in shared code |
+| `pnpm ingest:relink` | After full promote — recompute occurrence keys and cross-source links (step 7; `--dry-run` first) |
+| `pnpm review:orphan-cleanup` | Published orphan cleanup — `--dry-run` first; wired into `ingest:scheduled-local` |
 | `pnpm eventbrite:detail --limit=10` | Eventbrite URL rows still missing detail |
 | `pnpm priority:rerank -- --apply` | Recompute display priority on candidates/events |
 | `pnpm review:bulk-approve` | After Cursor or `/admin` vetting — approve all remaining pending |
@@ -206,7 +250,14 @@ SELECT status, count(*) FROM event_candidates GROUP BY 1;
 SELECT source, started_at, status, events_found FROM ingest_runs ORDER BY started_at DESC LIMIT 10;
 ```
 
-Expect: `pending_review` > 0 after enrich; no long-lived `ingest_runs.status = 'running'`.
+```bash
+# Orphan cleanup should be clean before bulk approve (API on :8790)
+curl -X POST "http://127.0.0.1:8790/review/ops/published-orphan-cleanup?dry_run=true" \
+  -H "x-admin-token: $ADMIN_REVIEW_TOKEN"
+# Expect: wouldDelete: 0
+```
+
+Expect: `pending_review` > 0 after enrich; no long-lived `ingest_runs.status = 'running'`; relink `errors: 0`; orphan preview `wouldDelete: 0` (or apply cleanup until it is).
 
 ---
 
