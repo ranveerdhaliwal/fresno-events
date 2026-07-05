@@ -28,6 +28,8 @@ describe("milb-api.utils", () => {
     expect(events[0]?.title).toContain("Fresno Grizzlies");
     expect(events[0]?.externalUrl).toContain("milb.com/gameday/");
     expect(events[0]?.imageUrl).toBe(GRIZZLIES_DEFAULT_IMAGE_URL);
+    expect(events[0]?.showVenueLogoInList).toBe(true);
+    expect(events[0]?.listVenueLogoPadding).toBe(10);
     expect(events[0]?.ticketUrl).toBe(GRIZZLIES_TICKETS_ORG_URL);
   });
 });
