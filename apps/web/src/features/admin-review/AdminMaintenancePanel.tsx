@@ -1,10 +1,11 @@
-import { CheckCircle2, ChevronDown, ChevronUp, Link2, Loader2, MapPin, ShieldAlert, Sparkles } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Link2, Loader2, MapPin, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type {
   ReviewOccurrenceRelinkOpsResponse,
   ReviewPriorityRerankOpsResponse,
+  ReviewPublishedOrphanOpsResponse,
   ReviewVenueAddressBackfillOpsResponse,
   ReviewVenueGeocodeOpsResponse
 } from "@fresno-events/shared";
@@ -14,16 +15,18 @@ import { Text } from "@/components/Text";
 
 import {
   normalizeOccurrenceRelinkSummary,
-  normalizePriorityRuleGroups
+  normalizePriorityRuleGroups,
+  normalizePublishedOrphanSummary
 } from "./admin-maintenance.utils";
 import styles from "./AdminMaintenancePanel.module.css";
 
-export type MaintenanceOpKind = "relink" | "addresses" | "priority" | "geocode";
+export type MaintenanceOpKind = "relink" | "orphans" | "addresses" | "priority" | "geocode";
 
 export interface MaintenanceOpResult {
   kind: MaintenanceOpKind;
   dryRun: boolean;
   relink?: ReviewOccurrenceRelinkOpsResponse;
+  orphans?: ReviewPublishedOrphanOpsResponse;
   addresses?: ReviewVenueAddressBackfillOpsResponse;
   priority?: ReviewPriorityRerankOpsResponse;
   geocode?: ReviewVenueGeocodeOpsResponse;
@@ -47,6 +50,15 @@ const OPS: MaintenanceOpConfig[] = [
     icon: Link2,
     applyLabel: "Run",
     requiresIngest: true
+  },
+  {
+    kind: "orphans",
+    title: "Published orphan cleanup",
+    description:
+      "Delete scheduled events that duplicate another published show (same title, venue, and start time).",
+    icon: Trash2,
+    applyLabel: "Clean up",
+    requiresIngest: false
   },
   {
     kind: "addresses",
@@ -103,6 +115,10 @@ function isCleanCheck(result: MaintenanceOpResult): boolean {
   if (result.kind === "relink" && result.relink) {
     const summary = normalizeOccurrenceRelinkSummary(result.relink.summary);
     return summary.changed === 0 && summary.errors === 0;
+  }
+  if (result.kind === "orphans" && result.orphans) {
+    const summary = normalizePublishedOrphanSummary(result.orphans.summary);
+    return summary.wouldDelete === 0 && summary.errors === 0;
   }
   if (result.kind === "addresses" && result.addresses) {
     return (
@@ -202,6 +218,44 @@ function ResultBody({ result }: { result: MaintenanceOpResult }) {
         ) : null}
         <Text as="p" variant="body3" tone="onCard" className={styles.message}>
           {result.relink.message}
+        </Text>
+      </>
+    );
+  }
+
+  if (result.orphans) {
+    const s = normalizePublishedOrphanSummary(result.orphans.summary);
+    return (
+      <>
+        <div className={styles.stats}>
+          <Stat label="Scheduled scanned" value={s.scheduledScanned} />
+          <Stat label="Duplicate groups" value={s.duplicateGroups} />
+          <Stat
+            label={result.dryRun ? "Would delete" : "Deleted"}
+            value={result.dryRun ? s.wouldDelete : s.deleted}
+          />
+          {s.errors > 0 ? <Stat label="Errors" value={s.errors} /> : null}
+        </div>
+        {s.deletions.length > 0 ? (
+          <ul className={styles.sampleList}>
+            {s.deletions.map((deletion) => (
+              <li key={deletion.eventId}>
+                <Text variant="body3" tone="onCard">
+                  <strong>{deletion.title}</strong> — remove{" "}
+                  <Text as="code" variant="body3" tone="labelOnCard" className={styles.code}>
+                    {deletion.slug}
+                  </Text>
+                  , keep{" "}
+                  <Text as="code" variant="body3" tone="labelOnCard" className={styles.code}>
+                    {deletion.keepSlug}
+                  </Text>
+                </Text>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <Text as="p" variant="body3" tone="onCard" className={styles.message}>
+          {result.orphans.message}
         </Text>
       </>
     );

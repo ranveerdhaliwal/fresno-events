@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeOccurrenceRelinkOpsResponse,
   normalizeOccurrenceRelinkSummary,
-  normalizePriorityRuleGroups
+  normalizePriorityRuleGroups,
+  normalizePublishedOrphanOpsResponse,
+  normalizePublishedOrphanSummary
 } from "./admin-maintenance.utils";
 
 describe("admin-maintenance.utils", () => {
@@ -73,5 +75,43 @@ describe("admin-maintenance.utils", () => {
 
   it("normalizes missing priority rule groups", () => {
     expect(normalizePriorityRuleGroups(undefined)).toEqual([]);
+  });
+
+  it("fills missing orphan summary fields", () => {
+    const summary = normalizePublishedOrphanSummary({
+      scheduledScanned: 100,
+      wouldDelete: 2
+    });
+
+    expect(summary.scheduledScanned).toBe(100);
+    expect(summary.wouldDelete).toBe(2);
+    expect(summary.deleted).toBe(0);
+    expect(summary.deletions).toEqual([]);
+  });
+
+  it("normalizes orphan ops response", () => {
+    const response = normalizePublishedOrphanOpsResponse({
+      dryRun: true,
+      message: "Would delete 1 orphan published event(s).",
+      summary: {
+        scheduledScanned: 50,
+        duplicateGroups: 1,
+        wouldDelete: 1,
+        deleted: 0,
+        errors: 0,
+        deletions: [
+          {
+            eventId: "a",
+            slug: "orphan-slug",
+            title: "Show",
+            keepEventId: "b",
+            keepSlug: "keep-slug"
+          }
+        ]
+      }
+    });
+
+    expect(response.summary.deletions).toHaveLength(1);
+    expect(response.summary.deletions[0]?.keepSlug).toBe("keep-slug");
   });
 });

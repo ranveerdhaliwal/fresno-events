@@ -127,6 +127,18 @@ export {
   type PreviewCaps
 } from "./event-preview.js";
 export {
+  dedupeEventsByContent,
+  eventContentSignature,
+  type EventContentSignatureInput
+} from "./event-dedupe.js";
+export {
+  groupPublishedEventsByContent,
+  pickCanonicalPublishedEvent,
+  planPublishedOrphanDeletions,
+  type PublishedEventAuditRow,
+  type PublishedOrphanDeletion
+} from "./published-event-dedupe.utils.js";
+export {
   PACIFIC_TZ,
   addDaysToIsoDate,
   daysFromIsoThroughSunday,
@@ -833,6 +845,7 @@ export type ReviewQueueAuditCode =
   | "slug_conflict_pending_peer"
   | "pending_linked_duplicate"
   | "multi_primary_occurrence"
+  | "published_content_duplicate"
   | "ticketmaster_needs_ai";
 
 export interface ReviewQueueAuditIssue {
@@ -866,6 +879,9 @@ export type {
   ReviewPriorityTriageOpsResponse,
   ReviewPriorityTriageRuleGroup,
   ReviewPriorityTriageSummary,
+  ReviewPublishedOrphanOpsResponse,
+  ReviewPublishedOrphanSummary,
+  ReviewPublishedOrphanDeletion,
   ReviewVenueAddressBackfillOpsResponse,
   ReviewVenueAddressBackfillSummary,
   ReviewVenueGeocodeOpsResponse,
