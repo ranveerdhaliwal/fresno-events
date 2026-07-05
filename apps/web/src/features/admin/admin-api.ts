@@ -19,6 +19,7 @@ import type {
   ReviewDecisionResponse,
   ReviewOccurrenceRelinkOpsResponse,
   ReviewPriorityRerankOpsResponse,
+  ReviewPublishedOrphanOpsResponse,
   ReviewQueueAuditResponse,
   ReviewVenueAddressBackfillOpsResponse,
   ReviewVenueGeocodeOpsResponse
@@ -31,7 +32,7 @@ import type {
   RejectBody,
   ReviewQueueTab
 } from "./admin-api.types";
-import { normalizeOccurrenceRelinkOpsResponse } from "../admin-review/admin-maintenance.utils";
+import { normalizeOccurrenceRelinkOpsResponse, normalizePublishedOrphanOpsResponse } from "../admin-review/admin-maintenance.utils";
 
 export type { ApproveBody, BulkApproveBody, CandidateStatusFilter, RejectBody, ReviewQueueTab } from "./admin-api.types";
 
@@ -87,6 +88,19 @@ export async function runOccurrenceRelinkOps(token: string, dryRun: boolean) {
     `/review/ops/occurrence-relink${query ? `?${query}` : ""}`,
     { method: "POST" }
   ).then(normalizeOccurrenceRelinkOpsResponse);
+}
+
+export async function runPublishedOrphanCleanupOps(token: string, dryRun: boolean) {
+  const params = new URLSearchParams();
+  if (dryRun) {
+    params.set("dry_run", "true");
+  }
+  const query = params.toString();
+  return adminFetch<ReviewPublishedOrphanOpsResponse>(
+    token,
+    `/review/ops/published-orphan-cleanup${query ? `?${query}` : ""}`,
+    { method: "POST" }
+  ).then(normalizePublishedOrphanOpsResponse);
 }
 
 export async function runVenueAddressBackfillOps(token: string, dryRun: boolean, source?: string) {

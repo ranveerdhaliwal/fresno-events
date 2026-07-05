@@ -23,6 +23,7 @@ import {
   getCandidate,
   runOccurrenceRelinkOps,
   runPriorityRerankOps,
+  runPublishedOrphanCleanupOps,
   runVenueAddressBackfillOps,
   runVenueGeocodeOps,
   isAdminAuthError,
@@ -454,6 +455,28 @@ export function ReviewWorkspace({
     }
   });
 
+  const orphanCleanupMutation = useMutation({
+    mutationFn: (dryRun: boolean) => runPublishedOrphanCleanupOps(token, dryRun),
+    onMutate: (dryRun) => {
+      setMaintenanceOp("orphans");
+      setMaintenanceResult({ kind: "orphans", dryRun });
+    },
+    onSuccess: (orphans, dryRun) => {
+      setMaintenanceResult({ kind: "orphans", dryRun, orphans });
+      void queryClient.invalidateQueries({ queryKey: [...adminKeys.all, "published-events"] });
+    },
+    onError: (error: unknown, dryRun) => {
+      setMaintenanceResult({
+        kind: "orphans",
+        dryRun,
+        error: error instanceof AdminApiError ? error.message : "Published orphan cleanup failed."
+      });
+    },
+    onSettled: () => {
+      setMaintenanceOp(null);
+    }
+  });
+
   const addressBackfillMutation = useMutation({
     mutationFn: (dryRun: boolean) => runVenueAddressBackfillOps(token, dryRun),
     onMutate: (dryRun) => {
@@ -562,12 +585,14 @@ export function ReviewWorkspace({
     bulkPriorityMutation.isPending ||
     preApproveAuditMutation.isPending ||
     relinkOpsMutation.isPending ||
+    orphanCleanupMutation.isPending ||
     addressBackfillMutation.isPending ||
     priorityRerankMutation.isPending ||
     geocodeOpsMutation.isPending;
 
   const maintenanceLoading =
     relinkOpsMutation.isPending ||
+    orphanCleanupMutation.isPending ||
     addressBackfillMutation.isPending ||
     priorityRerankMutation.isPending ||
     geocodeOpsMutation.isPending;
@@ -576,6 +601,10 @@ export function ReviewWorkspace({
     (kind: MaintenanceOpKind) => {
       if (kind === "relink") {
         relinkOpsMutation.mutate(true);
+        return;
+      }
+      if (kind === "orphans") {
+        orphanCleanupMutation.mutate(true);
         return;
       }
       if (kind === "addresses") {
@@ -588,7 +617,13 @@ export function ReviewWorkspace({
       }
       priorityRerankMutation.mutate(true);
     },
-    [addressBackfillMutation, geocodeOpsMutation, priorityRerankMutation, relinkOpsMutation]
+    [
+      addressBackfillMutation,
+      geocodeOpsMutation,
+      orphanCleanupMutation,
+      priorityRerankMutation,
+      relinkOpsMutation
+    ]
   );
 
   const handleMaintenanceApply = useCallback(
@@ -600,6 +635,16 @@ export function ReviewWorkspace({
           )
         ) {
           relinkOpsMutation.mutate(false);
+        }
+        return;
+      }
+      if (kind === "orphans") {
+        if (
+          window.confirm(
+            "Delete published orphan events? This removes scheduled rows that duplicate another published show (same title, venue, and start time)."
+          )
+        ) {
+          orphanCleanupMutation.mutate(false);
         }
         return;
       }
@@ -631,7 +676,7 @@ export function ReviewWorkspace({
         priorityRerankMutation.mutate(false);
       }
     },
-    [addressBackfillMutation, geocodeOpsMutation, priorityRerankMutation, relinkOpsMutation]
+    [addressBackfillMutation, geocodeOpsMutation, orphanCleanupMutation, priorityRerankMutation, relinkOpsMutation]
   );
 
   const candidateQuery = useQuery({

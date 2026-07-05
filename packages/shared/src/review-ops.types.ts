@@ -86,6 +86,29 @@ export interface ReviewPriorityTriageOpsResponse {
   message: string;
 }
 
+export interface ReviewPublishedOrphanDeletion {
+  eventId: string;
+  slug: string;
+  title: string;
+  keepEventId: string;
+  keepSlug: string;
+}
+
+export interface ReviewPublishedOrphanSummary {
+  scheduledScanned: number;
+  duplicateGroups: number;
+  wouldDelete: number;
+  deleted: number;
+  errors: number;
+  deletions: ReviewPublishedOrphanDeletion[];
+}
+
+export interface ReviewPublishedOrphanOpsResponse {
+  dryRun: boolean;
+  summary: ReviewPublishedOrphanSummary;
+  message: string;
+}
+
 export interface ReviewVenueGeocodeSummary {
   scanned: number;
   geocoded: number;

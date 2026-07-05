@@ -2,7 +2,10 @@ import type {
   ReviewOccurrenceRelinkLinkExample,
   ReviewOccurrenceRelinkOpsResponse,
   ReviewOccurrenceRelinkSummary,
-  ReviewPriorityRerankRuleGroup
+  ReviewPriorityRerankRuleGroup,
+  ReviewPublishedOrphanDeletion,
+  ReviewPublishedOrphanOpsResponse,
+  ReviewPublishedOrphanSummary
 } from "@fresno-events/shared";
 
 function num(value: unknown): number {
@@ -80,4 +83,43 @@ export function normalizePriorityRuleGroups(
     count: num(group.count),
     samples: group.samples ?? []
   }));
+}
+
+function normalizePublishedOrphanDeletion(
+  deletion: Partial<ReviewPublishedOrphanDeletion>
+): ReviewPublishedOrphanDeletion | null {
+  const eventId = deletion.eventId?.trim();
+  const slug = deletion.slug?.trim();
+  const title = deletion.title?.trim();
+  const keepEventId = deletion.keepEventId?.trim();
+  const keepSlug = deletion.keepSlug?.trim();
+  if (!eventId || !slug || !title || !keepEventId || !keepSlug) {
+    return null;
+  }
+  return { eventId, slug, title, keepEventId, keepSlug };
+}
+
+export function normalizePublishedOrphanSummary(
+  summary: Partial<ReviewPublishedOrphanSummary> | undefined
+): ReviewPublishedOrphanSummary {
+  const raw = summary ?? {};
+  return {
+    scheduledScanned: num(raw.scheduledScanned),
+    duplicateGroups: num(raw.duplicateGroups),
+    wouldDelete: num(raw.wouldDelete),
+    deleted: num(raw.deleted),
+    errors: num(raw.errors),
+    deletions: (raw.deletions ?? [])
+      .map((deletion) => normalizePublishedOrphanDeletion(deletion))
+      .filter((deletion): deletion is ReviewPublishedOrphanDeletion => deletion !== null)
+  };
+}
+
+export function normalizePublishedOrphanOpsResponse(
+  response: ReviewPublishedOrphanOpsResponse
+): ReviewPublishedOrphanOpsResponse {
+  return {
+    ...response,
+    summary: normalizePublishedOrphanSummary(response.summary)
+  };
 }

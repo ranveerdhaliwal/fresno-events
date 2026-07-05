@@ -14,6 +14,7 @@ import {
   type ReviewDecisionResponse,
   type ReviewOccurrenceRelinkOpsResponse,
   type ReviewPriorityRerankOpsResponse,
+  type ReviewPublishedOrphanOpsResponse,
   type ReviewQueueAuditResponse,
   type ReviewVenueAddressBackfillOpsResponse,
   type ReviewVenueGeocodeOpsResponse
@@ -82,6 +83,7 @@ import {
 import { getPublishedEventForReview } from "@/routes/review-event.service";
 import { geocodeAddress } from "@/lib/geocode";
 import { runOccurrenceRelinkOps, runVenueAddressBackfillOps } from "@/routes/review-ops.service";
+import { runPublishedOrphanCleanupOps } from "@/routes/review-published-orphan.service";
 import { runPriorityRerankOps } from "@/routes/review-priority-rerank.service";
 import { runVenueGeocodeOps } from "@/routes/review-venue-geocode.service";
 import { stream } from "hono/streaming";
@@ -160,6 +162,15 @@ reviewRoute
       return ok<ReviewOccurrenceRelinkOpsResponse>(c, result);
     } catch (error) {
       return handleReviewError(c, error, "Occurrence relink could not be run.");
+    }
+  })
+  .post("/ops/published-orphan-cleanup", async (c) => {
+    const dryRun = c.req.query("dry_run") === "true";
+    try {
+      const result = await runPublishedOrphanCleanupOps(c.env, dryRun);
+      return ok<ReviewPublishedOrphanOpsResponse>(c, result);
+    } catch (error) {
+      return handleReviewError(c, error, "Published orphan cleanup could not be run.");
     }
   })
   .post("/ops/venue-address-backfill", async (c) => {
