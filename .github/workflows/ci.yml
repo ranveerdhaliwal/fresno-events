@@ -55,6 +55,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Build shared package
+        run: pnpm --filter @fresno-events/shared build
+
       - name: Deploy API worker
         uses: cloudflare/wrangler-action@v3
         with:

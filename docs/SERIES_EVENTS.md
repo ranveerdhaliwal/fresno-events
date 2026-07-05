@@ -2,7 +2,7 @@
 
 Operator summary for recurring shows, multi-day festivals, and duplicate CMS listings.
 
-**Full plan:** [SERIES_EVENTS_PLAN.md](SERIES_EVENTS_PLAN.md)
+See also [VENUE_INGEST.md](VENUE_INGEST.md) for venue module layout.
 
 ## Three layers
 

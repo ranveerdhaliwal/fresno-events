@@ -1,7 +1,5 @@
 # Ingest testing (safe real runs)
 
-**Remaining ingest work:** [INGEST_DISCOVERY_AND_DETAIL_PLAN.md](INGEST_DISCOVERY_AND_DETAIL_PLAN.md)
-
 Cloud dev Studio: [event_candidates table](https://supabase.com/dashboard/project/mrfkpvbvgzbtcutulfnc/editor)
 
 **Which database?** Admin → local API (`VITE_API_URL`) → `apps/api` `SUPABASE_URL`. Ingest uses `workers/ingest` `SUPABASE_URL`. Switch together via `pnpm env:local` or `pnpm env:cloud-dev` (`pnpm env:status` to verify).

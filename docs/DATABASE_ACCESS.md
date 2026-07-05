@@ -164,6 +164,19 @@ Local dump uses the Supabase Docker container (`pg_dump` inside `supabase_db_*`)
 
 ---
 
+## Pull cloud dev data to local
+
+When cloud dev is the source of truth (live site DB) and you want local Docker Postgres to match:
+
+1. Same `SUPABASE_DB_PASSWORD_CLOUD_DEV` and `supabase link` as push.
+2. Local stack running: `pnpm db:start`
+3. **`pnpm db:pull-cloud-dev --confirm`** — dumps cloud dev (`images`, `venues`, `events`, `event_candidates`, `ingest_runs`) and **replaces** those tables locally. `venue_ingest_state` / `venue_ingest_runs` are wiped by CASCADE (not synced).
+4. **`pnpm env:local`** and restart `pnpm dev:api` so `/admin` reads local data.
+
+Uses Docker `postgres:17-alpine` for `pg_dump` when local `pg_dump` version mismatches cloud Postgres 17.
+
+---
+
 ## Migrations
 
 Source of truth: `supabase/migrations/*.sql`.

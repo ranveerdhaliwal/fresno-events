@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { TicketmasterEvent } from "./ticketmaster.types";
+import type { TicketmasterEvent, TicketmasterResponse } from "./ticketmaster.types";
 import { toCategory, toLocalDateTime } from "./ticketmaster.types";
-import { toNormalizedEvent } from "./ticketmaster.utils";
+import { fetchAllTicketmasterEvents, toNormalizedEvent } from "./ticketmaster.utils";
 
 describe("ticketmaster.utils", () => {
   it("maps discovery event to normalized event", () => {
@@ -88,5 +88,82 @@ describe("ticketmaster.utils", () => {
     const [event] = toNormalizedEvent(raw);
     expect(event?.priceMin).toBe(25);
     expect(event?.priceMax).toBe(75);
+  });
+});
+
+function minimalTicketmasterEvent(id: string): TicketmasterEvent {
+  return {
+    id,
+    name: `Event ${id}`,
+    dates: { start: { dateTime: "2026-06-10T02:00:00Z" } },
+    _embedded: { venues: [{ name: "Warnors Theatre", city: { name: "Fresno" } }] }
+  };
+}
+
+function pagePayload(page: number, totalPages: number, events: TicketmasterEvent[]): TicketmasterResponse {
+  return {
+    _embedded: { events },
+    page: { number: page, totalPages, size: events.length }
+  };
+}
+
+describe("fetchAllTicketmasterEvents", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("stops after maxPages even when Ticketmaster reports more pages", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const fetchMock = vi.fn(async (url: string) => {
+      const parsed = new URL(url);
+      const page = Number(parsed.searchParams.get("page") ?? "0");
+      const events = Array.from({ length: 200 }, (_, i) => minimalTicketmasterEvent(`p${page}-e${i}`));
+      return new Response(JSON.stringify(pagePayload(page, 10, events)), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchAllTicketmasterEvents({
+      apiKey: "test-key",
+      lat: 36.7378,
+      lng: -119.7871,
+      radiusMiles: 25,
+      startDateTime: "2026-06-01T00:00:00Z",
+      userAgent: "test-agent",
+      maxPages: 3
+    });
+
+    expect(result.pagesVisited).toBe(3);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.events.length).toBe(600);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"ticketmaster_pages_capped"')
+    );
+  });
+
+  it("follows all pages when total is within the default cap", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const parsed = new URL(url);
+      const page = Number(parsed.searchParams.get("page") ?? "0");
+      const events =
+        page === 0
+          ? Array.from({ length: 200 }, (_, i) => minimalTicketmasterEvent(`e${i}`))
+          : [minimalTicketmasterEvent("last")];
+      const totalPages = 2;
+      return new Response(JSON.stringify(pagePayload(page, totalPages, events)), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchAllTicketmasterEvents({
+      apiKey: "test-key",
+      lat: 36.7378,
+      lng: -119.7871,
+      radiusMiles: 25,
+      startDateTime: "2026-06-01T00:00:00Z",
+      userAgent: "test-agent"
+    });
+
+    expect(result.pagesVisited).toBe(2);
+    expect(result.events.length).toBe(201);
   });
 });

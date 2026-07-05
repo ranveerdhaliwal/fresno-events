@@ -81,6 +81,11 @@ const VENUE_RULES: KnownVenueRule[] = [
     venueLat: 36.8133,
     venueLng: -119.7412
   }),
+  rule(
+    (k) => /\bbulldog\s+soccer\s+stadium\b/.test(k) || (/\bbulldog\b/.test(k) && /\bstadium\b/.test(k) && !/\bsave\s*mart\b/.test(k)),
+    "5250 N Barton Ave, Fresno, CA 93740",
+    { venueLat: 36.8128, venueLng: -119.7478 }
+  ),
   rule((k) => /\bswitch\s+lounge\b/.test(k), "5665 N Blackstone Ave, Fresno, CA 93710", {
     venueLat: 36.8214,
     venueLng: -119.7908

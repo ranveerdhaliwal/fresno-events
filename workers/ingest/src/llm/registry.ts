@@ -48,8 +48,12 @@ export function resolveTextProvider(env: IngestEnv, role?: TextProviderRole): Te
     }
   }
 
-  // Local `wrangler dev` exposes the AI binding stub but calls fail unless --remote.
-  const preferExternalLlm = env.APP_ENV === "local" || env.APP_ENV === "development";
+  // Local `wrangler dev --local` exposes the AI binding stub but calls fail unless --remote.
+  // Cloud-dev profile sets APP_ENV=dev; prefer Gemini when a key is configured.
+  const preferExternalLlm =
+    env.APP_ENV === "local" ||
+    env.APP_ENV === "development" ||
+    (env.APP_ENV === "dev" && hasGeminiKey(env));
 
   if (preferExternalLlm) {
     if (hasGeminiKey(env)) {

@@ -2,7 +2,19 @@
 
 Canonical schedule for the **live ingest worker** (`fresno-events-ingest-dev`). Scraping runs on cloud-dev Supabase only — not on a separate prod stack.
 
-**Overview:** [INGEST.md](INGEST.md) · **Testing:** [INGEST_TESTING.md](INGEST_TESTING.md) · **Venues:** [VENUE_INGEST.md](VENUE_INGEST.md)
+**Overview:** [INGEST.md](INGEST.md) · **Testing:** [INGEST_TESTING.md](INGEST_TESTING.md) · **Local ops (active):** [INGEST_LOCAL_OPS.md](INGEST_LOCAL_OPS.md) · **Venues:** [VENUE_INGEST.md](VENUE_INGEST.md)
+
+---
+
+## Current mode (2026): local ingest, cloud cron off
+
+| Layer | Status |
+| --- | --- |
+| **Cloudflare ingest cron** | **Off** — `crons = []` in [`workers/ingest/wrangler.toml`](../workers/ingest/wrangler.toml) |
+| **Local Mon/Thu ingest** | **On** — `pnpm ingest:scheduled-local` or Mac `launchd` (see [INGEST_LOCAL_OPS.md](INGEST_LOCAL_OPS.md)) |
+| **Manual `/trigger` on Worker** | Still works for TM-only tests; not used for full pipeline on free tier |
+
+**Re-enable cloud cron later (paid Workers):** uncomment the two `0 14 * * 1,4` lines in `wrangler.toml`, deploy (`cd workers/ingest && wrangler deploy --env dev`), verify Triggers in dashboard.
 
 ---
 

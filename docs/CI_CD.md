@@ -176,7 +176,26 @@ wrangler pages deploy apps/web/dist --project-name fresno-events --branch main
 
 ---
 
+## Live site checklist (v1)
+
+Cloud-dev Supabase (`what-up-fresno-dev`) is the **single database** for ingest, admin review, and the public site. Wrangler profile `dev` is the live Workers/Pages stack (`api.whatupfresno.com`, `whatupfresno.com`).
+
+| Item | Status |
+| --- | --- |
+| API + ingest Workers deployed (`--env dev`) | Done |
+| Pages on `whatupfresno.com` | Done |
+| Cloud-dev DB migrated + populated | Done |
+| Mon/Thu ingest cron | Configured — verify after subrequest-budget deploy |
+| GitHub Actions `check` + `deploy-workers` on `main` | Merge pending — requires shared package build step |
+| GA / AdSense verification on production domain | Open |
+| Workers Paid (optional) | If compact ingest mode (40+ events) is too lossy |
+
+**Architecture:** Pages → `VITE_API_URL` → API Worker → cloud-dev Postgres + R2 `fresno-event-images-dev`. Ingest Worker writes `event_candidates`; `/admin` approve publishes to `events` on the same DB.
+
+---
+
 ## Related
 
-- [PROD_DEPLOYMENT_PLAN.md](PROD_DEPLOYMENT_PLAN.md) — live architecture
 - [INGEST_SCHEDULE.md](INGEST_SCHEDULE.md) — Mon/Thu ingest cron
+- [DATABASE_ACCESS.md](DATABASE_ACCESS.md) — local vs cloud, push/pull sync
+- [INGEST.md](INGEST.md) — ingest overview

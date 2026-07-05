@@ -32,7 +32,7 @@ Use the scripted gate before writing candidates: [INGEST_TESTING.md](INGEST_TEST
 
 ## Local workflow
 
-**Prerequisites:** See [LAUNCH_PLAN.md](LAUNCH_PLAN.md) Phase 1 (Docker, DB, secrets).
+**Prerequisites:** Docker, local Supabase (`pnpm db:start`), and env via `pnpm env:local` — see [DATABASE_ACCESS.md](DATABASE_ACCESS.md).
 
 **Terminal 1 — ingest worker**
 

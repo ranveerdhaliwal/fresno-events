@@ -2,11 +2,25 @@
 
 A modern events discovery app for Fresno, Clovis, Madera, Kingsburg, Sanger, and the surrounding Central Valley.
 
-## Roadmap / TODO
+## Roadmap / remaining work
 
-- [ ] **Now:** Follow [docs/LAUNCH_PLAN.md](docs/LAUNCH_PLAN.md) — Docker + dev DB setup, then implement [docs/INGESTION_OVERHAUL_PLAN.md](docs/INGESTION_OVERHAUL_PLAN.md), ingest into dev DB, UI work.
-- [ ] **Later:** Auto-promote approved dev events to prod (API `approve-and-promote` + optional scheduled sync). Until then, prod is updated manually or by re-approving after pointing UI at prod.
-- [ ] **Later:** Daily dev ingest cron + refresh/cancel detection for approved events.
+Operational docs (not historical plans):
+
+| Topic | Doc |
+| --- | --- |
+| Ingest flow, sources, local vs cloud | [docs/INGEST.md](docs/INGEST.md) |
+| Safe promote / preflight / cleanup | [docs/INGEST_TESTING.md](docs/INGEST_TESTING.md) |
+| Mon/Thu cron | [docs/INGEST_SCHEDULE.md](docs/INGEST_SCHEDULE.md) |
+| CI, deploy, prod checklist | [docs/CI_CD.md](docs/CI_CD.md) |
+| Local ↔ cloud DB sync | [docs/DATABASE_ACCESS.md](docs/DATABASE_ACCESS.md) |
+
+**Still open (as of June 2026):**
+
+- [ ] Merge CI + Workers deploy fixes to `main`; confirm `deploy-workers` green after merge
+- [ ] Verify Mon/Thu ingest cron on cloud after subrequest-budget deploy
+- [ ] GA / AdSense verification on `whatupfresno.com` (slots still manual)
+- [ ] Optional: Workers Paid plan if full TM dedupe + published-event sync needed on every run (compact mode skips some work at 40+ events)
+- [ ] Later: auto-promote approved dev → prod DB; daily refresh/cancel detection for approved events
 
 ## Workspace
 
@@ -289,9 +303,9 @@ For the frontend, set `VITE_SENTRY_DSN` to enable error tracking. The web app al
 
 ## Cloud Deploy
 
-**Order:** [docs/LAUNCH_PLAN.md](docs/LAUNCH_PLAN.md) (setup + build path) → [docs/INGESTION_OVERHAUL_PLAN.md](docs/INGESTION_OVERHAUL_PLAN.md) (ingest implementation spec).
+Live stack: **Cloudflare Pages + API/ingest Workers** on the `dev` wrangler profile, **single cloud-dev Supabase** (`what-up-fresno-dev`). See [docs/CI_CD.md](docs/CI_CD.md) for deploy flow and remaining checklist items.
 
-Prod does **not** run ingest or scrape cron. Events reach production only after you promote them from dev (automation is on the roadmap above).
+Prod does **not** run a separate ingest DB or promotion step for v1 — ingest, review, and the public site share cloud-dev.
 
 ## Design Gate
 

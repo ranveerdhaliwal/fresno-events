@@ -1,10 +1,8 @@
 # Venue ingest
 
-**Implementation backlog:** [INGEST_DISCOVERY_AND_DETAIL_PLAN.md](INGEST_DISCOVERY_AND_DETAIL_PLAN.md)
-
 **Cross-source dedupe:** [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md) — `occurrence_id`, grouped admin review, `INGEST_CROSS_SOURCE_DEDUPE`.
 
-**Series events:** [SERIES_EVENTS.md](SERIES_EVENTS.md) — recurring shows, canonical `seriesId`, batch dedupe. Plan: [SERIES_EVENTS_PLAN.md](SERIES_EVENTS_PLAN.md).
+**Series events:** [SERIES_EVENTS.md](SERIES_EVENTS.md) — recurring shows, canonical `seriesId`, batch dedupe.
 
 **Venue location (address, geocode, maps):** [VENUE_LOCATION.md](VENUE_LOCATION.md) — per-source coords matrix, `upsertVenue`, address backfill, `GOOGLE_MAPS_PLATFORM_API_KEY`, admin maintenance ops.
 
