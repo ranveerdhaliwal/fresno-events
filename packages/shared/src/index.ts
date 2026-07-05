@@ -154,6 +154,38 @@ export {
   stripBracketedLinkPlaceholders
 } from "./description-text.utils.js";
 export {
+  buildBreadcrumbJsonLd,
+  buildCalendarDescription,
+  buildCalendarTitle,
+  buildDayDescription,
+  buildDayTitle,
+  buildEventDescription,
+  buildEventIntroSentence,
+  buildEventJsonLd,
+  buildEventTitle,
+  buildHomeDescription,
+  buildHomeTitle,
+  buildOgTags,
+  buildRobotsContent,
+  buildTwitterTags,
+  buildVenueDescription,
+  buildVenueJsonLd,
+  buildVenueTitle,
+  buildWebsiteJsonLd,
+  canonicalUrl,
+  defaultOgImageUrl,
+  DEFAULT_OG_IMAGE_PATH,
+  DEFAULT_SITE_DESCRIPTION,
+  formatCategoryLabel,
+  resolveOgImageUrl,
+  SITE_NAME,
+  SITE_ORIGIN,
+  truncateMetaDescription,
+  type OgTagSet,
+  type SeoHeadInput,
+  type TwitterTagSet
+} from "./seo/seo.utils.js";
+export {
   buildGoogleMapsSearchUrl,
   buildMapsSearchQuery,
   isValidCoordinate,

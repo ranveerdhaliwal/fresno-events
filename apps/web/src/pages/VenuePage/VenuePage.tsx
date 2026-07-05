@@ -1,4 +1,5 @@
 import { Link, useParams } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { EventRow } from "@/components/EventRow";
@@ -7,6 +8,8 @@ import { VenueMiniMap } from "@/components/VenueMiniMap";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
+import { buildVenueSeo } from "@/lib/seo/page-seo";
+import { useSeoHead } from "@/lib/seo/useSeoHead";
 import { getVenueDetail } from "@/services/events.service";
 import { eventsKeys } from "@/services/events.queryKeys";
 
@@ -19,6 +22,9 @@ export function VenuePage() {
     queryFn: ({ signal }) => getVenueDetail(slug, signal),
     enabled: Boolean(slug)
   });
+
+  const seo = useMemo(() => (data ? buildVenueSeo(data) : null), [data]);
+  useSeoHead(seo);
 
   const rows = (data?.upcomingEvents ?? []).map((item) => toEventRowViewModel(item));
 

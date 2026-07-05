@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /saved
+Disallow: /settings
+Disallow: /artist/
+
+Sitemap: https://api.whatupfresno.com/sitemap.xml

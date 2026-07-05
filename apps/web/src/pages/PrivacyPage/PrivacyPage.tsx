@@ -1,8 +1,12 @@
 import { PageChrome } from "@/components/PageChrome";
+import { buildPrivacySeo } from "@/lib/seo/page-seo";
+import { useSeoHead } from "@/lib/seo/useSeoHead";
 
 import styles from "./PrivacyPage.module.css";
 
 export function PrivacyPage() {
+  useSeoHead(buildPrivacySeo());
+
   return (
     <PageChrome mobileNav={{ variant: "day", title: "PRIVACY" }}>
       <article className={styles.article}>

@@ -6,6 +6,8 @@ import { EventRow } from "@/components/EventRow";
 import { PageChrome } from "@/components/PageChrome";
 import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
 import { toEventRowViewModel } from "@/lib/event-view-model";
+import { buildSearchSeo } from "@/lib/seo/page-seo";
+import { useSeoHead } from "@/lib/seo/useSeoHead";
 import { searchAll } from "@/services/search.service";
 
 import styles from "./SearchPage.module.css";
@@ -15,6 +17,8 @@ export function SearchPage() {
   const { q: urlQuery } = useSearch({ from: "/search" });
   const [draft, setDraft] = useState(urlQuery);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useSeoHead(useMemo(() => buildSearchSeo(urlQuery), [urlQuery]));
 
   useEffect(() => {
     setDraft(urlQuery);

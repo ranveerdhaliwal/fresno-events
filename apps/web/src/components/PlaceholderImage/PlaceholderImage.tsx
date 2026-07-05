@@ -11,6 +11,7 @@ export function PlaceholderImage({
   label,
   className,
   imageUrl,
+  alt = "",
   imageFit = "cover",
   imagePadding
 }: PlaceholderImageProps) {
@@ -24,7 +25,7 @@ export function PlaceholderImage({
             : undefined
         }
       >
-        <img src={imageUrl} alt="" className={styles.img} />
+        <img src={imageUrl} alt={alt} className={styles.img} />
       </div>
     );
   }

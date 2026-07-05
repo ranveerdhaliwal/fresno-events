@@ -12,7 +12,7 @@ import { EventShareCard } from "@/components/EventShareCard";
 import { VenueMiniMap } from "@/components/VenueMiniMap";
 import { deriveTagline, eventIsFree, formatDetailPrice, toEventRowViewModel } from "@/lib/event-view-model";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
-import { buildGoogleMapsSearchUrl } from "@fresno-events/shared";
+import { buildEventIntroSentence, buildGoogleMapsSearchUrl } from "@fresno-events/shared";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { formatCountdownLabel, formatEventDate, formatShortTime, toIsoDateLocal } from "@/lib/event-time";
 import { paletteKeyForCategory, gradientForPalette } from "@/lib/image-palette";
@@ -40,6 +40,8 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
   const priceLabel = formatDetailPrice(event);
   const originalUrl = event.externalUrl ?? event.ticketUrl ?? null;
   const shareUrl = typeof globalThis.location !== "undefined" ? globalThis.location.href : "";
+  const heroAlt = heroImage?.altText?.trim() || `${event.title} at ${venue.name}`;
+  const seoIntro = buildEventIntroSentence(event, venue);
 
   return (
     <article className={styles.article} data-testid="event-detail-view">
@@ -58,7 +60,12 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
 
       <div className={styles.heroWrap}>
         <div className={styles.hero}>
-          <PlaceholderImage paletteKey={paletteKey} label={event.category.replace("_", " ")} imageUrl={imageUrl} />
+          <PlaceholderImage
+            paletteKey={paletteKey}
+            label={event.category.replace("_", " ")}
+            imageUrl={imageUrl}
+            alt={heroAlt}
+          />
           <div className={styles.heroOverlay} />
           <div className={styles.heroContent}>
             <div className={styles.heroText}>
@@ -115,6 +122,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
         <div className={styles.mainCol}>
           <section className={styles.sec}>
             <SecHead number="01" script="the story" title="ABOUT" />
+            <p className={styles.seoIntro}>{seoIntro}</p>
             <p>{event.descriptionText ?? "Details are still being confirmed for this event."}</p>
           </section>
 

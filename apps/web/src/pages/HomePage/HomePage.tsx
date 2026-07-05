@@ -6,10 +6,14 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { FeaturedEvents } from "@/features/featured-events/FeaturedEvents";
 import { TodayStrip } from "@/features/today-strip/TodayStrip";
 import { UpcomingEvents } from "@/features/upcoming-events/UpcomingEvents";
+import { useSeoHead } from "@/lib/seo/useSeoHead";
+import { buildHomeSeo } from "@/lib/seo/page-seo";
 
 import styles from "./HomePage.module.css";
 
 export function HomePage() {
+  useSeoHead(buildHomeSeo());
+
   return (
     <div className={styles.page} data-testid="home-page">
       <div className={styles.desktopChrome}>
@@ -20,6 +24,7 @@ export function HomePage() {
       <RainbowStripe variant="mobile" />
 
       <main className={styles.main}>
+        <h1 className={styles.pageTitle}>Events in Fresno &amp; the Central Valley</h1>
         <FeaturedEvents />
         <AdSlot variant="banner-wide" />
         <TodayStrip />
