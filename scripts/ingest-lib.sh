@@ -110,6 +110,16 @@ ingest_print_relink_summary() {
   printf '%s' "$resp" | node "$script"
 }
 
+ingest_print_orphan_cleanup_summary() {
+  local resp="$1"
+  local script="${REPO_ROOT:-}/scripts/ingest-print-orphan-cleanup-summary.mjs"
+  if [[ ! -f "$script" ]] || ! command -v node >/dev/null 2>&1; then
+    echo "Orphan cleanup summary requires Node.js and $script" >&2
+    return 1
+  fi
+  printf '%s' "$resp" | node "$script"
+}
+
 # Resolve user --source= to worker scraper key + optional venue filter (internal).
 # Sets: INGEST_DISPLAY_SOURCE, INGEST_SCRAPER, INGEST_VENUE_FILTER
 ingest_resolve_user_source() {

@@ -169,12 +169,14 @@ The web app exposes the review console at [/admin](http://localhost:5182/admin).
 ```text
 ingest:promote (or ingest:run)  →  event_candidates (pending_review)
 ingest:enrich                   →  confidence, suggested_priority, category/tags (AI)
+ingest:relink                   →  occurrence keys + cross-source duplicate links (after promote)
+published-orphan-cleanup        →  drop duplicate scheduled events (after relink, before approve)
 /admin approve                  →  events (+ venues, images) in the same database
 ```
 
 Prod is separate: approving on cloud dev does not publish to production until you have a prod promotion path (see roadmap).
 
-More detail: **[docs/INGEST.md](docs/INGEST.md)**, **[docs/INGEST_TESTING.md](docs/INGEST_TESTING.md)**. Scraper registry: [`workers/ingest/src/registry.ts`](workers/ingest/src/registry.ts).
+More detail: **[docs/INGEST.md](docs/INGEST.md)**, **[docs/INGEST_TESTING.md](docs/INGEST_TESTING.md)**, **[docs/INGEST_LOCAL_OPS.md](docs/INGEST_LOCAL_OPS.md)** (full Mon/Thu pipeline including relink + orphan cleanup). Scraper registry: [`workers/ingest/src/registry.ts`](workers/ingest/src/registry.ts).
 
 ### Prerequisite
 
@@ -244,8 +246,11 @@ pnpm ingest:dev
 pnpm ingest:preflight-all && pnpm ingest:promote-all
 pnpm ingest:preflight --source=ticketmaster && pnpm ingest:promote --source=ticketmaster
 pnpm ingest:enrich --limit=50
-pnpm dev:api                           # open http://127.0.0.1:5182/admin
+pnpm ingest:relink --dry-run && pnpm ingest:relink    # after promote — see INGEST_LOCAL_OPS.md
+pnpm dev:api                                           # orphan cleanup + http://127.0.0.1:5182/admin
 ```
+
+Full promote job (Mon/Thu, cloud-dev, detail-backfill, enrich, relink, orphan cleanup): **[docs/INGEST_LOCAL_OPS.md](docs/INGEST_LOCAL_OPS.md)**.
 
 Check data in Studio (http://127.0.0.1:54423 when on local — run `supabase status` if the port changed). For cloud dev, use `pnpm env:cloud-dev`, restart workers, run the same ingest commands, and use the Supabase dashboard or MCP — local Studio will not show cloud rows.
 
