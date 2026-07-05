@@ -50,7 +50,9 @@ describe("buildReviewQueueAudit", () => {
           id: "e1",
           slug: "ringling-bros-and-barnum-bailey-presents-the-greatest-show-on-earth-2026-07-05",
           occurrenceId,
-          title: "Ringling Bros."
+          title: "Ringling Bros.",
+          startTs: "2026-07-06T00:00:00.000Z",
+          venueName: "Save Mart Center"
         }
       ]
     });
@@ -74,5 +76,33 @@ describe("buildReviewQueueAudit", () => {
 
     expect(audit.issues.some((issue) => issue.code === "pending_linked_duplicate")).toBe(true);
     expect(audit.issues.some((issue) => issue.code === "ticketmaster_needs_ai")).toBe(true);
+  });
+
+  it("flags pending primaries when a published show exists with different occurrence_id", () => {
+    const audit = buildReviewQueueAudit({
+      primaries: [
+        primary({
+          id: "scrape-1",
+          title: "Ringling Bros. And Barnum & Bailey Presents The Greatest Show On Earth",
+          startTs: "2026-07-05T20:00:00.000-07:00",
+          occurrenceId: "occ-new",
+          reviewNotes: "[ai] ok"
+        })
+      ],
+      linkedDuplicates: [],
+      scheduledEvents: [
+        {
+          id: "evt-tm",
+          slug: "ringling-tm",
+          occurrenceId: "occ-old",
+          title: "Ringling Bros. And Barnum & Bailey Presents The Greatest Show On Earth",
+          startTs: "2026-07-05T20:00:00.000-07:00",
+          venueName: "Save Mart Center"
+        }
+      ]
+    });
+
+    expect(audit.issues.some((issue) => issue.code === "published_content_duplicate")).toBe(true);
+    expect(audit.summary.errors).toBe(1);
   });
 });

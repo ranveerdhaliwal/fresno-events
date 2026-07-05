@@ -29,6 +29,7 @@ import { candidateSelect } from "@/routes/review.constants";
 import { ReviewRouteError } from "@/routes/review.errors";
 import {
   getPublishedEventForReview,
+  getScheduledEventByContentSignature,
   getScheduledEventByOccurrenceId,
   linkOccurrenceSiblings,
   patchApprovedEvent,
@@ -68,11 +69,22 @@ export async function publishCandidateToEvent(
 
   const siblings = options.siblings ?? [];
   const existingByOccurrence = await getScheduledEventByOccurrenceId(env, candidate.occurrenceId);
+  const existingByContent =
+    existingByOccurrence ?? (await getScheduledEventByContentSignature(env, normalized));
 
-  const event = existingByOccurrence
+  if (!existingByOccurrence && existingByContent) {
+    logStructured("publish_existing_by_content_signature", {
+      candidate_id: candidate.id,
+      existing_event_id: existingByContent.id,
+      candidate_occurrence_id: candidate.occurrenceId,
+      existing_occurrence_id: existingByContent.occurrence_id
+    });
+  }
+
+  const event = existingByContent
     ? await patchApprovedEvent(
         env,
-        existingByOccurrence,
+        existingByContent,
         candidate,
         normalized,
         venue.id,

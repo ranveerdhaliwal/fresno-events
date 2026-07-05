@@ -92,4 +92,45 @@ describe("AdminMaintenancePanel", () => {
     expect(screen.getByText(/Miss California 2026/)).toBeInTheDocument();
     expect(screen.getByText(/visitfresnocounty · cross-source/)).toBeInTheDocument();
   });
+
+  it("renders orphan cleanup preview with deletion samples", () => {
+    renderWithProviders(
+      <AdminMaintenancePanel
+        activeOp={null}
+        isLoading={false}
+        result={{
+          kind: "orphans",
+          dryRun: true,
+          orphans: {
+            dryRun: true,
+            message: "Would delete 2 orphan published event(s) across 2 duplicate group(s).",
+            summary: {
+              scheduledScanned: 100,
+              duplicateGroups: 2,
+              wouldDelete: 2,
+              deleted: 0,
+              errors: 0,
+              deletions: [
+                {
+                  eventId: "orphan-1",
+                  slug: "friday-night-wine-down-96ebe5b2",
+                  title: "Friday Night Wine Down",
+                  keepEventId: "keep-1",
+                  keepSlug: "friday-night-wine-down-2026-06-19-1800"
+                }
+              ]
+            }
+          }
+        }}
+        onCheck={() => undefined}
+        onApply={() => undefined}
+        onDismiss={() => undefined}
+      />
+    );
+
+    expect(screen.getByText("Would delete")).toBeInTheDocument();
+    expect(screen.getByText(/Friday Night Wine Down/)).toBeInTheDocument();
+    expect(screen.getByText(/friday-night-wine-down-96ebe5b2/)).toBeInTheDocument();
+    expect(screen.getByText(/Would delete 2 orphan published event/)).toBeInTheDocument();
+  });
 });

@@ -74,6 +74,19 @@ create unique index events_occurrence_id_scheduled_unique
   where status = 'scheduled' and occurrence_id is not null;
 ```
 
+### Published orphan cleanup
+
+When sources were bulk-approved in different orders, candidate dedupe may be correct while **two scheduled `events` rows** remain (stale `occurrence_id` on the older publish). Admin API:
+
+```http
+POST /review/ops/published-orphan-cleanup?dry_run=true
+POST /review/ops/published-orphan-cleanup
+```
+
+Keeps the row duplicate candidates vote for (or venue scraper over Ticketmaster). Approve also patches an existing scheduled row when **content signature** (title + venue + start) matches, even if `occurrence_id` differs.
+
+Pre-approve audit flags `published_content_duplicate` when a pending primary would collide with an existing scheduled show on a different `occurrence_id`.
+
 ## Examples
 
 - **Same title/time/venue** across Visit + Downtown → one primary, one duplicate (step A).

@@ -22,6 +22,8 @@ interface ScheduledEventDbRow {
   slug: string;
   occurrence_id: string | null;
   title: string;
+  start_ts: string;
+  venues: { name: string } | { name: string }[] | null;
 }
 
 async function fetchPendingLinkedDuplicates(env: Env): Promise<LinkedDuplicateRow[]> {
@@ -46,7 +48,7 @@ async function fetchPendingLinkedDuplicates(env: Env): Promise<LinkedDuplicateRo
 
 async function fetchScheduledEventsForAudit(env: Env): Promise<ScheduledEventAuditRow[]> {
   const params = new URLSearchParams({
-    select: "id,slug,occurrence_id,title",
+    select: "id,slug,occurrence_id,title,start_ts,venues(name)",
     status: "eq.scheduled",
     limit: "5000"
   });
@@ -57,7 +59,9 @@ async function fetchScheduledEventsForAudit(env: Env): Promise<ScheduledEventAud
     id: row.id,
     slug: row.slug,
     occurrenceId: row.occurrence_id,
-    title: row.title
+    title: row.title,
+    startTs: row.start_ts,
+    venueName: Array.isArray(row.venues) ? (row.venues[0]?.name ?? "") : (row.venues?.name ?? "")
   }));
 }
 

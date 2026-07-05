@@ -1,5 +1,6 @@
 import {
   EVENT_PRIORITY_DEFAULT,
+  eventContentSignature,
   normalizeVenueStreetAddress,
   parseLineup,
   type Event,
@@ -193,6 +194,72 @@ export async function getScheduledEventByOccurrenceId(
 
   const rows = await supabaseReviewRequest<SupabaseEventRow[]>(env, `/rest/v1/events?${params}`);
   return rows[0] ?? null;
+}
+
+const scheduledEventSelect = [
+  "id",
+  "slug",
+  "source",
+  "source_event_id",
+  "source_refs",
+  "title",
+  "description_html",
+  "description_text",
+  "venue_id",
+  "start_ts",
+  "end_ts",
+  "timezone",
+  "category",
+  "subcategories",
+  "tags",
+  "price_min",
+  "price_max",
+  "currency",
+  "is_free",
+  "ticket_url",
+  "external_url",
+  "dedupe_hash",
+  "confidence_score",
+  "last_seen_at",
+  "priority",
+  "occurrence_id",
+  "series_id",
+  "series_name",
+  "lineup",
+  "created_at",
+  "updated_at",
+  "venue:venues(name)"
+].join(",");
+
+export async function getScheduledEventByContentSignature(
+  env: Env,
+  normalized: Pick<NormalizedEvent, "title" | "startTs" | "venueName">
+): Promise<SupabaseEventRow | null> {
+  const targetSignature = eventContentSignature({
+    event: { title: normalized.title, startTs: normalized.startTs },
+    venue: { name: normalized.venueName }
+  });
+
+  const params = new URLSearchParams({
+    select: scheduledEventSelect,
+    start_ts: `eq.${normalized.startTs}`,
+    status: "eq.scheduled",
+    limit: "25"
+  });
+
+  const rows = await supabaseReviewRequest<SupabaseEventRow[]>(env, `/rest/v1/events?${params}`);
+
+  for (const row of rows) {
+    const signature = eventContentSignature({
+      event: { title: row.title, startTs: row.start_ts },
+      venue: { name: row.venue?.name ?? normalized.venueName }
+    });
+    if (signature === targetSignature) {
+      return row;
+    }
+  }
+
+  return null;
 }
 
 export async function upsertEvent(

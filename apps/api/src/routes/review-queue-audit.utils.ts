@@ -3,6 +3,7 @@ import type {
   ReviewQueueAuditIssue,
   ReviewQueueAuditResponse
 } from "@fresno-events/shared";
+import { eventContentSignature } from "@fresno-events/shared";
 
 import { auditSlugCollisions } from "@/routes/review-slug-audit.utils";
 
@@ -17,6 +18,8 @@ export interface ScheduledEventAuditRow {
   slug: string;
   occurrenceId: string | null;
   title: string;
+  startTs: string;
+  venueName: string;
 }
 
 export interface ReviewQueueAuditInput {
@@ -107,6 +110,49 @@ export function buildReviewQueueAudit(input: ReviewQueueAuditInput): ReviewQueue
         }
       });
     }
+  }
+
+  const scheduledByContent = new Map<string, ScheduledEventAuditRow[]>();
+  for (const event of input.scheduledEvents) {
+    const signature = eventContentSignature({
+      event: { title: event.title, startTs: event.startTs },
+      venue: { name: event.venueName }
+    });
+    const bucket = scheduledByContent.get(signature) ?? [];
+    bucket.push(event);
+    scheduledByContent.set(signature, bucket);
+  }
+
+  for (const row of input.primaries) {
+    const signature = eventContentSignature({
+      event: { title: row.title, startTs: row.startTs },
+      venue: { name: row.venueName }
+    });
+    const publishedMatches = scheduledByContent.get(signature) ?? [];
+    if (publishedMatches.length === 0) {
+      continue;
+    }
+
+    const hasSameOccurrence = publishedMatches.some((event) => event.occurrenceId === row.occurrenceId);
+    if (hasSameOccurrence) {
+      continue;
+    }
+
+    const existing = publishedMatches[0]!;
+    issues.push({
+      code: "published_content_duplicate",
+      severity: "error",
+      candidateId: row.id,
+      title: row.title,
+      message:
+        "A scheduled event already exists for this show (different occurrence_id). Approve will patch the existing row, or run published-orphan cleanup first.",
+      detail: {
+        existingEventId: existing.id,
+        existingSlug: existing.slug,
+        existingOccurrenceId: existing.occurrenceId ?? "",
+        candidateOccurrenceId: row.occurrenceId
+      }
+    });
   }
 
   for (const row of input.primaries) {
