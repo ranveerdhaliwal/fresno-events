@@ -22,7 +22,6 @@
 .tag {
   background: var(--surface-nav);
   color: var(--mustard);
-  font-family: var(--font-display);
   font-size: 9px;
   letter-spacing: 2.5px;
   padding: 3px 8px;
@@ -33,7 +32,6 @@
 }
 
 .body h4 {
-  font-family: var(--font-display);
   font-size: 18px;
   margin: 4px 0 2px;
 }
@@ -49,7 +47,6 @@
   color: var(--surface-card);
   border: 2px solid var(--border-default);
   padding: 10px 18px;
-  font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 2px;
   box-shadow: var(--shadow-sm);
@@ -72,7 +69,6 @@
 }
 
 .card h4 {
-  font-family: var(--font-display);
   font-size: 15px;
   margin: 4px 0 2px;
 }
@@ -89,7 +85,6 @@
   color: var(--text-primary);
   border: 2px solid var(--border-default);
   padding: 7px 14px;
-  font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 2px;
   box-shadow: var(--shadow-xs);
@@ -108,7 +103,6 @@
 }
 
 .sideTitle {
-  font-family: var(--font-display);
   font-size: 14px;
   margin: 4px 0 0;
 }

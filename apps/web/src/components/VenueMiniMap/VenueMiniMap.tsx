@@ -6,6 +6,7 @@ import { resolveMapPinEmoji } from "@fresno-events/shared";
 import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from "@/lib/map-config";
 
 import type { VenueMiniMapProps } from "./VenueMiniMap.types";
+import { buildEmojiMarkerHtml } from "./VenueMiniMap.utils";
 import styles from "./VenueMiniMap.module.css";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -43,7 +44,7 @@ export function VenueMiniMap({
     }
     return L.divIcon({
       className: "",
-      html: `<span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;font-size:22px;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.25))">${emoji}</span>`,
+      html: buildEmojiMarkerHtml(emoji),
       iconSize: [32, 32],
       iconAnchor: [16, 32]
     });

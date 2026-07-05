@@ -1,0 +1,22 @@
+.headGap {
+  margin-bottom: 16px;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.factLines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.orgLines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

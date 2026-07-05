@@ -27,7 +27,6 @@
 }
 
 .script {
-  font-family: var(--font-script);
   font-size: 28px;
   color: var(--mustard);
   transform: rotate(-3deg);
@@ -36,7 +35,6 @@
 }
 
 .hero h1 {
-  font-family: var(--font-display);
   font-size: 38px;
   margin: 0;
   letter-spacing: 0.5px;
@@ -62,7 +60,6 @@
   color: var(--text-primary);
   border: 2px solid var(--border-on-page);
   padding: 10px 14px;
-  font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 2px;
   text-decoration: none;

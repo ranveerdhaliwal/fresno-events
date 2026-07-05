@@ -1,0 +1,23 @@
+.panel {
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
+  box-shadow: var(--shadow-card-on-page);
+  overflow: hidden;
+}
+
+.hero {
+  width: 100%;
+}
+
+.body {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.facts {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}

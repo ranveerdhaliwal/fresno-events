@@ -1,16 +1,18 @@
 import { Link } from "@tanstack/react-router";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 import { AdSlot } from "@/components/AdSlot";
 import { EventRow } from "@/components/EventRow";
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import { SecHead } from "@/components/SecHead";
 import { SeeAllDayCta } from "@/components/SeeAllDayCta";
+import { Text } from "@/components/Text";
 import { ContextStrip } from "@/components/ContextStrip";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { EventShareCard } from "@/components/EventShareCard";
 import { VenueMiniMap } from "@/components/VenueMiniMap";
 import { deriveTagline, eventIsFree, formatDetailPrice, toEventRowViewModel } from "@/lib/event-view-model";
+import { heroImageFit, heroImagePadding } from "@/lib/hero-image.utils";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
 import { buildEventIntroSentence, buildGoogleMapsSearchUrl } from "@fresno-events/shared";
 import { resolveMediaUrl } from "@/lib/media-url";
@@ -19,6 +21,7 @@ import { paletteKeyForCategory, gradientForPalette } from "@/lib/image-palette";
 import type { EventDetailResult } from "@/services/events.types";
 
 import styles from "./EventDetailView.module.css";
+import { EventDetailSkeleton } from "./EventDetailSkeleton";
 
 export function EventDetailView({ data }: { data: EventDetailResult }) {
   const { detail } = data;
@@ -27,6 +30,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
   const imageUrl = resolveMediaUrl(heroImage?.cdnUrl ?? null);
   const tagline = deriveTagline(event);
   const dayIso = toIsoDateLocal(new Date(event.startTs));
+  const logoPadding = heroImagePadding(imageUrl);
 
   const relatedRows = detail.relatedEvents.map((item) => toEventRowViewModel(item));
   const seriesRows = (detail.seriesEvents ?? []).map((item) => toEventRowViewModel(item));
@@ -65,18 +69,29 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
             label={event.category.replace("_", " ")}
             imageUrl={imageUrl}
             alt={heroAlt}
+            imageFit={heroImageFit(imageUrl)}
+            {...(logoPadding !== undefined ? { imagePadding: logoPadding } : {})}
           />
           <div className={styles.heroOverlay} />
           <div className={styles.heroContent}>
             <div className={styles.heroText}>
               <div className={styles.heroPills}>
-                {event.priority <= 1 ? <span className={styles.pill}>HUGE</span> : null}
-                <span className={styles.pillMustard}>{event.category.replace("_", " ")}</span>
+                <Text variant="eyebrow" tone="onPage" as="span" className={styles.pillMustard}>
+                  {event.category.replace("_", " ")}
+                </Text>
                 <AdminEditLink eventId={event.id} />
               </div>
-              <h1>{event.title}</h1>
-              {event.seriesName ? <p className={styles.seriesSubtitle}>{event.seriesName}</p> : null}
-              <p className={styles.tagline}>{tagline}</p>
+              <Text variant="header1" tone="inverse" as="h1" className={styles.heroTitle}>
+                {event.title}
+              </Text>
+              {event.seriesName ? (
+                <Text variant="body2" tone="inverse" as="p" className={styles.seriesSubtitle}>
+                  {event.seriesName}
+                </Text>
+              ) : null}
+              <Text variant="script" tone="accent" scriptStyle="section" as="p" className={styles.tagline}>
+                {tagline}
+              </Text>
             </div>
             {event.ticketUrl ? (
               <div className={styles.heroActions}>
@@ -93,13 +108,21 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
 
       <div className={styles.quickFacts}>
         <div className={styles.fact}>
-          <span className={styles.lab}>When</span>
-          <span className={styles.val}>{formatEventDate(event.startTs)}</span>
-          <span className={styles.sub}>{formatShortTime(event.startTs)}</span>
+          <Text variant="eyebrow" tone="label" as="span" className={styles.lab}>
+            When
+          </Text>
+          <Text variant="header3" tone="onPage" as="span" className={styles.val}>
+            {formatEventDate(event.startTs)}
+          </Text>
+          <Text variant="body3" tone="mutedOnPage" as="span" className={styles.sub}>
+            {formatShortTime(event.startTs)}
+          </Text>
         </div>
         <div className={styles.fact}>
-          <span className={styles.lab}>Where</span>
-          <span className={styles.val}>
+          <Text variant="eyebrow" tone="label" as="span" className={styles.lab}>
+            Where
+          </Text>
+          <Text variant="header3" tone="onPage" as="span" className={styles.val}>
             {venue.slug ? (
               <Link to="/venue/$slug" params={{ slug: venue.slug }} className={styles.venueLink}>
                 {venue.name}
@@ -107,13 +130,24 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
             ) : (
               venue.name
             )}
-          </span>
-          <span className={styles.sub}>{venue.neighborhood ?? venue.city}</span>
+          </Text>
+          <Text variant="body3" tone="mutedOnPage" as="span" className={styles.sub}>
+            {venue.neighborhood ?? venue.city}
+          </Text>
         </div>
         {priceLabel ? (
           <div className={styles.fact}>
-            <span className={styles.lab}>Price</span>
-            <span className={`${styles.val} ${eventIsFree(event) ? styles.olive : styles.coral}`}>{priceLabel}</span>
+            <Text variant="eyebrow" tone="label" as="span" className={styles.lab}>
+              Price
+            </Text>
+            <Text
+              variant="price"
+              tone={eventIsFree(event) ? "label" : "accent"}
+              as="span"
+              className={styles.val}
+            >
+              {priceLabel}
+            </Text>
           </div>
         ) : null}
       </div>
@@ -122,8 +156,12 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
         <div className={styles.mainCol}>
           <section className={styles.sec}>
             <SecHead number="01" script="the story" title="ABOUT" />
-            <p className={styles.seoIntro}>{seoIntro}</p>
-            <p>{event.descriptionText ?? "Details are still being confirmed for this event."}</p>
+            <Text variant="body1" tone="onPage" as="p" className={styles.seoIntro}>
+              {seoIntro}
+            </Text>
+            <Text variant="body1" tone="onPage" as="p">
+              {event.descriptionText ?? "Details are still being confirmed for this event."}
+            </Text>
           </section>
 
           {event.lineup && event.lineup.length > 0 ? (
@@ -132,9 +170,19 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               <div className={styles.lineup}>
                 {event.lineup.map((entry, index) => (
                   <div key={`${entry.name}-${index}`} className={styles.act}>
-                    <p className={styles.who}>{entry.name}</p>
-                    {entry.time ? <p className={styles.when}>{entry.time}</p> : null}
-                    {entry.stage ? <p className={styles.where}>{entry.stage}</p> : null}
+                    <Text variant="header3" tone="onPage" as="p" className={styles.who}>
+                      {entry.name}
+                    </Text>
+                    {entry.time ? (
+                      <Text variant="body2" tone="mutedOnPage" as="p" className={styles.when}>
+                        {entry.time}
+                      </Text>
+                    ) : null}
+                    {entry.stage ? (
+                      <Text variant="body3" tone="label" as="p" className={styles.where}>
+                        {entry.stage}
+                      </Text>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -154,7 +202,9 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
                 {...(event.mapPinEmoji != null ? { mapPinEmoji: event.mapPinEmoji } : {})}
               />
             ) : null}
-            <p className={styles.addressLine}>{formatVenueAddressLine(venue) || venue.name}</p>
+            <Text variant="body2" tone="onPage" as="p" className={styles.addressLine}>
+              {formatVenueAddressLine(venue) || venue.name}
+            </Text>
             {mapsUrl ? (
               <a href={mapsUrl} target="_blank" rel="noreferrer" className={styles.mapLink}>
                 Open in Google Maps →
@@ -170,13 +220,15 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
                   <a href={originalUrl} target="_blank" rel="noreferrer" className={styles.sourceLink}>
                     View original listing <ExternalLink size={14} aria-hidden />
                   </a>
-                  <p className={styles.sourceNote}>
+                  <Text variant="body2" tone="mutedOnPage" as="p" className={styles.sourceNote}>
                     Check the original listing for details we may have missed here — and to confirm
                     pricing and whether the event is still on.
-                  </p>
+                  </Text>
                 </>
               ) : (
-                <p className={styles.sourceMissing}>No external listing link on file yet.</p>
+                <Text variant="body2" tone="mutedOnPage" as="p" className={styles.sourceMissing}>
+                  No external listing link on file yet.
+                </Text>
               )}
               {venue.website ? (
                 <a href={venue.website} target="_blank" rel="noreferrer" className={styles.sourceLink}>
@@ -229,27 +281,41 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
 
         <aside className={styles.sideCol}>
           <div className={styles.sideCard}>
-            <h3>VENUE</h3>
+            <Text variant="eyebrow" tone="labelOnCard" as="h3">
+              VENUE
+            </Text>
             <div className={styles.organizer}>
               <div className={styles.avatar} style={{ background: gradientForPalette(paletteKey) }} />
               <div>
                 {venue.slug ? (
                   <Link to="/venue/$slug" params={{ slug: venue.slug }} className={styles.orgName}>
-                    {venue.name}
+                    <Text variant="header3" tone="onCard" as="span">
+                      {venue.name}
+                    </Text>
                   </Link>
                 ) : (
-                  <p className={styles.orgName}>{venue.name}</p>
+                  <Text variant="header3" tone="onCard" as="p" className={styles.orgName}>
+                    {venue.name}
+                  </Text>
                 )}
-                <p className={styles.orgMeta}>{venue.neighborhood ?? venue.city}</p>
-                <p className={styles.orgAddress}>{formatVenueAddressLine(venue)}</p>
+                <Text variant="body3" tone="mutedOnCard" as="p" className={styles.orgMeta}>
+                  {venue.neighborhood ?? venue.city}
+                </Text>
+                <Text variant="body3" tone="mutedOnCard" as="p" className={styles.orgAddress}>
+                  {formatVenueAddressLine(venue)}
+                </Text>
               </div>
             </div>
           </div>
           <div className={styles.sideCard}>
-            <h3>TAGS</h3>
+            <Text variant="eyebrow" tone="labelOnCard" as="h3">
+              TAGS
+            </Text>
             <div className={styles.tags}>
               {event.tags.map((tag) => (
-                <span key={tag}>{tag}</span>
+                <Text key={tag} variant="eyebrow" tone="labelOnCard" as="span">
+                  {tag}
+                </Text>
               ))}
             </div>
           </div>
@@ -262,19 +328,18 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
 }
 
 export function EventDetailLoading() {
-  return (
-    <div className={styles.loading}>
-      <Loader2 className={styles.spin} size={32} />
-      <p>Loading event…</p>
-    </div>
-  );
+  return <EventDetailSkeleton />;
 }
 
 export function EventDetailError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className={styles.error}>
-      <h1>Event not available</h1>
-      <p>This listing may have moved or failed to load.</p>
+      <Text variant="header1" tone="onPage" as="h1">
+        Event not available
+      </Text>
+      <Text variant="body1" tone="mutedOnPage" as="p">
+        This listing may have moved or failed to load.
+      </Text>
       <button type="button" onClick={onRetry}>
         Retry
       </button>

@@ -1,7 +1,7 @@
 import { memo } from "react";
-import { Loader2 } from "lucide-react";
 
 import { EventRow } from "@/components/EventRow";
+import { EventRowSkeleton } from "@/components/EventRowSkeleton";
 import { SecHead } from "@/components/SecHead";
 import { getEventDisplayPriorityLabel } from "@fresno-events/shared";
 import { listDisplayPriority, type CandidateListGroup } from "../admin/admin-priority.utils";
@@ -46,8 +46,10 @@ export const CandidateList = memo(function CandidateList({
 
   if (isLoading) {
     return (
-      <div className={styles.loading}>
-        <Loader2 className={styles.spin} size={18} /> Loading candidates…
+      <div className={styles.loading} data-testid="candidate-list-skeleton" aria-busy="true">
+        {Array.from({ length: 5 }, (_, index) => (
+          <EventRowSkeleton key={index} />
+        ))}
       </div>
     );
   }

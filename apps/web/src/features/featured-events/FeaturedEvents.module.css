@@ -17,22 +17,6 @@
   flex-wrap: wrap;
 }
 
-.header h2 {
-  font-family: var(--font-display);
-  font-size: 26px;
-  margin: 0;
-  letter-spacing: 1px;
-}
-
-.script {
-  font-family: var(--font-script);
-  font-size: 30px;
-  color: var(--coral);
-  margin-right: -10px;
-  transform: rotate(-3deg);
-  display: inline-block;
-}
-
 .tabsDesktop {
   display: flex;
   background: var(--surface-card);
@@ -47,7 +31,6 @@
   background: var(--surface-card);
   border: 0;
   padding: 6px 18px;
-  font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 2px;
   color: var(--text-primary);
@@ -70,7 +53,6 @@
   border: var(--border-card);
   border-radius: 999px;
   padding: 6px 14px;
-  font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 2px;
   background: var(--surface-card);

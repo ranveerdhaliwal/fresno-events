@@ -1,18 +1,9 @@
 import { ShieldAlert } from "lucide-react";
 
-export function ErrorBanner({ error }: { error: unknown }) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : "Something went wrong.";
+import { formatErrorBannerContent } from "./ErrorBanner.utils";
 
-  const status =
-    error != null &&
-    typeof error === "object" &&
-    "status" in error &&
-    typeof (error as { status: unknown }).status === "number"
-      ? (error as { status: number }).status
-      : undefined;
+export function ErrorBanner({ error }: { error: unknown }) {
+  const { message, status } = formatErrorBannerContent(error);
 
   return (
     <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100">

@@ -38,21 +38,6 @@
   flex-wrap: wrap;
 }
 
-.toolbar h2 {
-  font-family: var(--font-display);
-  font-size: 22px;
-  margin: 0;
-}
-
-.script {
-  font-family: var(--font-script);
-  font-size: 30px;
-  color: var(--coral);
-  margin-right: -4px;
-  transform: rotate(-3deg);
-  display: inline-block;
-}
-
 .sub {
   font-size: 12px;
   color: var(--text-label);
@@ -66,23 +51,6 @@
   padding: 6px 0 14px;
   overflow-x: auto;
   scrollbar-width: none;
-}
-
-.chip,
-.chipActive {
-  flex: 0 0 auto;
-  background: var(--surface-card);
-  border: var(--border-card);
-  border-radius: 999px;
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.chipActive {
-  background: var(--coral);
-  color: var(--surface-card);
-  font-weight: 600;
 }
 
 .split {

@@ -1,49 +1,44 @@
-import { cn } from "@/lib/cn";
+import { Link } from "@tanstack/react-router";
 
-import type { ButtonProps, ButtonSize, ButtonVariant, HtmlButtonType } from "./Button.types";
-import styles from "./Button.module.css";
-
-const variantClass = {
-  approve: styles.approve ?? "",
-  reject: styles.reject ?? "",
-  secondary: styles.secondary ?? "",
-  secondaryActive: styles.secondaryActive ?? "",
-  ghost: styles.ghost ?? ""
-} satisfies Record<ButtonVariant, string>;
-
-const sizeClass = {
-  xs: styles.xs ?? "",
-  sm: styles.sm ?? "",
-  md: styles.md ?? ""
-} satisfies Record<ButtonSize, string>;
-
-type ButtonElementProps = Extract<ButtonProps, { href?: undefined }>;
+import type { ButtonProps, HtmlButtonType } from "./Button.types";
+import { buttonClasses, defaultButtonVariant, resolveButtonRenderKind } from "./Button.utils";
 
 export function Button(props: ButtonProps) {
-  if ("href" in props && props.href) {
-    const { variant = "secondary", size = "md", className, children, href, ...linkProps } = props;
-    const classes = cn(styles.base, variantClass[variant], sizeClass[size], className);
+  const kind = resolveButtonRenderKind(props);
+
+  if (kind === "router-link" && "to" in props && props.to != null) {
+    const { variant = defaultButtonVariant(kind), size = "md", className, children, to, ...linkProps } = props;
 
     return (
-      <a href={href} className={classes} {...linkProps}>
+      <Link to={to} className={buttonClasses(variant, size, className)} {...linkProps}>
+        {children}
+      </Link>
+    );
+  }
+
+  if (kind === "anchor" && "href" in props && typeof props.href === "string") {
+    const { variant = defaultButtonVariant(kind), size = "md", className, children, href, ...linkProps } = props;
+
+    return (
+      <a href={href} className={buttonClasses(variant, size, className)} {...linkProps}>
         {children}
       </a>
     );
   }
 
+  const buttonProps = props as Extract<ButtonProps, { to?: undefined; href?: undefined }>;
   const {
-    variant = "secondary",
+    variant = defaultButtonVariant(kind),
     size = "md",
     className,
     children,
     type,
-    ...buttonProps
-  } = props as ButtonElementProps;
-  const classes = cn(styles.base, variantClass[variant], sizeClass[size], className);
+    ...rest
+  } = buttonProps;
   const buttonType = (type ?? "button") as HtmlButtonType;
 
   return (
-    <button type={buttonType} className={classes} {...buttonProps}>
+    <button type={buttonType} className={buttonClasses(variant, size, className)} {...rest}>
       {children}
     </button>
   );

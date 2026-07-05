@@ -8,6 +8,7 @@ import { buildDayWindowTiles, dayWindowStart, daysBetweenIso } from "@/lib/day-w
 import { addDaysIso } from "@/lib/parse-day-param";
 import { cn } from "@/lib/cn";
 
+import { swipeDayDelta } from "./DayDateCarousel.utils";
 import styles from "./DayDateCarousel.module.css";
 
 const GAP = 8;
@@ -154,11 +155,11 @@ export function DayDateCarousel({
         if (start == null || end == null) {
           return;
         }
-        const delta = end - start;
-        if (Math.abs(delta) < 48) {
+        const dayDelta = swipeDayDelta(start, end);
+        if (dayDelta === 0) {
           return;
         }
-        shiftByDays(delta < 0 ? 1 : -1);
+        shiftByDays(dayDelta);
       }}
     >
       <div className={styles.viewport} ref={viewportRef}>

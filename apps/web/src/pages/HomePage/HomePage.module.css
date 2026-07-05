@@ -13,10 +13,8 @@
 }
 
 .pageTitle {
-  margin: 0;
   padding: 24px 32px 0;
-  font-size: clamp(1.5rem, 2.5vw, 2rem);
-  line-height: 1.15;
+  text-transform: uppercase;
 }
 
 .upcomingSection {

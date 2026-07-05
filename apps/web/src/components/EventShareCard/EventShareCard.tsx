@@ -1,6 +1,9 @@
 import { Link2 } from "lucide-react";
 import { useState } from "react";
 
+import { Text } from "@/components/Text";
+
+import { buildEventShareUrls, copyTextToClipboard } from "./EventShareCard.utils";
 import styles from "./EventShareCard.module.css";
 
 export interface EventShareCardProps {
@@ -10,49 +13,41 @@ export interface EventShareCardProps {
 
 export function EventShareCard({ title, url }: EventShareCardProps) {
   const [copied, setCopied] = useState(false);
-  const encodedUrl = encodeURIComponent(url);
-  const encodedTitle = encodeURIComponent(title);
+  const shareUrls = buildEventShareUrls(title, url);
 
   const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
+    const ok = await copyTextToClipboard(url);
+    if (!ok) {
       setCopied(false);
+      return;
     }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <div className={styles.card} data-testid="event-share-card">
-      <h3>SHARE</h3>
-      <p className={styles.script}>greetings from the central valley</p>
-      <p className={styles.hint}>Share this event with friends across Fresno.</p>
+      <Text variant="eyebrow" tone="onCard" as="h3">
+        SHARE
+      </Text>
+      <Text variant="script" tone="accent" scriptStyle="footer" as="p" className={styles.script}>
+        greetings from the central valley
+      </Text>
+      <Text variant="body2" tone="mutedOnCard" as="p" className={styles.hint}>
+        Share this event with friends across Fresno.
+      </Text>
       <div className={styles.buttons}>
         <button type="button" className={styles.btn} onClick={() => void copyLink()}>
           <Link2 size={14} aria-hidden />
           {copied ? "Copied!" : "Copy link"}
         </button>
-        <a
-          className={styles.btn}
-          href={`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a className={styles.btn} href={shareUrls.twitter} target="_blank" rel="noreferrer">
           X
         </a>
-        <a
-          className={styles.btn}
-          href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a className={styles.btn} href={shareUrls.facebook} target="_blank" rel="noreferrer">
           Facebook
         </a>
-        <a
-          className={styles.btn}
-          href={`sms:?&body=${encodedTitle}%20${encodedUrl}`}
-        >
+        <a className={styles.btn} href={shareUrls.sms}>
           Text
         </a>
       </div>

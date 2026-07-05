@@ -1,0 +1,34 @@
+.chip,
+.chipActive {
+  flex: 0 0 auto;
+  background: var(--surface-card);
+  border: var(--border-card);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.label {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+}
+
+.chip:hover {
+  border-color: var(--mustard);
+}
+
+.chipActive {
+  background: var(--coral);
+  border-color: var(--border-default);
+}
+
+.chipActive .label {
+  color: var(--surface-card);
+}
+
+.chipActive:hover {
+  background: color-mix(in srgb, var(--coral) 88%, var(--ink));
+}

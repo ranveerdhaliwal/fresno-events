@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 
+import { Text } from "@/components/Text";
+
 import styles from "./SiteFooter.module.css";
 
 export function SiteFooter() {
@@ -9,24 +11,38 @@ export function SiteFooter() {
     <footer className={styles.footer} data-testid="site-footer">
       <div className={styles.inner}>
         <div className={styles.brandBlock}>
-          <p className={styles.brand}>What Up Fresno</p>
-          <p className={styles.tagline}>Fresno &amp; Central Valley events</p>
-          <p className={styles.script}>greetings from the central valley</p>
+          <Text variant="header2" tone="onPage" as="p" className={styles.brand}>
+            What Up Fresno
+          </Text>
+          <Text variant="body2" tone="mutedOnPage" as="p" className={styles.tagline}>
+            Fresno &amp; Central Valley events
+          </Text>
+          <Text variant="script" tone="accent" scriptStyle="footer" as="p" className={styles.script}>
+            greetings from the central valley
+          </Text>
         </div>
 
         <nav className={styles.links} aria-label="Site">
           <Link to="/privacy" className={styles.link}>
-            Privacy Policy
+            <Text variant="eyebrow" tone="inherit" as="span">
+              Privacy Policy
+            </Text>
           </Link>
         </nav>
 
         <div className={styles.social} aria-label="Social links">
-          <p className={styles.socialLabel}>Follow us</p>
-          <p className={styles.socialPlaceholder}>Social links coming soon</p>
+          <Text variant="eyebrow" tone="mutedOnPage" as="p" className={styles.socialLabel}>
+            Follow us
+          </Text>
+          <Text variant="body2" tone="mutedOnPage" as="p" className={styles.socialPlaceholder}>
+            Social links coming soon
+          </Text>
         </div>
       </div>
 
-      <p className={styles.copy}>&copy; {year} What Up Fresno</p>
+      <Text variant="body3" tone="mutedOnPage" as="p" className={styles.copy}>
+        &copy; {year} What Up Fresno
+      </Text>
     </footer>
   );
 }

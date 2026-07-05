@@ -29,6 +29,28 @@ Don't pre-create empty files. Add `.utils.ts` when there's logic worth testing. 
 - Components import and call. Components don't define logic inline beyond trivial render-time expressions.
 - Util functions are pure where possible. Pure = same input, same output, no side effects, unit-testable without mocks.
 
+## Unit tests (required)
+
+Every component and feature module under `apps/web/src/components/` and `apps/web/src/features/` must have tests before merge.
+
+**File pairing:**
+
+| File | Purpose |
+| --- | --- |
+| `Feature.utils.ts` | Pure logic (when non-trivial logic exists) |
+| `Feature.utils.test.ts` | Utils unit tests — no DOM, fast |
+| `Feature.test.tsx` | Component render + interaction smoke tests |
+
+**What to test:**
+
+- **Utils** — happy path, edge cases, and error branches for extracted logic.
+- **Components** — renders without crash, key `data-testid` / roles, one primary interaction (click, toggle, submit) when applicable.
+- Don't re-test logic already covered in `*.utils.test.ts` inside component tests.
+
+**Infrastructure:** Vitest + happy-dom + Testing Library; use `renderWithProviders` from `src/tests/render.tsx`. Router-dependent components need `withRouter: true` or a minimal route tree (see `MobileNav.test.tsx`).
+
+**When adding or changing a component:** add or update its test files in the same PR. No new component without `Feature.test.tsx`; extract logic to `Feature.utils.ts` + `Feature.utils.test.ts` when the component has non-trivial branching, formatting, or data transforms.
+
 ## Don't
 
 - Don't use `any` to silence type errors. Fix the type or use `unknown` and narrow.

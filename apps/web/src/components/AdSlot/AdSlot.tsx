@@ -1,6 +1,7 @@
 import { useRouterState } from "@tanstack/react-router";
 
 import { PlaceholderImage } from "@/components/PlaceholderImage";
+import { Text } from "@/components/Text";
 import { cn } from "@/lib/cn";
 
 import { AdSenseUnit } from "./AdSenseUnit";
@@ -28,13 +29,21 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
   if (variant === "card") {
     return (
       <div className={styles.card} data-testid="ad-slot-card">
-        <span className={styles.tag}>AD</span>
+        <Text variant="eyebrow" tone="inverse" as="span" className={styles.tag}>
+          AD
+        </Text>
         <div className={styles.phImg}>
           <PlaceholderImage paletteKey="festival" label="LOCAL" />
         </div>
-        <h4>Support local venues</h4>
-        <p>Your ad could reach Fresno event-goers every week.</p>
-        <span className={styles.ctaLink}>LEARN MORE</span>
+        <Text variant="header3" tone="onCard" as="h4">
+          Support local venues
+        </Text>
+        <Text variant="body2" tone="mutedOnCard" as="p">
+          Your ad could reach Fresno event-goers every week.
+        </Text>
+        <Text variant="eyebrow" tone="accent" as="span" className={styles.ctaLink}>
+          LEARN MORE
+        </Text>
       </div>
     );
   }
@@ -42,10 +51,18 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
   if (variant === "side") {
     return (
       <div className={styles.side} data-testid="ad-slot-side">
-        <span className={styles.tag}>AD</span>
-        <p className={styles.sideTitle}>Local spotlight</p>
-        <p className={styles.sideCopy}>Your business here — reach event-goers weekly.</p>
-        <span className={styles.ctaLink}>LEARN MORE</span>
+        <Text variant="eyebrow" tone="inverse" as="span" className={styles.tag}>
+          AD
+        </Text>
+        <Text variant="header3" tone="onCard" as="p" className={styles.sideTitle}>
+          Local spotlight
+        </Text>
+        <Text variant="body2" tone="mutedOnCard" as="p" className={styles.sideCopy}>
+          Your business here — reach event-goers weekly.
+        </Text>
+        <Text variant="eyebrow" tone="accent" as="span" className={styles.ctaLink}>
+          LEARN MORE
+        </Text>
       </div>
     );
   }
@@ -55,12 +72,20 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
       className={cn(styles.banner, variant === "banner-wide" && styles.wide, variant === "banner-stacked" && styles.stacked)}
       data-testid="ad-slot"
     >
-      <span className={styles.tag}>AD</span>
+      <Text variant="eyebrow" tone="inverse" as="span" className={styles.tag}>
+        AD
+      </Text>
       <div className={styles.body}>
-        <h4>Reach Fresno locals</h4>
-        <p>Promote your business on What Up Fresno.</p>
+        <Text variant="header3" tone="onCard" as="h4">
+          Reach Fresno locals
+        </Text>
+        <Text variant="body2" tone="mutedOnCard" as="p">
+          Promote your business on What Up Fresno.
+        </Text>
       </div>
-      <span className={styles.cta}>GET STARTED</span>
+      <Text variant="eyebrow" tone="accent" as="span" className={styles.cta}>
+        GET STARTED
+      </Text>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import type { FeatureCardViewModel, PopularEventViewModel } from "@/lib/event-vi
 import { getHomepageCuration } from "@/services/events.service";
 import { eventsKeys } from "@/services/events.queryKeys";
 
+import { dedupeEventItems, dedupeFeaturedItems } from "./featured-dedupe.utils";
+
 export interface HomepageCurationViewModel {
   featuredCards: FeatureCardViewModel[];
   biggestMonth: PopularEventViewModel[];
@@ -25,12 +27,12 @@ export function useHomepageCuration() {
       return null;
     }
 
-    const featuredCards = query.data.featured.map((slot) => ({
+    const featuredCards = dedupeFeaturedItems(query.data.featured).map((slot) => ({
       ...toFeatureCardViewModel(slot.item),
       isPinned: slot.source === "pinned"
     }));
 
-    const biggestMonth = toPopularViewModels(query.data.biggestMonth, 10).map((row, index) => ({
+    const biggestMonth = toPopularViewModels(dedupeEventItems(query.data.biggestMonth), 10).map((row, index) => ({
       ...row,
       rank: index + 1
     }));

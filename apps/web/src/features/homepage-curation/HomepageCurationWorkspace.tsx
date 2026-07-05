@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 import type { AdminEventSearchHit, HomepageSection, HomepageSlotRow } from "@fresno-events/shared";
 
 import styles from "./HomepageCurationWorkspace.module.css";
+import { HomepageCurationWorkspaceSkeleton } from "./HomepageCurationWorkspaceSkeleton";
 
 const SECTIONS: Array<{ id: HomepageSection; label: string; positions: number[] }> = [
   { id: "featured", label: "Featured grid (this week through Sunday)", positions: [1, 2, 3, 4, 5] }
@@ -143,12 +144,7 @@ export function HomepageCurationWorkspace({ token, onAuthFailure }: HomepageCura
   };
 
   if (slotsQuery.isLoading) {
-    return (
-      <div className={styles.loading}>
-        <Loader2 className="size-5 animate-spin" />
-        Loading homepage slots…
-      </div>
-    );
+    return <HomepageCurationWorkspaceSkeleton />;
   }
 
   if (slotsQuery.error && !isAdminAuthError(slotsQuery.error)) {

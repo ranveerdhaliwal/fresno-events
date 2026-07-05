@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { Text } from "@/components/Text";
 import type { DayStripTile } from "@/lib/event-view-model";
 
 import styles from "./DayStrip.module.css";
@@ -8,6 +9,22 @@ export interface DayStripTilesProps {
   selectedIso?: string;
   onSelectDate?: (isoDate: string) => void;
   tileWidth?: number;
+}
+
+function TileContent({ tile }: { tile: DayStripTile }) {
+  return (
+    <>
+      <Text variant="eyebrow" tone="inherit" as="span" className={styles.dow}>
+        {tile.dow}
+      </Text>
+      <Text variant="header2" tone="inherit" as="span" className={styles.dnum}>
+        {tile.dayNum}
+      </Text>
+      <Text variant="body3" tone="inherit" as="span" className={styles.dcount}>
+        {tile.count} events
+      </Text>
+    </>
+  );
 }
 
 export function DayStripTiles({ tiles, selectedIso, onSelectDate, tileWidth }: DayStripTilesProps) {
@@ -32,18 +49,14 @@ export function DayStripTiles({ tiles, selectedIso, onSelectDate, tileWidth }: D
               style={style}
               onClick={() => onSelectDate(tile.isoDate)}
             >
-              <span className={styles.dow}>{tile.dow}</span>
-              <span className={styles.dnum}>{tile.dayNum}</span>
-              <span className={styles.dcount}>{tile.count} events</span>
+              <TileContent tile={tile} />
             </button>
           );
         }
 
         return (
           <div key={tile.isoDate} className={className} style={style}>
-            <span className={styles.dow}>{tile.dow}</span>
-            <span className={styles.dnum}>{tile.dayNum}</span>
-            <span className={styles.dcount}>{tile.count} events</span>
+            <TileContent tile={tile} />
           </div>
         );
       })}

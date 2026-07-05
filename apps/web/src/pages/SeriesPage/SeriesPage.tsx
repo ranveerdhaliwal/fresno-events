@@ -2,7 +2,10 @@ import { useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { EventRow } from "@/components/EventRow";
+import { EventRowSkeleton } from "@/components/EventRowSkeleton";
 import { PageChrome } from "@/components/PageChrome";
+import { Skeleton } from "@/components/Skeleton";
+import { Text } from "@/components/Text";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 import { listSeriesEvents } from "@/services/events.service";
@@ -25,14 +28,27 @@ export function SeriesPage() {
   return (
     <PageChrome mobileNav={{ variant: "day", title: "SERIES" }}>
       <div className={styles.wrap}>
-        <h1>{title}</h1>
-        <p className={styles.sub}>All upcoming dates in this series</p>
-        {isLoading ? <p>Loading…</p> : null}
-        <div className={styles.list}>
-          {rows.map((row) => (
-            <EventRow key={row.id} event={row} slug={row.slug} adminAction={<AdminEditLink eventId={row.id} />} />
-          ))}
-        </div>
+        <Text variant="header1" tone="onPage" as="h1">
+          {title}
+        </Text>
+        <Text variant="body2" tone="mutedOnPage" as="p" className={styles.sub}>
+          All upcoming dates in this series
+        </Text>
+        {isLoading ? (
+          <div className={styles.list} data-testid="series-page-skeleton" aria-busy="true">
+            <Skeleton height={32} width="70%" />
+            <Skeleton height={14} width="45%" className={styles.sub} />
+            {Array.from({ length: 4 }, (_, index) => (
+              <EventRowSkeleton key={index} />
+            ))}
+          </div>
+        ) : (
+          <div className={styles.list}>
+            {rows.map((row) => (
+              <EventRow key={row.id} event={row} slug={row.slug} adminAction={<AdminEditLink eventId={row.id} />} />
+            ))}
+          </div>
+        )}
       </div>
     </PageChrome>
   );

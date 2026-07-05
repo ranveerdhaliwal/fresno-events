@@ -1,10 +1,12 @@
 import { Link } from "@tanstack/react-router";
 
 import { PlaceholderImage } from "@/components/PlaceholderImage";
+import { Text } from "@/components/Text";
 import { cn } from "@/lib/cn";
 import { isListTicketPriceLabel } from "@/lib/event-price.utils";
 
 import type { EventRowProps } from "./EventRow.types";
+import { getEventRowLayoutFlags, getEventRowModifiers } from "./EventRow.utils";
 import styles from "./EventRow.module.css";
 
 export function EventRow({
@@ -20,39 +22,55 @@ export function EventRow({
   forceVisible = false,
   adminAction
 }: EventRowProps) {
-  const showRowImage =
-    showImage &&
-    (event.priority < 5 || event.showVenueLogoInList === true || showP5ListImage);
-  const p5ListLayout =
-    event.priority === 5 && showP5ListImage && event.showVenueLogoInList !== true;
+  const { showRowImage } = getEventRowLayoutFlags({
+    showImage,
+    showP5ListImage,
+    priority: event.priority,
+    showVenueLogoInList: event.showVenueLogoInList
+  });
+  const modifiers = getEventRowModifiers({
+    showImage,
+    showP5ListImage,
+    priority: event.priority,
+    showVenueLogoInList: event.showVenueLogoInList,
+    forceVisible,
+    isSelected,
+    isLive
+  });
 
   const className = cn(
     styles.row,
-    forceVisible && styles.forceVisible,
-    event.priority === 0 && styles.p0,
-    event.priority === 1 && styles.p1,
-    event.priority === 1 && event.showVenueLogoInList && styles.p1VenueLogo,
-    event.priority === 2 && styles.p2,
-    event.priority === 4 && styles.p4,
-    event.priority === 5 && styles.p5,
-    event.priority === 5 && event.showVenueLogoInList && styles.p5WithLogo,
-    p5ListLayout && styles.p5ShowImage,
-    isSelected && styles.selected,
-    isLive && styles.live
+    modifiers.forceVisible && styles.forceVisible,
+    modifiers.p0 && styles.p0,
+    modifiers.p1 && styles.p1,
+    modifiers.p1VenueLogo && styles.p1VenueLogo,
+    modifiers.p2 && styles.p2,
+    modifiers.p4 && styles.p4,
+    modifiers.p5 && styles.p5,
+    modifiers.p5WithLogo && styles.p5WithLogo,
+    modifiers.p5ShowImage && styles.p5ShowImage,
+    modifiers.selected && styles.selected,
+    modifiers.live && styles.live
   );
 
   const content = (
     <>
       {event.flagLabel ? (
-        <span className={cn(styles.flag, isLive && styles.flagLive)}>
+        <Text variant="eyebrow" tone="inverse" as="span" className={cn(styles.flag, isLive && styles.flagLive)}>
           {isLive && <span className={styles.liveDot} aria-hidden />}
           {event.flagLabel}
-        </span>
+        </Text>
       ) : null}
       <div className={styles.rowDate}>
-        <span className={styles.day}>{event.dayShort}</span>
-        <span className={styles.num}>{event.dayNum}</span>
-        <span className={styles.month}>{event.monthShort}</span>
+        <Text variant="eyebrow" tone="accent" as="span" className={styles.day}>
+          {event.dayShort}
+        </Text>
+        <Text variant="header3" tone="onCard" as="span" className={styles.num}>
+          {event.dayNum}
+        </Text>
+        <Text variant="body3" tone="mutedOnCard" as="span" className={styles.month}>
+          {event.monthShort}
+        </Text>
       </div>
       {showRowImage ? (
         <div className={styles.rowImg}>
@@ -68,12 +86,20 @@ export function EventRow({
         </div>
       ) : null}
       <div className={styles.rowBody}>
-        <h4>{event.title}</h4>
+        <Text variant="header3" tone="onCard" as="h4" className={styles.rowTitle}>
+          {event.title}
+        </Text>
         <div className={styles.rowMeta}>
-          <span>{event.timeLabel}</span>
-          <span>{event.venueName}</span>
+          <Text variant="body3" tone="mutedOnCard" as="span">
+            {event.timeLabel}
+          </Text>
+          <Text variant="body3" tone="mutedOnCard" as="span">
+            {event.venueName}
+          </Text>
         </div>
-        <span className={styles.rowCat}>{event.categoryLabel}</span>
+        <Text variant="eyebrow" tone="labelOnCard" as="span" className={styles.rowCat}>
+          {event.categoryLabel}
+        </Text>
       </div>
       <div className={cn(styles.rowPrice, event.isFree && styles.priceFree)}>
         {adminAction ? (
@@ -81,13 +107,26 @@ export function EventRow({
             {adminAction}
           </div>
         ) : null}
-        {priorityLabel ? <small className={styles.rowPriority}>{priorityLabel}</small> : null}
-        {event.priceLabel ? (
-          <span className={cn(isListTicketPriceLabel(event.priceLabel) && styles.priceTicketHint)}>
-            {event.priceLabel}
-          </span>
+        {priorityLabel ? (
+          <Text variant="body3" tone="mutedOnCard" as="small" className={styles.rowPriority}>
+            {priorityLabel}
+          </Text>
         ) : null}
-        {priceSubLabel ? <small>{priceSubLabel}</small> : null}
+        {event.priceLabel ? (
+          <Text
+            variant="price"
+            tone="accent"
+            as="span"
+            className={cn(event.isFree && styles.priceFree, isListTicketPriceLabel(event.priceLabel) && styles.priceTicketHint)}
+          >
+            {event.priceLabel}
+          </Text>
+        ) : null}
+        {priceSubLabel ? (
+          <Text variant="body3" tone="mutedOnCard" as="small">
+            {priceSubLabel}
+          </Text>
+        ) : null}
       </div>
     </>
   );

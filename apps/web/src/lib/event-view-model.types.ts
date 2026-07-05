@@ -1,6 +1,6 @@
 import type { ImagePaletteKey } from "@/lib/image-palette";
 
-export type FeaturedBadge = "tonight" | "weekend" | "huge" | "default";
+export type FeaturedBadge = "tonight" | "weekend" | "default";
 export type RowPriority = 0 | 1 | 2 | 3 | 4 | 5;
 
 export interface EventRowViewModel {
@@ -42,6 +42,7 @@ export interface FeatureCardViewModel {
   title: string;
   description: string;
   venueName: string;
+  dateLabel: string;
   timeLabel: string;
   priceLabel: string;
   categoryLabel: string;
