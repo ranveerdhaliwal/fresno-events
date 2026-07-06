@@ -62,14 +62,12 @@
 }
 
 .dow {
-  font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 1.5px;
   display: block;
 }
 
 .dnum {
-  font-family: var(--font-display);
   font-size: 20px;
   line-height: 1;
   margin-top: 2px;
@@ -105,7 +103,6 @@
 }
 
 .sdLabel {
-  font-family: var(--font-display);
   font-size: 9px;
   letter-spacing: 1.5px;
   line-height: 1.05;

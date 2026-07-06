@@ -1,3 +1,4 @@
+import { Text } from "@/components/Text";
 import { cn } from "@/lib/cn";
 
 import styles from "./SecHead.module.css";
@@ -28,7 +29,7 @@ export function SecHead({
   return (
     <div className={cn(styles.head, variant === "live" && styles.live)} data-testid="sec-head">
       <div className={styles.lead}>
-        <h2>
+        <Text variant="eyebrow" tone="inherit" as="h2" className={styles.title}>
           {groupSelectAll ? (
             <label className={styles.groupSelectAll} aria-label={`Select all ${title}`}>
               <input
@@ -39,14 +40,22 @@ export function SecHead({
             </label>
           ) : null}
           {variant === "live" ? <span className={styles.liveDot} aria-hidden /> : null}
-          {script ? <span className={styles.script}>{script}</span> : null}
+          {script ? (
+            <Text variant="script" tone="onNav" scriptStyle="nav" as="span" className={styles.script}>
+              {script}
+            </Text>
+          ) : null}
           {title}
-        </h2>
+        </Text>
       </div>
       {count !== undefined ? (
-        <span className={styles.count}>{count}</span>
+        <Text variant="eyebrow" tone="inverse" as="span" className={styles.count}>
+          {count}
+        </Text>
       ) : number ? (
-        <span className={styles.count}>{number}</span>
+        <Text variant="eyebrow" tone="inverse" as="span" className={styles.count}>
+          {number}
+        </Text>
       ) : null}
     </div>
   );

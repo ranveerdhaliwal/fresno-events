@@ -6,6 +6,8 @@ import { CalendarDayTile } from "@/components/CalendarDayTile";
 import { isPacificWeekend } from "@/components/CalendarDayTile/CalendarDayTile.utils";
 import { CalendarMonthStrip } from "@/components/CalendarMonthStrip";
 import { PageChrome } from "@/components/PageChrome";
+import { SectionTitle } from "@/components/SectionTitle";
+import { Text } from "@/components/Text";
 import { EventRow } from "@/components/EventRow";
 import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
 import { toEventRowViewModel } from "@/lib/event-view-model";
@@ -14,6 +16,7 @@ import { useSeoHead } from "@/lib/seo/useSeoHead";
 import { getCalendarMonth } from "@/services/events.service";
 import { eventsKeys } from "@/services/events.queryKeys";
 
+import { CalendarPageSkeleton } from "./CalendarPageSkeleton";
 import styles from "./CalendarPage.module.css";
 
 const DOW_HEADERS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
@@ -51,20 +54,20 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
     <PageChrome mobileNav={{ variant: "day", title: "CALENDAR" }}>
       <div className={styles.wrap} data-testid="calendar-page">
         <header className={styles.head}>
-          <h1>
-            <span className={styles.script}>the</span> {monthLabel.toUpperCase()}
-          </h1>
+          <SectionTitle script="the" size="lg" as="h1">
+            {monthLabel.toUpperCase()}
+          </SectionTitle>
         </header>
 
         {isLoading || !data ? (
-          <p className={styles.loading}>Loading calendar…</p>
+          <CalendarPageSkeleton monthLabel={monthLabel} />
         ) : (
           <>
             <div className={styles.dowRow}>
               {DOW_HEADERS.map((label) => (
-                <span key={label} className={styles.dowHead}>
+                <Text key={label} variant="eyebrow" tone="label" as="span" className={styles.dowHead}>
                   {label}
-                </span>
+                </Text>
               ))}
             </div>
 
@@ -87,14 +90,18 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
 
             <div className={styles.split}>
               <div className={styles.weekList}>
-                <h2 className={styles.weekHeading}>
-                  <span className={styles.script}>this</span> MONTH BY WEEK
-                </h2>
+                <SectionTitle script="this" size="sm" as="h2" className={styles.weekHeading}>
+                  MONTH BY WEEK
+                </SectionTitle>
                 {data.weeks.map((week) => (
                   <section key={week.label} className={styles.weekBlock}>
-                    <h3>{week.label}</h3>
+                    <Text variant="header3" tone="onPage" as="h3">
+                      {week.label}
+                    </Text>
                     {week.preview.length === 0 ? (
-                      <p className={styles.empty}>No events yet</p>
+                      <Text variant="body2" tone="mutedOnPage" className={styles.empty}>
+                        No events yet
+                      </Text>
                     ) : (
                       week.preview.map((item) => {
                         const row = toEventRowViewModel(item);

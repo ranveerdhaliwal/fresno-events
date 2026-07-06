@@ -2,8 +2,9 @@ import type { Event, EventListItem } from "@fresno-events/shared";
 import { clampEventPriority, daysFromIsoThroughSunday } from "@fresno-events/shared";
 
 import { eventIsFree, formatListPrice } from "@/lib/event-price.utils";
-import { formatEventDate, formatMonthLong, formatShortTime, isTonight, isWeekend, toIsoDateLocal } from "@/lib/event-time";
+import { formatEventDate, formatMonthDay, formatMonthLong, formatShortTime, isTonight, isWeekend, toIsoDateLocal } from "@/lib/event-time";
 import { resolveMediaUrl } from "@/lib/media-url";
+import { isTeamLogoHeroUrl } from "@/lib/hero-image.utils";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
 import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
 
@@ -82,7 +83,6 @@ export function deriveTagline(event: Event): string {
 }
 
 export function deriveFeaturedBadge(event: Event, now = new Date()): FeaturedBadge {
-  if (event.priority <= 1) return "huge";
   if (isTonight(event.startTs, now)) return "tonight";
   const start = new Date(event.startTs);
   if (isWeekend(start)) return "weekend";
@@ -101,6 +101,8 @@ export function toEventRowViewModel(item: EventListItem, now = new Date()): Even
   const priority = clampEventPriority(event.priority) as RowPriority;
   const paletteKey = paletteKeyForCategory(event.category, event.id);
   const start = new Date(event.startTs);
+  const imageUrl = resolveMediaUrl(heroImage?.cdnUrl ?? null);
+  const teamLogo = isTeamLogoHeroUrl(imageUrl);
 
   return {
     id: event.id,
@@ -123,7 +125,8 @@ export function toEventRowViewModel(item: EventListItem, now = new Date()): Even
     priority,
     paletteKey,
     paletteGradient: gradientForPalette(paletteKey),
-    imageUrl: resolveMediaUrl(heroImage?.cdnUrl ?? null),
+    imageUrl,
+    ...(teamLogo ? { showVenueLogoInList: true, listVenueLogoPadding: 10 } : {}),
     isFree: eventIsFree(event),
     isLive: false,
     featuredBadge: deriveFeaturedBadge(event, now),
@@ -147,6 +150,7 @@ export function toFeatureCardViewModel(item: EventListItem, now = new Date()): F
     title: event.title,
     description: shortDesc,
     venueName: venue.name,
+    dateLabel: formatMonthDay(event.startTs),
     timeLabel: formatShortTime(event.startTs),
     priceLabel: formatPrice(event),
     categoryLabel: CATEGORY_LABELS[event.category] ?? "Event",

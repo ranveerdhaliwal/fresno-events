@@ -5,11 +5,19 @@ import type { ApiResponse, EventListResponse } from "@fresno-events/shared";
 
 import { EventRow } from "@/components/EventRow";
 import { PageChrome } from "@/components/PageChrome";
+import { SectionTitle } from "@/components/SectionTitle";
+import { Text } from "@/components/Text";
 import { toEventRowViewModel } from "@/lib/event-view-model";
+import type { DatePreset } from "@/lib/date-presets";
+import { FRESNO_CENTER } from "@/lib/map-config";
+import { parseUrlFilters } from "@/lib/url-filters";
 import { buildMapSeo } from "@/lib/seo/page-seo";
 import { useSeoHead } from "@/lib/seo/useSeoHead";
 
 import { EventMap } from "./EventMap";
+import { EventMapFilters } from "./EventMapFilters";
+import { EventMapPageSkeleton } from "./EventMapPageSkeleton";
+import { filterEventsForMap } from "./EventMap.utils";
 import styles from "./EventMap.module.css";
 
 function getApiUrl() {
@@ -43,7 +51,12 @@ async function fetchMapEvents(): Promise<EventListResponse> {
 }
 
 export function EventMapPage() {
+  const initialFilters = parseUrlFilters(typeof window !== "undefined" ? window.location.search : "");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [q, setQ] = useState(initialFilters.q);
+  const [datePreset, setDatePreset] = useState<DatePreset | null>(initialFilters.datePreset);
+  const [nearMe, setNearMe] = useState<{ lat: number; lng: number; radiusKm: number } | null>(null);
+
   useSeoHead(buildMapSeo());
   const query = useQuery({
     queryKey: ["event-map"],
@@ -51,31 +64,57 @@ export function EventMapPage() {
     staleTime: 1000 * 60
   });
 
-  const rows = useMemo(() => (query.data?.items ?? []).map((item) => toEventRowViewModel(item)), [query.data]);
+  const filteredItems = useMemo(
+    () => filterEventsForMap(query.data?.items ?? [], { q, datePreset, nearMe }),
+    [query.data?.items, q, datePreset, nearMe]
+  );
+
+  const rows = useMemo(
+    () => filteredItems.map((item) => toEventRowViewModel(item)),
+    [filteredItems]
+  );
 
   return (
     <PageChrome mobileNav={{ variant: "day", title: "MAP" }}>
       <div className={styles.page}>
         <header className={styles.header}>
-          <h1 className={styles.title}>Map</h1>
-          <p className={styles.meta}>{rows.length} pinned events</p>
+          <SectionTitle size="md" as="h1" className={styles.title}>
+            MAP
+          </SectionTitle>
+          <Text variant="body2" tone="label" className={styles.meta}>
+            {rows.length} events on map
+          </Text>
         </header>
-        {query.isLoading ? <p className={styles.meta}>Loading events…</p> : null}
-        {query.error ? <p className={styles.meta}>{query.error.message}</p> : null}
+        {query.isLoading ? <EventMapPageSkeleton /> : null}
+        {query.error ? (
+          <Text variant="body2" tone="label" className={styles.meta}>
+            {query.error.message}
+          </Text>
+        ) : null}
         {query.data ? (
           <div className={styles.layout}>
             <aside className={styles.sidebar}>
-              {rows.map((row) => (
-                <EventRow
-                  key={row.id}
-                  event={row}
-                  isSelected={selectedId === row.id}
-                  onSelect={() => setSelectedId(row.id)}
-                  showImage={false}
-                />
-              ))}
+              <EventMapFilters
+                q={q}
+                datePreset={datePreset}
+                omittedNoCoords={query.data.meta?.omittedNoCoords ?? 0}
+                pinCount={rows.length}
+                onQueryChange={setQ}
+                onDatePresetChange={setDatePreset}
+                onNearMe={() => setNearMe({ lat: FRESNO_CENTER.lat, lng: FRESNO_CENTER.lng, radiusKm: 25 })}
+              />
+              <div className={styles.sidebarList}>
+                {rows.map((row) => (
+                  <EventRow
+                    key={row.id}
+                    event={row}
+                    isSelected={selectedId === row.id}
+                    onSelect={() => setSelectedId(row.id)}
+                  />
+                ))}
+              </div>
             </aside>
-            <EventMap items={query.data.items} omittedNoCoords={query.data.meta?.omittedNoCoords ?? 0} />
+            <EventMap items={filteredItems} />
           </div>
         ) : null}
       </div>

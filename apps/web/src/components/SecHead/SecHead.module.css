@@ -8,20 +8,22 @@
   margin-bottom: 16px;
 }
 
-.head h2 {
-  font-family: var(--font-display);
-  font-size: 14px;
-  margin: 0;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-}
-
 .lead {
   display: flex;
   align-items: center;
   gap: 12px;
   flex: 1;
   min-width: 0;
+}
+
+.title {
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  font-size: 14px;
+}
+
+.script {
+  margin-right: 6px;
 }
 
 .groupSelectAll {
@@ -41,16 +43,6 @@
   cursor: pointer;
 }
 
-.script {
-  font-family: var(--font-script);
-  font-size: 18px;
-  color: var(--text-on-nav);
-  margin-right: 6px;
-  transform: rotate(-3deg);
-  display: inline-block;
-  text-transform: none;
-}
-
 .count,
 .num {
   margin-left: auto;
@@ -58,8 +50,8 @@
   color: var(--surface-card);
   border-radius: 999px;
   padding: 2px 10px;
-  font-family: var(--font-display);
   font-size: 11px;
+  letter-spacing: 0.12em;
 }
 
 .live {

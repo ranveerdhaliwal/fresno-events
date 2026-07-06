@@ -20,7 +20,6 @@
 }
 
 .dow {
-  font-family: var(--font-display);
   font-size: 9px;
   letter-spacing: 1.5px;
   color: var(--coral);
@@ -28,7 +27,6 @@
 }
 
 .dnum {
-  font-family: var(--font-display);
   font-size: 20px;
   line-height: 1;
   display: block;
@@ -63,7 +61,6 @@
 }
 
 .price {
-  font-family: var(--font-display);
   font-size: 12px;
   color: var(--coral);
 }
@@ -73,7 +70,6 @@
 }
 
 .priceTicketHint {
-  font-family: var(--font-body);
   font-size: 10px;
   font-weight: 600;
   line-height: 1.25;

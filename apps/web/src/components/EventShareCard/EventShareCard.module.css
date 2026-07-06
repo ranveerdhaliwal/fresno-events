@@ -6,14 +6,12 @@
 }
 
 .card h3 {
-  font-family: var(--font-display);
   font-size: 12px;
   letter-spacing: 2px;
   margin: 0 0 10px;
 }
 
 .script {
-  font-family: var(--font-script);
   color: var(--coral);
   font-size: 22px;
   margin: 0 0 8px;
@@ -41,7 +39,6 @@
   border: 2px solid var(--border-default);
   background: var(--mustard);
   color: var(--text-primary);
-  font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 1px;
   padding: 8px 12px;

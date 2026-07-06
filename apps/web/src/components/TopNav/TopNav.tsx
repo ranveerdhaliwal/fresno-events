@@ -1,32 +1,23 @@
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { Link } from "@tanstack/react-router";
 
 import { AirQualityChip } from "@/components/AirQualityChip";
+import { Text } from "@/components/Text";
 import { WeatherChip } from "@/components/WeatherChip";
 
 import styles from "./TopNav.module.css";
 
 const links = [
   { to: "/" as const, label: "EVENTS" },
-  { to: "/search" as const, label: "EXPLORE", search: { q: "" } },
-  { to: "/map" as const, label: "MAP" },
-  { to: "/saved" as const, label: "SAVED" }
+  { to: "/search" as const, label: "SEARCH", search: { q: "" } },
+  { to: "/map" as const, label: "MAP" }
 ];
 
 export function TopNav() {
-  const navigate = useNavigate();
-  const [query, setQuery] = useState("");
-
-  const handleSearch = (event: FormEvent) => {
-    event.preventDefault();
-    void navigate({ to: "/search", search: { q: query.trim() } });
-  };
-
   return (
     <header className={styles.outer} data-testid="top-nav">
       <nav className={styles.nav}>
         <Link to="/" className={styles.logo}>
-          <img src="/brand/nav-mark.svg" alt="What Up Fresno" width={178} height={56} />
+          <img src="/brand/fresno-logo.png" alt="What Up Fresno" width={200} height={56} />
         </Link>
         <div className={styles.links}>
           {links.map((link) => (
@@ -38,7 +29,9 @@ export function TopNav() {
               activeProps={{ className: styles.linkActive }}
               activeOptions={{ exact: link.to === "/" }}
             >
-              {link.label}
+              <Text variant="navLabel" tone="inherit" as="span">
+                {link.label}
+              </Text>
             </Link>
           ))}
         </div>
@@ -47,16 +40,6 @@ export function TopNav() {
             <WeatherChip />
             <AirQualityChip />
           </div>
-          <form className={styles.searchForm} onSubmit={handleSearch}>
-          <input
-            type="search"
-            className={styles.search}
-            placeholder="Search events, venues…"
-            aria-label="Search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          </form>
         </div>
       </nav>
     </header>

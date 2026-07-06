@@ -30,11 +30,13 @@
 .row:hover {
   transform: translate(-1px, -1px);
   box-shadow: 6px 6px 0 rgba(232, 217, 184, 0.45);
+  background: var(--surface-card);
 }
 
 .selected {
-  outline: var(--selected-outline);
-  outline-offset: -2px;
+  outline: 4px solid var(--mustard);
+  outline-offset: -3px;
+  box-shadow: 6px 6px 0 color-mix(in srgb, var(--mustard) 72%, var(--ink));
 }
 
 .live {
@@ -64,16 +66,12 @@
 }
 
 .day {
-  font-family: var(--font-display);
-  font-size: 11px;
   letter-spacing: 2px;
-  color: var(--coral);
   text-transform: uppercase;
   display: block;
 }
 
 .num {
-  font-family: var(--font-display);
   font-size: 22px;
   line-height: 1;
   margin-top: 2px;
@@ -81,12 +79,9 @@
 }
 
 .month {
-  font-family: var(--font-body);
-  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.25;
-  color: var(--text-secondary-on-card);
   margin-top: 4px;
   display: block;
   white-space: nowrap;
@@ -96,10 +91,8 @@
   min-width: 0;
 }
 
-.rowBody h4 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+.rowTitle {
+  font-weight: 400;
   line-height: 1.2;
 }
 
@@ -118,14 +111,10 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.5px;
-  color: var(--text-label-on-card);
   text-transform: uppercase;
 }
 
 .rowPrice {
-  font-family: var(--font-display);
-  font-size: 13px;
-  color: var(--coral);
   text-align: right;
   line-height: 1.1;
   min-width: 5.5rem;
@@ -133,11 +122,8 @@
 
 .rowPriority {
   display: block;
-  font-family: var(--font-body);
-  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--text-secondary-on-card);
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -148,7 +134,6 @@
 
 .priceTicketHint {
   display: block;
-  font-family: var(--font-body);
   font-size: 10px;
   font-weight: 600;
   line-height: 1.25;
@@ -157,9 +142,7 @@
 
 .rowPrice small {
   display: block;
-  font-family: var(--font-body);
   font-size: 10px;
-  color: var(--text-secondary-on-card);
   font-weight: 500;
   letter-spacing: 1px;
   margin-top: 2px;
@@ -173,7 +156,6 @@
   color: var(--surface-card);
   border: var(--border-card);
   padding: 2px 9px;
-  font-family: var(--font-display);
   font-size: 9.5px;
   letter-spacing: 2px;
   box-shadow: var(--shadow-xs);
@@ -193,7 +175,7 @@
 .p1 {
   grid-template-columns: 88px 130px 1fr auto;
   padding: 14px 18px 14px 14px;
-  box-shadow: 6px 6px 0 color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
+  box-shadow: var(--shadow-card-on-page);
 }
 
 .p1 .rowImg {
@@ -210,7 +192,7 @@
   height: 72px;
 }
 
-.p1 .rowBody h4 {
+.p1 .rowTitle {
   font-size: 19px;
 }
 
@@ -232,7 +214,7 @@
   height: 90px;
 }
 
-.p2 .rowBody h4 {
+.p2 .rowTitle {
   font-size: 16.5px;
 }
 
@@ -244,7 +226,7 @@
 .p4 {
   grid-template-columns: 80px 56px 1fr auto;
   padding: 10px 14px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card-on-page);
 }
 
 .p4 .rowImg {
@@ -252,14 +234,14 @@
   height: 56px;
 }
 
-.p4 .rowBody h4 {
+.p4 .rowTitle {
   font-size: 14px;
 }
 
 .p5 {
   grid-template-columns: 88px 1fr auto;
   padding: 9px 14px 9px 10px;
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-card-on-page);
   background: var(--surface-card);
 }
 
@@ -289,7 +271,7 @@
   height: 56px;
 }
 
-.p5 .rowBody h4 {
+.p5 .rowTitle {
   font-size: 13.5px;
 }
 
@@ -309,7 +291,7 @@
   background: var(--surface-muted);
 }
 
-.p0 .rowBody h4 {
+.p0 .rowTitle {
   font-style: italic;
 }
 

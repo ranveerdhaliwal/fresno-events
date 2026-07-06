@@ -1,4 +1,5 @@
 import { RainbowStripe } from "@/components/RainbowStripe";
+import { Text } from "@/components/Text";
 import { TopNav } from "@/components/TopNav";
 import { MobileNav } from "@/components/MobileNav";
 import { AdSlot } from "@/components/AdSlot";
@@ -24,7 +25,9 @@ export function HomePage() {
       <RainbowStripe variant="mobile" />
 
       <main className={styles.main}>
-        <h1 className={styles.pageTitle}>Events in Fresno &amp; the Central Valley</h1>
+        <Text variant="header1" tone="onPage" className={styles.pageTitle}>
+          Events in Fresno &amp; the Central Valley
+        </Text>
         <FeaturedEvents />
         <AdSlot variant="banner-wide" />
         <TodayStrip />

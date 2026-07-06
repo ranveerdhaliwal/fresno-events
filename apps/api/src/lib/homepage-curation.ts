@@ -1,6 +1,8 @@
 import {
   addDaysToIsoDate,
   compareEventsByPriorityStart,
+  dedupeEventsByContent,
+  eventContentSignature,
   pacificEndOfDay,
   pacificStartOfDay,
   pacificTodayIso,
@@ -95,13 +97,19 @@ async function loadFeaturedAutoPool(env: Env, now: Date): Promise<EventListItem[
     })
   ]);
 
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenSignatures = new Set<string>();
   const merged: EventListItem[] = [];
   for (const item of [...todayPool.items, ...aheadPool.items]) {
-    if (seen.has(item.event.id)) {
+    if (seenIds.has(item.event.id)) {
       continue;
     }
-    seen.add(item.event.id);
+    const signature = eventContentSignature(item);
+    if (seenSignatures.has(signature)) {
+      continue;
+    }
+    seenIds.add(item.event.id);
+    seenSignatures.add(signature);
     merged.push(item);
   }
 
@@ -163,7 +171,7 @@ async function resolveBiggestMonth(env: Env, now: Date): Promise<EventListItem[]
     until: monthWindow.until,
     limit: 50
   });
-  return pool.items.slice(0, 10);
+  return dedupeEventsByContent(pool.items).slice(0, 10);
 }
 
 export async function resolveHomepageCuration(env: Env): Promise<HomepageCurationResponse> {

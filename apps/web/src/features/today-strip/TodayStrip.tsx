@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
+import { FilterChip } from "@/components/FilterChip";
 import { DayStrip } from "@/components/DayStrip";
+import { Text } from "@/components/Text";
 import { calendarSearchCurrent } from "@/lib/calendar-search.utils";
 import { buildDayStripTilesThroughSunday } from "@/lib/event-view-model";
 import { formatEventDate, toIsoDateLocal } from "@/lib/event-time";
@@ -35,30 +37,39 @@ export function TodayStrip() {
   return (
     <section className={styles.section} data-testid="lineup-section">
       <div className={styles.head}>
-        <h2>
+        <h2 className={styles.headTitle}>
           {tab === "month" ? (
-            <Link to="/calendar" search={calendarSearchCurrent()}>
-              <span className={styles.script}>the</span> LINEUP <span className={styles.arrow}>→</span>
+            <Link to="/calendar" search={calendarSearchCurrent()} className={styles.headLink}>
+              <Text variant="script" tone="accent" scriptStyle="section" as="span">
+                the
+              </Text>{" "}
+              <Text variant="header1" tone="onPage" as="span" className={styles.headDisplay}>
+                LINEUP
+              </Text>{" "}
+              <span className={styles.arrow}>→</span>
             </Link>
           ) : (
-            <Link to="/day/$date" params={{ date: todayIso }}>
-              <span className={styles.script}>the</span> LINEUP <span className={styles.arrow}>→</span>
+            <Link to="/day/$date" params={{ date: todayIso }} className={styles.headLink}>
+              <Text variant="script" tone="accent" scriptStyle="section" as="span">
+                the
+              </Text>{" "}
+              <Text variant="header1" tone="onPage" as="span" className={styles.headDisplay}>
+                LINEUP
+              </Text>{" "}
+              <span className={styles.arrow}>→</span>
             </Link>
           )}
         </h2>
         <div className={styles.tabs}>
           {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={tab === item.id ? styles.tabActive : styles.tab}
-              onClick={() => setTab(item.id)}
-            >
+            <FilterChip key={item.id} active={tab === item.id} onClick={() => setTab(item.id)}>
               {item.label}
-            </button>
+            </FilterChip>
           ))}
         </div>
-        <span className={styles.sub}>{formatEventDate(today)} · Fresno, CA</span>
+        <Text variant="body3" tone="label" as="span" className={styles.sub}>
+          {formatEventDate(today)} · Fresno, CA
+        </Text>
       </div>
       <DayStrip tiles={tiles} />
     </section>

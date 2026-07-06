@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 
 import { gradientForPalette } from "@/lib/image-palette";
 import { cn } from "@/lib/cn";
+import { Text } from "@/components/Text";
 
 import type { PlaceholderImageProps } from "./PlaceholderImage.types";
 import styles from "./PlaceholderImage.module.css";
@@ -36,7 +37,9 @@ export function PlaceholderImage({
       style={{ background: gradientForPalette(paletteKey) }}
       data-testid="placeholder-image"
     >
-      <span className={styles.label}>{label ?? paletteKey}</span>
+      <Text variant="eyebrow" tone="inverse" as="span" className={styles.label}>
+        {label ?? paletteKey}
+      </Text>
     </div>
   );
 }

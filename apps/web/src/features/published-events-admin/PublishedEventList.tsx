@@ -1,6 +1,5 @@
-import { Loader2 } from "lucide-react";
-
 import { EventRow } from "@/components/EventRow";
+import { EventRowSkeleton } from "@/components/EventRowSkeleton";
 import { SecHead } from "@/components/SecHead";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { getEventDisplayPriorityLabel } from "@fresno-events/shared";
@@ -36,8 +35,10 @@ export function PublishedEventList({
 
   if (isLoading) {
     return (
-      <div className={listStyles.loading}>
-        <Loader2 className={listStyles.spin} size={18} /> Loading events…
+      <div className={listStyles.loading} data-testid="published-event-list-skeleton" aria-busy="true">
+        {Array.from({ length: 5 }, (_, index) => (
+          <EventRowSkeleton key={index} />
+        ))}
       </div>
     );
   }

@@ -3,6 +3,9 @@ import { useMemo, useState } from "react";
 
 import { EventCard } from "@/components/EventCard";
 import { EventRow } from "@/components/EventRow";
+import { FilterChip } from "@/components/FilterChip";
+import { SectionTitle } from "@/components/SectionTitle";
+import { Text } from "@/components/Text";
 import { WeekBlockHeader } from "@/components/WeekBlockHeader";
 import { calendarSearchCurrent } from "@/lib/calendar-search.utils";
 import { toEventRowViewModel } from "@/lib/event-view-model";
@@ -11,6 +14,7 @@ import type { EventSectionBucket } from "@fresno-events/shared";
 
 import { useEventSections } from "./useEventSections";
 import { UpcomingDetailPanel } from "./UpcomingDetailPanel";
+import { UpcomingEventsSkeleton } from "./UpcomingEventsSkeleton";
 import styles from "./UpcomingEvents.module.css";
 
 const FILTERS = ["All", "Today", "This weekend"] as const;
@@ -34,7 +38,9 @@ function SectionBlock({
     <section className={styles.sectionBlock}>
       <WeekBlockHeader label={label} dateRange={`${bucket.fromIso} – ${bucket.untilIso}`} />
       {rows.length === 0 ? (
-        <p className={styles.empty}>No events yet</p>
+        <Text variant="body2" tone="mutedOnPage" className={styles.empty}>
+          No events yet
+        </Text>
       ) : (
         <div className={styles.list}>
           {rows.map((row) => (
@@ -93,27 +99,22 @@ export function UpcomingEvents() {
   const showWeekend = filter === "All" || filter === "This weekend";
 
   if (isLoading || !data) {
-    return <div className={styles.loading}>Loading upcoming events…</div>;
+    return <UpcomingEventsSkeleton />;
   }
 
   return (
     <div className={styles.wrap} data-testid="upcoming-events">
       <div className={styles.toolbar}>
-        <h2>
-          <span className={styles.script}>upcoming</span> EVENTS
-        </h2>
+        <SectionTitle as="h2" script="upcoming" size="sm">
+          EVENTS
+        </SectionTitle>
       </div>
 
       <div className={styles.chips}>
         {FILTERS.map((chip) => (
-          <button
-            key={chip}
-            type="button"
-            className={filter === chip ? styles.chipActive : styles.chip}
-            onClick={() => setFilter(chip)}
-          >
+          <FilterChip key={chip} active={filter === chip} onClick={() => setFilter(chip)}>
             {chip}
-          </button>
+          </FilterChip>
         ))}
       </div>
 

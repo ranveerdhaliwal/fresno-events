@@ -1,16 +1,19 @@
 import { AdSlot } from "@/components/AdSlot";
 import { FeatureCard } from "@/components/FeatureCard";
 import { PopularList } from "@/components/PopularList";
+import { SectionTitle } from "@/components/SectionTitle";
+import { Text } from "@/components/Text";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 
 import { useHomepageCuration } from "./useHomepageCuration";
+import { FeaturedEventsSkeleton } from "./FeaturedEventsSkeleton";
 import styles from "./FeaturedEvents.module.css";
 
 export function FeaturedEvents() {
   const { viewModel, isLoading } = useHomepageCuration();
 
   if (isLoading) {
-    return <div className={styles.loading}>Loading featured events…</div>;
+    return <FeaturedEventsSkeleton />;
   }
 
   const cards = viewModel?.featuredCards ?? [];
@@ -21,9 +24,9 @@ export function FeaturedEvents() {
   return (
     <section className={styles.section} data-testid="featured-events">
       <div className={styles.header}>
-        <h2>
-          <span className={styles.script}>what&apos;s</span> HAPPENING
-        </h2>
+        <SectionTitle script="what's" size="md">
+          HAPPENING
+        </SectionTitle>
       </div>
 
       <div className={styles.layout}>

@@ -4,9 +4,11 @@ import { EventCard } from "@/components/EventCard";
 import { EventRow } from "@/components/EventRow";
 import { SecHead } from "@/components/SecHead";
 import { ShowMore } from "@/components/ShowMore";
+import { Text } from "@/components/Text";
 import { bucketPeriod, isLiveNow, type DayPeriod } from "@/lib/event-time";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
+import { DayScheduleSkeleton } from "./DayScheduleSkeleton";
 import { useDayEvents } from "./useDayEvents";
 import styles from "./DaySchedule.module.css";
 
@@ -68,7 +70,7 @@ export function DaySchedule({ isoDate, onNavigateEvent }: DayScheduleProps) {
   };
 
   if (isLoading) {
-    return <p className={styles.loading}>Loading day schedule…</p>;
+    return <DayScheduleSkeleton />;
   }
 
   return (
@@ -86,9 +88,9 @@ export function DaySchedule({ isoDate, onNavigateEvent }: DayScheduleProps) {
                 variant={live ? "live" : "default"}
               />
               {events.length === 0 ? (
-                <p className={styles.empty}>
+                <Text variant="body2" tone="mutedOnPage" className={styles.empty}>
                   {live ? "Nothing live right now — check back closer to showtime." : "No events in this block yet."}
-                </p>
+                </Text>
               ) : (
                 <div className={styles.list}>
                   {events.map((row) => (

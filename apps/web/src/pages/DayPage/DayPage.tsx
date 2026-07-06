@@ -5,6 +5,8 @@ import { AdSlot } from "@/components/AdSlot";
 import { DayDateCarousel } from "@/components/DayDateCarousel";
 import { PageChrome } from "@/components/PageChrome";
 import { PopularList } from "@/components/PopularList";
+import { SectionTitle } from "@/components/SectionTitle";
+import { Text } from "@/components/Text";
 import { DaySchedule } from "@/features/day-schedule/DaySchedule";
 import { useTodayEvents } from "@/features/featured-events/useTodayEvents";
 import { toPopularViewModels } from "@/lib/event-view-model";
@@ -90,18 +92,22 @@ export function DayPage() {
   return (
     <PageChrome mobileNav={{ variant: "day", title: dayTitle.toUpperCase() }}>
       <div className={styles.wrap} data-testid="day-page">
-        <p className={styles.crumb}>
+        <Text variant="body3" tone="mutedOnPage" as="p" className={styles.crumb}>
           <Link to="/">Home</Link> / <span>{dayTitle}</span>
-        </p>
+        </Text>
 
         <header className={styles.hero}>
           <div>
-            <h1>
-              <span className={styles.script}>what&apos;s on</span> {dayTitle.toUpperCase()}
-            </h1>
+            <SectionTitle script="what's on" size="lg" as="h1">
+              {dayTitle.toUpperCase()}
+            </SectionTitle>
             <div className={styles.meta}>
-              <span>📅 {formatEventDate(new Date(`${viewDate}T12:00:00-07:00`))}</span>
-              <span>📆 {eventCount} events</span>
+              <Text variant="body2" tone="label" as="span">
+                📅 {formatEventDate(new Date(`${viewDate}T12:00:00-07:00`))}
+              </Text>
+              <Text variant="body2" tone="label" as="span">
+                📆 {eventCount} events
+              </Text>
             </div>
           </div>
         </header>

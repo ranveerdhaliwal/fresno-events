@@ -4,7 +4,6 @@
   background: var(--surface-inset);
   border: 1.5px dashed var(--border-on-page);
   padding: 12px;
-  font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 2px;
   color: var(--text-on-page);

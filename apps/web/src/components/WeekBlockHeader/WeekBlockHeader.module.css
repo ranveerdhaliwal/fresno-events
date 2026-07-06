@@ -8,7 +8,6 @@
 }
 
 .script {
-  font-family: var(--font-script);
   font-size: 22px;
   color: var(--coral);
   transform: rotate(-3deg);
@@ -16,7 +15,6 @@
 }
 
 .header h3 {
-  font-family: var(--font-display);
   font-size: 13px;
   letter-spacing: 3px;
   margin: 0;

@@ -34,6 +34,14 @@ export function formatMonthLong(value: string | Date): string {
   }).format(typeof value === "string" ? new Date(value) : value);
 }
 
+export function formatMonthDay(value: string | Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: TIME_ZONE
+  }).format(typeof value === "string" ? new Date(value) : value);
+}
+
 export function toIsoDateLocal(value: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",

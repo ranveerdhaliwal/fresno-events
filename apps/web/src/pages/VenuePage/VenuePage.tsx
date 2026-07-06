@@ -3,7 +3,10 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { EventRow } from "@/components/EventRow";
+import { EventRowSkeleton } from "@/components/EventRowSkeleton";
 import { PageChrome } from "@/components/PageChrome";
+import { Skeleton } from "@/components/Skeleton";
+import { Text } from "@/components/Text";
 import { VenueMiniMap } from "@/components/VenueMiniMap";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { toEventRowViewModel } from "@/lib/event-view-model";
@@ -31,12 +34,34 @@ export function VenuePage() {
   return (
     <PageChrome mobileNav={{ variant: "day", title: "VENUE" }}>
       <div className={styles.wrap}>
-        {isLoading ? <p>Loading venue…</p> : null}
-        {isError || !data ? !isLoading ? <p>Venue not found.</p> : null : null}
+        {isLoading ? (
+          <div data-testid="venue-page-skeleton" aria-busy="true">
+            <Skeleton height={32} width="55%" />
+            <Skeleton height={14} width="40%" className={styles.address} />
+            <Skeleton height={200} width="100%" radius={0} />
+            <Skeleton height={20} width={180} className={styles.sectionTitle} />
+            <div className={styles.list}>
+              {Array.from({ length: 4 }, (_, index) => (
+                <EventRowSkeleton key={index} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {isError || !data ? (
+          !isLoading ? (
+            <Text variant="body2" tone="label">
+              Venue not found.
+            </Text>
+          ) : null
+        ) : null}
         {data ? (
           <>
-            <h1>{data.venue.name}</h1>
-            <p className={styles.address}>{formatVenueAddressLine(data.venue)}</p>
+            <Text variant="header1" tone="onPage" as="h1">
+              {data.venue.name}
+            </Text>
+            <Text variant="body2" tone="mutedOnPage" as="p" className={styles.address}>
+              {formatVenueAddressLine(data.venue)}
+            </Text>
             {data.venue.lat != null && data.venue.lng != null ? (
               <VenueMiniMap lat={data.venue.lat} lng={data.venue.lng} category="community" />
             ) : null}
@@ -45,9 +70,15 @@ export function VenuePage() {
                 Website
               </a>
             ) : null}
-            <h2 className={styles.sectionTitle}>Upcoming events</h2>
+            <Text variant="header2" tone="onPage" as="h2" className={styles.sectionTitle}>
+              Upcoming events
+            </Text>
             <div className={styles.list}>
-              {rows.length === 0 ? <p className={styles.empty}>No events yet</p> : null}
+              {rows.length === 0 ? (
+                <Text variant="body2" tone="mutedOnPage" className={styles.empty}>
+                  No events yet
+                </Text>
+              ) : null}
               {rows.map((row) => (
                 <EventRow key={row.id} event={row} slug={row.slug} adminAction={<AdminEditLink eventId={row.id} />} />
               ))}

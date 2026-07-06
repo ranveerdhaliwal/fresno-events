@@ -1,0 +1,30 @@
+.root {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.script {
+  margin-right: -0.15em;
+}
+
+.title {
+  text-transform: uppercase;
+}
+
+.lg .title {
+  font-size: 28px;
+  letter-spacing: 0.5px;
+}
+
+.md .title {
+  font-size: 26px;
+  letter-spacing: 1px;
+}
+
+.sm .title {
+  font-size: 22px;
+  letter-spacing: 0.5px;
+}

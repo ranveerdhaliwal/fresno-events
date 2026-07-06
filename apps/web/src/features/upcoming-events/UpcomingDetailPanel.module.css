@@ -12,30 +12,24 @@
 }
 
 .emptyScript {
-  font-family: var(--font-script);
-  font-size: 44px;
-  color: var(--coral);
   transform: rotate(-3deg);
   display: inline-block;
+  font-size: 44px;
 }
 
-.empty h3 {
-  font-family: var(--font-display);
-  font-size: 16px;
+.badge,
+.badgeCat {
+  background: var(--coral);
+  border: var(--border-card);
+  padding: 4px 10px;
+  box-shadow: var(--shadow-xs);
+  font-size: 10px;
   letter-spacing: 2px;
-  margin: 6px 0 8px;
-}
-
-.empty p {
-  font-size: 13px;
-  margin: 0;
-  color: var(--text-secondary-on-card);
 }
 
 .hero {
   height: 220px;
   position: relative;
-  border-bottom: 3px solid var(--border-default);
   overflow: hidden;
 }
 
@@ -48,21 +42,8 @@
   z-index: 2;
 }
 
-.badge,
-.badgeCat {
-  background: var(--coral);
-  color: var(--surface-card);
-  border: var(--border-card);
-  padding: 4px 10px;
-  font-family: var(--font-display);
-  font-size: 10px;
-  letter-spacing: 2px;
-  box-shadow: var(--shadow-xs);
-}
-
 .badgeCat {
   background: var(--mustard);
-  color: var(--text-primary);
 }
 
 .body {
@@ -70,10 +51,10 @@
 }
 
 .title {
-  font-family: var(--font-display);
   font-size: 24px;
+  letter-spacing: 0.035em;
   line-height: 1.1;
-  margin: 0 0 4px;
+  margin: 0 0 14px;
 }
 
 .title a {
@@ -87,10 +68,7 @@
 
 .description {
   margin: 0 0 12px;
-  font-size: 14px;
-  color: var(--text-secondary-on-card);
   font-weight: 500;
-  line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
@@ -121,37 +99,21 @@
 }
 
 .facts dt {
-  font-family: var(--font-display);
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: var(--text-primary);
   margin-bottom: 2px;
   text-transform: uppercase;
 }
 
-.facts dd {
-  margin: 0;
-  font-size: 14px;
+.factValue {
   font-weight: 600;
-  color: var(--text-primary);
+  margin: 0;
 }
 
 .actions {
   display: flex;
 }
 
-.detailsLink {
+.detailsButton {
   flex: 1;
-  text-align: center;
-  background: var(--coral);
-  color: var(--surface-card);
-  border: 2px solid var(--border-default);
-  padding: 12px;
-  font-family: var(--font-display);
-  font-size: 12px;
-  letter-spacing: 2px;
-  box-shadow: var(--shadow-md);
-  text-decoration: none;
 }
 
 @media (max-width: 600px) {

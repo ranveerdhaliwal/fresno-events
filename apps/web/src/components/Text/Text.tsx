@@ -2,7 +2,7 @@ import type { ElementType } from "react";
 
 import { cn } from "@/lib/cn";
 
-import type { TextProps, TextTone, TextVariant } from "./Text.types";
+import type { TextProps, TextScriptStyle, TextTone, TextVariant } from "./Text.types";
 import styles from "./Text.module.css";
 
 const variantClass = {
@@ -10,6 +10,8 @@ const variantClass = {
   header2: styles.header2 ?? "",
   header3: styles.header3 ?? "",
   eyebrow: styles.eyebrow ?? "",
+  navLabel: styles.navLabel ?? "",
+  price: styles.price ?? "",
   body1: styles.body1 ?? "",
   body2: styles.body2 ?? "",
   body3: styles.body3 ?? "",
@@ -19,18 +21,30 @@ const variantClass = {
 const toneClass = {
   onPage: styles.toneOnPage ?? "",
   onCard: styles.toneOnCard ?? "",
+  onNav: styles.toneOnNav ?? "",
+  accent: styles.toneAccent ?? "",
   mutedOnPage: styles.toneMutedOnPage ?? "",
   mutedOnCard: styles.toneMutedOnCard ?? "",
   label: styles.toneLabel ?? "",
   labelOnCard: styles.toneLabelOnCard ?? "",
+  inverse: styles.toneInverse ?? "",
   inherit: styles.toneInherit ?? ""
 } satisfies Record<TextTone, string>;
+
+const scriptStyleClass = {
+  default: "",
+  section: styles.scriptSection ?? "",
+  nav: styles.scriptNav ?? "",
+  footer: styles.scriptFooter ?? ""
+} satisfies Record<TextScriptStyle, string>;
 
 const defaultElement = {
   header1: "h1",
   header2: "h2",
   header3: "h3",
   eyebrow: "p",
+  navLabel: "span",
+  price: "span",
   body1: "p",
   body2: "p",
   body3: "p",
@@ -42,6 +56,8 @@ const defaultTone = {
   header2: "onCard",
   header3: "onCard",
   eyebrow: "label",
+  navLabel: "onNav",
+  price: "accent",
   body1: "onPage",
   body2: "onPage",
   body3: "onPage",
@@ -51,6 +67,7 @@ const defaultTone = {
 export function Text({
   variant,
   tone,
+  scriptStyle = "default",
   as,
   className,
   children,
@@ -61,7 +78,12 @@ export function Text({
 
   return (
     <Component
-      className={cn(variantClass[variant], toneClass[resolvedTone], className)}
+      className={cn(
+        variantClass[variant],
+        toneClass[resolvedTone],
+        variant === "script" && scriptStyleClass[scriptStyle],
+        className
+      )}
       {...props}
     >
       {children}

@@ -44,14 +44,12 @@
 }
 
 .dow {
-  font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 1.5px;
   display: block;
 }
 
 .dnum {
-  font-family: var(--font-display);
   font-size: 28px;
   line-height: 1;
   margin-top: 2px;

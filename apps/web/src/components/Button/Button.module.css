@@ -98,3 +98,29 @@
 .ghost:hover:not(:disabled) {
   color: var(--text-on-page);
 }
+
+.cta {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 16px;
+  border-radius: 0;
+  border: 2px solid var(--border-default);
+  background: var(--coral);
+  color: var(--surface-card);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.12s ease;
+}
+
+.cta:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-coral-hover);
+  background: color-mix(in srgb, var(--coral) 92%, var(--ink));
+}

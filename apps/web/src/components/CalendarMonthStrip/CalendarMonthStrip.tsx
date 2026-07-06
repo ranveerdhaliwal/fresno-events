@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { buildNextPacificMonths } from "@fresno-events/shared";
 
+import { SectionTitle } from "@/components/SectionTitle";
+import { Text } from "@/components/Text";
 import { cn } from "@/lib/cn";
 
 import styles from "./CalendarMonthStrip.module.css";
@@ -15,9 +17,9 @@ export function CalendarMonthStrip({ selectedYear, selectedMonth }: CalendarMont
 
   return (
     <section className={styles.section} data-testid="calendar-month-strip">
-      <h2 className={styles.heading}>
-        <span className={styles.script}>pick a</span> MONTH
-      </h2>
+      <SectionTitle script="pick a" size="sm" className={styles.heading}>
+        MONTH
+      </SectionTitle>
       <div className={styles.strip}>
         {months.map((tile) => {
           const isSelected = tile.year === selectedYear && tile.month === selectedMonth;
@@ -29,8 +31,12 @@ export function CalendarMonthStrip({ selectedYear, selectedMonth }: CalendarMont
               className={cn(styles.tile, isSelected && styles.selected)}
               aria-current={isSelected ? "page" : undefined}
             >
-              <span className={styles.short}>{tile.shortLabel}</span>
-              <span className={styles.year}>{tile.yearLabel}</span>
+              <Text variant="eyebrow" tone="inherit" as="span" className={styles.short}>
+                {tile.shortLabel}
+              </Text>
+              <Text variant="body3" tone="inherit" as="span" className={styles.year}>
+                {tile.yearLabel}
+              </Text>
             </Link>
           );
         })}

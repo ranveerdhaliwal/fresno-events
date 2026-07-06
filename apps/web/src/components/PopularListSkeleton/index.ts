@@ -1,0 +1,1 @@
+export { PopularListSkeleton } from "./PopularListSkeleton";

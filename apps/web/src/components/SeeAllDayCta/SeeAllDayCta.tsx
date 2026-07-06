@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 
+import { Text } from "@/components/Text";
+
 import styles from "./SeeAllDayCta.module.css";
 
 export interface SeeAllDayCtaProps {
@@ -17,7 +19,9 @@ export function SeeAllDayCta({ date, count, variant = "desktop" }: SeeAllDayCtaP
       className={variant === "mobile" ? styles.mobile : styles.desktop}
       data-testid="see-all-day-cta"
     >
-      {label}
+      <Text variant="eyebrow" tone="inherit" as="span">
+        {label}
+      </Text>
     </Link>
   );
 }

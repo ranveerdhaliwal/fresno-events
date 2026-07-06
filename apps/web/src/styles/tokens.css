@@ -36,23 +36,17 @@
 
   --rainbow-stripe: repeating-linear-gradient(
     90deg,
-    var(--coral) 0 14px,
-    var(--stripe-gap) 14px 18px,
-    var(--text-label) 18px 32px,
-    var(--stripe-gap) 32px 36px,
-    var(--mustard) 36px 50px,
-    var(--stripe-gap) 50px 54px
+    var(--coral) 0 12px,
+    var(--mustard) 12px 24px,
+    var(--text-label) 24px 36px
   );
   --rainbow-stripe-height: 6px;
 
   --rainbow-stripe-mobile: repeating-linear-gradient(
     90deg,
-    var(--coral) 0 12px,
-    var(--stripe-gap) 12px 15px,
-    var(--text-label) 15px 27px,
-    var(--stripe-gap) 27px 30px,
-    var(--mustard) 30px 42px,
-    var(--stripe-gap) 42px 45px
+    var(--coral) 0 10px,
+    var(--mustard) 10px 20px,
+    var(--text-label) 20px 30px
   );
   --rainbow-stripe-height-mobile: 5px;
 }

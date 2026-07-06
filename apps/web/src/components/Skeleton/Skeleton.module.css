@@ -1,0 +1,44 @@
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.root {
+  display: block;
+  width: var(--skeleton-width, 100%);
+  height: var(--skeleton-height, 1rem);
+  border-radius: var(--skeleton-radius, 4px);
+  background: color-mix(in srgb, var(--text-primary) 10%, var(--surface-card));
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.animate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, white 52%, var(--surface-card)) 48%,
+    color-mix(in srgb, white 52%, var(--surface-card)) 52%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate::after {
+    animation: none;
+    opacity: 0.35;
+    transform: none;
+    background: color-mix(in srgb, white 20%, transparent);
+  }
+}

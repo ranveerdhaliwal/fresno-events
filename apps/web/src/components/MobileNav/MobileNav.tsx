@@ -2,6 +2,8 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Menu, Search, X } from "lucide-react";
 
+import { Text } from "@/components/Text";
+
 import styles from "./MobileNav.module.css";
 
 export type MobileNavVariant = "home" | "day" | "event";
@@ -13,9 +15,8 @@ export interface MobileNavProps {
 
 const menuLinks = [
   { to: "/" as const, label: "EVENTS", exact: true },
-  { to: "/search" as const, label: "EXPLORE", exact: false, search: { q: "" } },
-  { to: "/map" as const, label: "MAP", exact: false },
-  { to: "/saved" as const, label: "SAVED", exact: false }
+  { to: "/search" as const, label: "SEARCH", exact: false, search: { q: "" } },
+  { to: "/map" as const, label: "MAP", exact: false }
 ];
 
 export function MobileNav({ variant = "home", title }: MobileNavProps) {
@@ -60,7 +61,7 @@ export function MobileNav({ variant = "home", title }: MobileNavProps) {
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
             <Link to="/" className={styles.logoCenter}>
-              <img src="/brand/nav-mark.svg" alt="What Up Fresno" height={40} />
+              <img src="/brand/fresno-logo.png" alt="What Up Fresno" height={40} />
             </Link>
             <Link to="/search" search={{ q: "" }} className={styles.iconBtn} aria-label="Search">
               <Search size={20} />
@@ -71,7 +72,9 @@ export function MobileNav({ variant = "home", title }: MobileNavProps) {
             <Link to="/" className={styles.iconBtn} aria-label="Back">
               ←
             </Link>
-            <span className={styles.title}>{title}</span>
+            <Text variant="navLabel" tone="onNav" as="span" className={styles.title}>
+              {title}
+            </Text>
             <Link to="/search" search={{ q: "" }} className={styles.iconBtn} aria-label="Search">
               <Search size={20} />
             </Link>
@@ -81,7 +84,9 @@ export function MobileNav({ variant = "home", title }: MobileNavProps) {
             <Link to="/" className={styles.iconBtn} aria-label="Back">
               ←
             </Link>
-            <span className={styles.title}>EVENT DETAILS</span>
+            <Text variant="navLabel" tone="onNav" as="span" className={styles.title}>
+              EVENT DETAILS
+            </Text>
             <button type="button" className={styles.iconBtn} aria-label="Share">
               ↗
             </button>
@@ -103,12 +108,11 @@ export function MobileNav({ variant = "home", title }: MobileNavProps) {
                 activeOptions={{ exact: link.exact }}
                 onClick={closeMenu}
               >
-                {link.label}
+                <Text variant="navLabel" tone="inherit" as="span">
+                  {link.label}
+                </Text>
               </Link>
             ))}
-            <Link to="/search" search={{ q: "" }} className={styles.menuLink} onClick={closeMenu}>
-              SEARCH
-            </Link>
           </nav>
         </div>
       ) : null}
