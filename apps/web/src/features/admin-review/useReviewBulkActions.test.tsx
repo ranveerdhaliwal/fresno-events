@@ -6,6 +6,7 @@ import type { EventCandidate } from "@fresno-events/shared";
 
 import { act, renderHook } from "@/tests/render";
 
+import type { ReviewQueueTab } from "../admin/admin-api";
 import { useReviewBulkActions } from "./useReviewBulkActions";
 
 function candidate(id: string): EventCandidate {
@@ -94,7 +95,7 @@ describe("useReviewBulkActions", () => {
           setPriorityOverrides: vi.fn(),
           onAfterDecision: vi.fn()
         }),
-      { initialProps: { activeTab: "new" as const }, wrapper: createWrapper() }
+      { initialProps: { activeTab: "new" as ReviewQueueTab }, wrapper: createWrapper() }
     );
 
     act(() => {
