@@ -28,3 +28,12 @@ dev-target.env
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
+
+# Local agent/tool state
+.agents/
+.codex/
+.impeccable/
+.claude/settings.local.json
+
+# Supabase Studio scratch queries
+supabase/snippets/
