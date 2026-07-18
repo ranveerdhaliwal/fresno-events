@@ -61,9 +61,12 @@
   left: 0;
   bottom: 0;
   width: min(280px, 85vw);
-  background: var(--surface-nav);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--coral) 24%, var(--surface-nav)) 0%,
+    var(--surface-nav) 12px
+  );
   color: var(--text-on-nav);
-  border-right: 3px solid var(--coral);
   padding: calc(var(--nav-height-mobile) + 12px) 20px 24px;
   display: flex;
   flex-direction: column;
