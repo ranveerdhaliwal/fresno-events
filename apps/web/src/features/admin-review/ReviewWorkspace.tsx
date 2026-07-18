@@ -1,52 +1,28 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ClipboardList, Loader2, LogOut, RefreshCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { LinkedEventCandidate, ReviewQueueAuditResponse } from "@fresno-events/shared";
+import type { LinkedEventCandidate } from "@fresno-events/shared";
 import { ORGANIC_CANDIDATE_DISPLAY_PRIORITY } from "@fresno-events/shared";
 
 import { Button } from "@/components/Button/Button";
 import { SelectInput } from "@/components/SelectInput/SelectInput";
 import { Text } from "@/components/Text";
 import {
-  AdminApiError,
-  bulkApproveAllPending,
-  bulkApproveCandidates,
-  bulkApproveChanges,
-  bulkApproveChangesAll,
-  bulkSetCandidatePriority,
-  bulkSetPublishedEventPriority,
-  bulkRejectCandidates,
-  deleteCandidates,
-  fetchPreApproveAudit,
   fetchCandidateTabCounts,
   getCandidate,
-  runOccurrenceRelinkOps,
-  runPriorityRerankOps,
-  runPublishedOrphanCleanupOps,
-  runVenueAddressBackfillOps,
-  runVenueGeocodeOps,
   isAdminAuthError,
   listCandidates,
   reviewTabToStatus
 } from "../admin/admin-api";
-import type { BulkApproveBody } from "../admin/admin-api";
-import { adminKeys } from "../admin/admin.queryKeys";
 import {
-  buildBulkApprovePriorityById,
-  buildSeriesDisplayPriorities,
   clearPriorityOverride,
-  clearPriorityOverridesForIds,
-  resolveDetailDisplayPriority,
-  groupCandidatesBySource,
   readPriorityOverrides,
-  sortCandidatesByReviewedAt,
-  sortCandidatesForSourceGroupedReview,
+  resolveDetailDisplayPriority,
   writePriorityOverrides
 } from "../admin/admin-priority.utils";
 import {
   candidateStatusToReviewTab,
-  resolveActiveCandidateId,
   selectNextAfterDecision
 } from "./admin-review-navigation.utils";
 
@@ -62,15 +38,12 @@ import { AdminSearchInput } from "./AdminSearchInput";
 import { CandidateChangeDetail } from "./CandidateChangeDetail";
 import { CandidateDetail } from "./CandidateDetail";
 import { CandidateList } from "./CandidateList";
-import { filterCandidatesForSearch } from "./admin-review-search.utils";
 import { formatReviewTabLabel, tabCountForReviewTab } from "./admin-review-tab-counts.utils";
-import { togglePageSelection } from "./admin-review-selection.utils";
-import {
-  AdminMaintenancePanel,
-  type MaintenanceOpKind,
-  type MaintenanceOpResult
-} from "./AdminMaintenancePanel";
+import { AdminMaintenancePanel } from "./AdminMaintenancePanel";
 import { ReviewQueueAuditPanel } from "./ReviewQueueAuditPanel";
+import { useReviewBulkActions } from "./useReviewBulkActions";
+import { useReviewListGroups } from "./useReviewListGroups";
+import { useReviewMaintenanceOps } from "./useReviewMaintenanceOps";
 
 export function ReviewWorkspace({
   token,
@@ -83,25 +56,14 @@ export function ReviewWorkspace({
 }: ReviewWorkspaceProps) {
   const statusFilter = reviewTabToStatus(activeTab);
   const queryClient = useQueryClient();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
-  const [approveMessage, setApproveMessage] = useState<string | null>(null);
   const [priorityOverrides, setPriorityOverrides] = useState<Record<string, number>>(() =>
     readPriorityOverrides()
   );
-  const [bulkPriority, setBulkPriority] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [auditResult, setAuditResult] = useState<ReviewQueueAuditResponse | null>(null);
-  const [auditError, setAuditError] = useState<string | null>(null);
-  const [maintenanceOp, setMaintenanceOp] = useState<MaintenanceOpKind | null>(null);
-  const [maintenanceResult, setMaintenanceResult] = useState<MaintenanceOpResult | null>(null);
-  const [geocodeProgress, setGeocodeProgress] = useState<string | null>(null);
 
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
   }, []);
-
-  const searchActive = searchQuery.trim().length >= 2;
 
   const candidatesQuery = useQuery({
     queryKey: ["admin", "candidates", activeTab, token],
@@ -131,109 +93,48 @@ export function ReviewWorkspace({
     }
   }, [tabCountsQuery.error, onAuthFailure]);
 
-  const items = candidatesQuery.data?.items ?? [];
+  const items = useMemo(() => candidatesQuery.data?.items ?? [], [candidatesQuery.data]);
 
-  const searchResults = useMemo(() => {
-    if (!searchActive) {
-      return [];
-    }
-    return filterCandidatesForSearch(items, searchQuery);
-  }, [items, searchActive, searchQuery]);
+  const {
+    searchActive,
+    listGroups,
+    visibleListItems,
+    activeId,
+    listSeriesDisplayPriorities
+  } = useReviewListGroups({
+    items,
+    statusFilter,
+    searchQuery,
+    priorityOverrides,
+    selectedId,
+    onSelect
+  });
 
-  const sortedItems = useMemo(() => {
-    if (statusFilter === "approved" || statusFilter === "rejected") {
-      return sortCandidatesByReviewedAt(items);
-    }
-    return sortCandidatesForSourceGroupedReview(items, priorityOverrides);
-  }, [items, priorityOverrides, statusFilter]);
-  const seriesDisplayPriorities = useMemo(
-    () => buildSeriesDisplayPriorities(items, priorityOverrides),
-    [items, priorityOverrides]
-  );
-  const sourceGroups = useMemo(() => {
-    if (statusFilter === "approved" || statusFilter === "rejected") {
-      return sortedItems.length > 0
-        ? [{ source: "", label: "", items: sortedItems }]
-        : [];
-    }
-    return groupCandidatesBySource(sortedItems, priorityOverrides, seriesDisplayPriorities);
-  }, [sortedItems, priorityOverrides, seriesDisplayPriorities, statusFilter]);
-  const listGroups = useMemo(() => {
-    if (!searchActive) {
-      return sourceGroups;
-    }
-    if (searchResults.length === 0) {
-      return [];
-    }
-    if (statusFilter === "approved" || statusFilter === "rejected") {
-      const ordered = sortCandidatesByReviewedAt(searchResults);
-      return ordered.length > 0 ? [{ source: "", label: "", items: ordered }] : [];
-    }
-    const searchSeriesPriorities = buildSeriesDisplayPriorities(searchResults, priorityOverrides);
-    return groupCandidatesBySource(
-      sortCandidatesForSourceGroupedReview(searchResults, priorityOverrides, searchSeriesPriorities),
-      priorityOverrides,
-      searchSeriesPriorities
-    );
-  }, [sourceGroups, searchActive, searchResults, priorityOverrides, statusFilter]);
-
-  const visibleListItems = useMemo(() => listGroups.flatMap((group) => group.items), [listGroups]);
-
-  const navigationItems = visibleListItems;
-
-  const activeId = useMemo(
-    () => resolveActiveCandidateId(selectedId, navigationItems),
-    [selectedId, navigationItems]
-  );
-
-  useEffect(() => {
-    const resolved = resolveActiveCandidateId(selectedId, navigationItems);
-    if (resolved !== selectedId) {
-      onSelect(resolved);
-    }
-  }, [selectedId, navigationItems, onSelect]);
-
-  const listSeriesDisplayPriorities = useMemo(
-    () =>
-      searchActive
-        ? buildSeriesDisplayPriorities(visibleListItems, priorityOverrides)
-        : seriesDisplayPriorities,
-    [searchActive, visibleListItems, priorityOverrides, seriesDisplayPriorities]
-  );
-
-  const handleSelectAllPage = useCallback((pageIds: string[]) => {
-    setSelectedIds((prev) => togglePageSelection(prev, pageIds));
-  }, []);
-
-  const handleToggleSelected = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
+  const handleAfterDecision = useCallback(
+    (candidateId?: string) => {
+      if (candidateId) {
+        setPriorityOverrides((prev) => clearPriorityOverride(candidateId, prev));
+        onSelect(selectNextAfterDecision(visibleListItems, candidateId));
       }
-      return next;
-    });
-  }, []);
-  const listLoading = candidatesQuery.isLoading;
+      queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "candidate-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "candidate"] });
+    },
+    [onSelect, queryClient, visibleListItems]
+  );
 
-  useEffect(() => {
-    setSelectedIds(new Set());
-    setBulkPriority("");
-    setDeleteMessage(null);
-    setApproveMessage(null);
-  }, [activeTab]);
+  const bulk = useReviewBulkActions({
+    token,
+    activeTab,
+    items,
+    priorityOverrides,
+    setPriorityOverrides,
+    onAfterDecision: handleAfterDecision
+  });
 
-  const handleAfterDecision = (candidateId?: string) => {
-    if (candidateId) {
-      setPriorityOverrides((prev) => clearPriorityOverride(candidateId, prev));
-      onSelect(selectNextAfterDecision(navigationItems, candidateId));
-    }
-    queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
-    queryClient.invalidateQueries({ queryKey: ["admin", "candidate-counts"] });
-    queryClient.invalidateQueries({ queryKey: ["admin", "candidate"] });
-  };
+  const maintenance = useReviewMaintenanceOps(token);
+
+  const bulkActionPending = bulk.isPending || maintenance.isPending;
 
   const handleSeriesUpdated = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "candidate", activeId, token] });
@@ -257,426 +158,6 @@ export function ReviewWorkspace({
       }
     },
     [activeTab, onActiveTabChange, onSelect]
-  );
-
-  const formatBulkApproveMessage = (result: {
-    approved: number;
-    skipped: Array<{ reason: string }>;
-    failed: Array<{ id: string; message: string }>;
-  }) => {
-    const parts = [`Approved ${result.approved}.`];
-    if (result.skipped.length > 0) {
-      parts.push(`${result.skipped.length} skipped.`);
-    }
-    if (result.failed.length > 0) {
-      parts.push(`${result.failed.length} failed — refresh and retry.`);
-      for (const item of result.failed.slice(0, 3)) {
-        const detail = item.message.length > 120 ? `${item.message.slice(0, 120)}…` : item.message;
-        parts.push(`${item.id}: ${detail}`);
-      }
-      if (result.failed.length > 3) {
-        parts.push(`(+${result.failed.length - 3} more — see API logs: bulk_approve_item_failed)`);
-      }
-    }
-    return parts.join(" ");
-  };
-
-  const formatBulkApproveChangesMessage = (result: {
-    approved: number;
-    skipped: Array<{ reason: string }>;
-    failed: Array<{ id: string; message: string }>;
-  }) => {
-    const parts = [`Approved ${result.approved} update(s).`];
-    if (result.skipped.length > 0) {
-      parts.push(`${result.skipped.length} skipped.`);
-    }
-    if (result.failed.length > 0) {
-      parts.push(`${result.failed.length} failed.`);
-    }
-    return parts.join(" ");
-  };
-
-  const deleteMutation = useMutation({
-    mutationFn: (opts: { ids: string[]; force: boolean }) =>
-      deleteCandidates(token, opts.ids, { force: opts.force }),
-    onSuccess: (result) => {
-      const parts = [`Deleted ${result.deleted}.`];
-      if (result.skipped.length > 0) {
-        const approved = result.skipped.filter((s) => s.reason === "approved").length;
-        if (approved > 0) {
-          parts.push(`${approved} skipped (approved).`);
-        }
-        const missing = result.skipped.filter((s) => s.reason === "not_found").length;
-        if (missing > 0) {
-          parts.push(`${missing} not found.`);
-        }
-      }
-      setDeleteMessage(parts.join(" "));
-      setSelectedIds(new Set());
-      handleAfterDecision();
-    },
-    onError: (error: unknown) => {
-      setDeleteMessage(error instanceof AdminApiError ? error.message : "Delete failed.");
-    }
-  });
-
-  const approveSelectedMutation = useMutation({
-    mutationFn: (ids: string[]) => {
-      const body: Omit<BulkApproveBody, "ids"> = { reviewedBy: "admin-bulk-ui" };
-      const priorityById = buildBulkApprovePriorityById(ids, priorityOverrides);
-      if (priorityById) {
-        body.priorityById = priorityById;
-      }
-      return bulkApproveCandidates(token, ids, body);
-    },
-    onSuccess: (result) => {
-      setApproveMessage(formatBulkApproveMessage(result));
-      setSelectedIds(new Set());
-      handleAfterDecision();
-    },
-    onError: (error: unknown) => {
-      setApproveMessage(error instanceof AdminApiError ? error.message : "Bulk approve failed.");
-    }
-  });
-
-  const approveAllMutation = useMutation({
-    mutationFn: () => {
-      const priorityById = buildBulkApprovePriorityById(
-        items.map((candidate) => candidate.id),
-        priorityOverrides
-      );
-      return bulkApproveAllPending(token, {
-        reviewedBy: "admin-bulk-ui",
-        ...(priorityById ? { priorityById } : {})
-      });
-    },
-    onSuccess: (result) => {
-      setApproveMessage(formatBulkApproveMessage(result));
-      setSelectedIds(new Set());
-      handleAfterDecision();
-    },
-    onError: (error: unknown) => {
-      setApproveMessage(error instanceof AdminApiError ? error.message : "Approve all failed.");
-    }
-  });
-
-  const approveAllUpdatesMutation = useMutation({
-    mutationFn: () => bulkApproveChangesAll(token, { reviewedBy: "admin-bulk-ui" }),
-    onSuccess: (result) => {
-      setApproveMessage(formatBulkApproveChangesMessage(result));
-      setSelectedIds(new Set());
-      handleAfterDecision();
-    },
-    onError: (error: unknown) => {
-      setApproveMessage(error instanceof AdminApiError ? error.message : "Approve all updates failed.");
-    }
-  });
-
-  const approveSelectedUpdatesMutation = useMutation({
-    mutationFn: (ids: string[]) => bulkApproveChanges(token, ids, { reviewedBy: "admin-bulk-ui" }),
-    onSuccess: (result) => {
-      setApproveMessage(formatBulkApproveChangesMessage(result));
-      setSelectedIds(new Set());
-      handleAfterDecision();
-    },
-    onError: (error: unknown) => {
-      setApproveMessage(error instanceof AdminApiError ? error.message : "Bulk approve updates failed.");
-    }
-  });
-
-  const bulkPriorityMutation = useMutation({
-    mutationFn: async ({ ids, priority }: { ids: string[]; priority: number }) => {
-      if (activeTab === "approved") {
-        const eventIds = [
-          ...new Set(
-            ids
-              .map((id) => items.find((candidate) => candidate.id === id)?.matchedEventId)
-              .filter((eventId): eventId is string => typeof eventId === "string" && eventId.length > 0)
-          )
-        ];
-        const [candidateResult, eventResult] = await Promise.all([
-          bulkSetCandidatePriority(token, ids, priority),
-          eventIds.length > 0
-            ? bulkSetPublishedEventPriority(token, eventIds, priority)
-            : Promise.resolve({ priority, updated: 0, failed: [] })
-        ]);
-        return { ...candidateResult, eventUpdated: eventResult.updated };
-      }
-      return bulkSetCandidatePriority(token, ids, priority);
-    },
-    onSuccess: (result, variables) => {
-      setPriorityOverrides((prev) => clearPriorityOverridesForIds(prev, variables.ids));
-      setSelectedIds(new Set());
-      const failedPart =
-        result.failed.length > 0 ? ` ${result.failed.length} failed.` : "";
-      const eventPart =
-        "eventUpdated" in result && result.eventUpdated > 0
-          ? ` Updated ${result.eventUpdated} published event(s).`
-          : "";
-      setApproveMessage(`Set priority P${result.priority} on ${result.updated} row(s).${eventPart}${failedPart}`);
-      handleAfterDecision();
-    },
-    onError: (error: unknown) => {
-      setApproveMessage(error instanceof AdminApiError ? error.message : "Bulk priority update failed.");
-    }
-  });
-
-  const preApproveAuditMutation = useMutation({
-    mutationFn: () => fetchPreApproveAudit(token),
-    onSuccess: (result) => {
-      setAuditResult(result);
-      setAuditError(null);
-    },
-    onError: (error: unknown) => {
-      setAuditResult(null);
-      setAuditError(error instanceof AdminApiError ? error.message : "Pre-approve check failed.");
-    }
-  });
-
-  const relinkOpsMutation = useMutation({
-    mutationFn: (dryRun: boolean) => runOccurrenceRelinkOps(token, dryRun),
-    onMutate: (dryRun) => {
-      setMaintenanceOp("relink");
-      setMaintenanceResult({ kind: "relink", dryRun });
-    },
-    onSuccess: (relink, dryRun) => {
-      setMaintenanceResult({ kind: "relink", dryRun, relink });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
-    },
-    onError: (error: unknown, dryRun) => {
-      setMaintenanceResult({
-        kind: "relink",
-        dryRun,
-        error: error instanceof AdminApiError ? error.message : "Occurrence relink failed."
-      });
-    },
-    onSettled: () => {
-      setMaintenanceOp(null);
-    }
-  });
-
-  const orphanCleanupMutation = useMutation({
-    mutationFn: (dryRun: boolean) => runPublishedOrphanCleanupOps(token, dryRun),
-    onMutate: (dryRun) => {
-      setMaintenanceOp("orphans");
-      setMaintenanceResult({ kind: "orphans", dryRun });
-    },
-    onSuccess: (orphans, dryRun) => {
-      setMaintenanceResult({ kind: "orphans", dryRun, orphans });
-      void queryClient.invalidateQueries({ queryKey: [...adminKeys.all, "published-events"] });
-    },
-    onError: (error: unknown, dryRun) => {
-      setMaintenanceResult({
-        kind: "orphans",
-        dryRun,
-        error: error instanceof AdminApiError ? error.message : "Published orphan cleanup failed."
-      });
-    },
-    onSettled: () => {
-      setMaintenanceOp(null);
-    }
-  });
-
-  const addressBackfillMutation = useMutation({
-    mutationFn: (dryRun: boolean) => runVenueAddressBackfillOps(token, dryRun),
-    onMutate: (dryRun) => {
-      setMaintenanceOp("addresses");
-      setMaintenanceResult({ kind: "addresses", dryRun });
-    },
-    onSuccess: (addresses, dryRun) => {
-      setMaintenanceResult({ kind: "addresses", dryRun, addresses });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
-    },
-    onError: (error: unknown, dryRun) => {
-      setMaintenanceResult({
-        kind: "addresses",
-        dryRun,
-        error: error instanceof AdminApiError ? error.message : "Venue address cleanup failed."
-      });
-    },
-    onSettled: () => {
-      setMaintenanceOp(null);
-    }
-  });
-
-  const priorityRerankMutation = useMutation({
-    mutationFn: (dryRun: boolean) => runPriorityRerankOps(token, dryRun),
-    onMutate: (dryRun) => {
-      setMaintenanceOp("priority");
-      setMaintenanceResult({ kind: "priority", dryRun });
-    },
-    onSuccess: (priority, dryRun) => {
-      setMaintenanceResult({ kind: "priority", dryRun, priority });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "candidates"] });
-      void queryClient.invalidateQueries({ queryKey: [...adminKeys.all, "published-events"] });
-    },
-    onError: (error: unknown, dryRun) => {
-      setMaintenanceResult({
-        kind: "priority",
-        dryRun,
-        error: error instanceof AdminApiError ? error.message : "Priority rerank failed."
-      });
-    },
-    onSettled: () => {
-      setMaintenanceOp(null);
-    }
-  });
-
-  const geocodeOpsMutation = useMutation({
-    mutationFn: (dryRun: boolean) =>
-      runVenueGeocodeOps(token, {
-        dryRun,
-        ...(dryRun
-          ? {}
-          : {
-              onProgress: (progress) => {
-                setGeocodeProgress(
-                  `Batch ${progress.batch}: ${progress.totalGeocoded} geocoded (${progress.totalScanned} scanned)…`
-                );
-              }
-            })
-      }),
-    onMutate: (dryRun) => {
-      setMaintenanceOp("geocode");
-      setMaintenanceResult({ kind: "geocode", dryRun });
-      if (!dryRun) {
-        setGeocodeProgress("Starting geocode run…");
-      }
-    },
-    onSuccess: (geocode, dryRun) => {
-      setMaintenanceResult({ kind: "geocode", dryRun, geocode });
-    },
-    onError: (error: unknown, dryRun) => {
-      setMaintenanceResult({
-        kind: "geocode",
-        dryRun,
-        error: error instanceof AdminApiError ? error.message : "Venue geocode failed."
-      });
-    },
-    onSettled: () => {
-      setMaintenanceOp(null);
-      setGeocodeProgress(null);
-    }
-  });
-
-  const rejectSelectedMutation = useMutation({
-    mutationFn: (ids: string[]) => bulkRejectCandidates(token, ids, { reviewedBy: "admin-bulk-ui" }),
-    onSuccess: (result) => {
-      const parts = [`Rejected ${result.rejected}.`];
-      if (result.failed.length > 0) {
-        parts.push(`${result.failed.length} failed.`);
-      }
-      setApproveMessage(parts.join(" "));
-      setSelectedIds(new Set());
-      handleAfterDecision();
-    },
-    onError: (error: unknown) => {
-      setApproveMessage(error instanceof AdminApiError ? error.message : "Bulk reject failed.");
-    }
-  });
-
-  const bulkActionPending =
-    deleteMutation.isPending ||
-    rejectSelectedMutation.isPending ||
-    approveSelectedMutation.isPending ||
-    approveAllMutation.isPending ||
-    approveSelectedUpdatesMutation.isPending ||
-    approveAllUpdatesMutation.isPending ||
-    bulkPriorityMutation.isPending ||
-    preApproveAuditMutation.isPending ||
-    relinkOpsMutation.isPending ||
-    orphanCleanupMutation.isPending ||
-    addressBackfillMutation.isPending ||
-    priorityRerankMutation.isPending ||
-    geocodeOpsMutation.isPending;
-
-  const maintenanceLoading =
-    relinkOpsMutation.isPending ||
-    orphanCleanupMutation.isPending ||
-    addressBackfillMutation.isPending ||
-    priorityRerankMutation.isPending ||
-    geocodeOpsMutation.isPending;
-
-  const handleMaintenanceCheck = useCallback(
-    (kind: MaintenanceOpKind) => {
-      if (kind === "relink") {
-        relinkOpsMutation.mutate(true);
-        return;
-      }
-      if (kind === "orphans") {
-        orphanCleanupMutation.mutate(true);
-        return;
-      }
-      if (kind === "addresses") {
-        addressBackfillMutation.mutate(true);
-        return;
-      }
-      if (kind === "geocode") {
-        geocodeOpsMutation.mutate(true);
-        return;
-      }
-      priorityRerankMutation.mutate(true);
-    },
-    [
-      addressBackfillMutation,
-      geocodeOpsMutation,
-      orphanCleanupMutation,
-      priorityRerankMutation,
-      relinkOpsMutation
-    ]
-  );
-
-  const handleMaintenanceApply = useCallback(
-    (kind: MaintenanceOpKind) => {
-      if (kind === "relink") {
-        if (
-          window.confirm(
-            "Run occurrence relink? This updates occurrence keys and cross-source duplicate links."
-          )
-        ) {
-          relinkOpsMutation.mutate(false);
-        }
-        return;
-      }
-      if (kind === "orphans") {
-        if (
-          window.confirm(
-            "Delete published orphan events? This removes scheduled rows that duplicate another published show (same title, venue, and start time)."
-          )
-        ) {
-          orphanCleanupMutation.mutate(false);
-        }
-        return;
-      }
-      if (kind === "addresses") {
-        if (
-          window.confirm(
-            "Fix venue addresses? This normalizes mailing-line addresses on candidates and published venues."
-          )
-        ) {
-          addressBackfillMutation.mutate(false);
-        }
-        return;
-      }
-      if (kind === "geocode") {
-        if (
-          window.confirm(
-            "Geocode all missing coordinates on venues and review candidates? This runs in rate-limited batches until finished and may take several minutes."
-          )
-        ) {
-          geocodeOpsMutation.mutate(false);
-        }
-        return;
-      }
-      if (
-        window.confirm(
-          "Apply priority rerank? This patches suggested_priority on pending primaries and priority on published events (excluding manual) when the shared rules match."
-        )
-      ) {
-        priorityRerankMutation.mutate(false);
-      }
-    },
-    [addressBackfillMutation, geocodeOpsMutation, orphanCleanupMutation, priorityRerankMutation, relinkOpsMutation]
   );
 
   const candidateQuery = useQuery({
@@ -729,9 +210,9 @@ export function ReviewWorkspace({
               variant="secondary"
               size="sm"
               disabled={bulkActionPending || candidatesQuery.isLoading}
-              onClick={() => preApproveAuditMutation.mutate()}
+              onClick={() => maintenance.preApproveAuditMutation.mutate()}
             >
-              {preApproveAuditMutation.isPending ? (
+              {maintenance.preApproveAuditMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
                 <ClipboardList className="size-3.5" aria-hidden />
@@ -744,9 +225,9 @@ export function ReviewWorkspace({
               variant="approve"
               size="sm"
               disabled={bulkActionPending || candidatesQuery.isLoading}
-              onClick={() => approveAllMutation.mutate()}
+              onClick={() => bulk.approveAllMutation.mutate()}
             >
-              {approveAllMutation.isPending ? (
+              {bulk.approveAllMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
                 <CheckCircle2 className="size-3.5" aria-hidden />
@@ -759,9 +240,9 @@ export function ReviewWorkspace({
               variant="approve"
               size="sm"
               disabled={bulkActionPending || candidatesQuery.isLoading}
-              onClick={() => approveAllUpdatesMutation.mutate()}
+              onClick={() => bulk.approveAllUpdatesMutation.mutate()}
             >
-              {approveAllUpdatesMutation.isPending ? (
+              {bulk.approveAllUpdatesMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
                 <CheckCircle2 className="size-3.5" aria-hidden />
@@ -792,48 +273,45 @@ export function ReviewWorkspace({
       ) : null}
 
       <AdminMaintenancePanel
-        activeOp={maintenanceOp}
-        isLoading={maintenanceLoading}
-        result={maintenanceResult}
-        progressMessage={maintenanceOp === "geocode" ? geocodeProgress : null}
-        onCheck={handleMaintenanceCheck}
-        onApply={handleMaintenanceApply}
-        onDismiss={() => setMaintenanceResult(null)}
+        activeOp={maintenance.maintenanceOp}
+        isLoading={maintenance.maintenanceLoading}
+        result={maintenance.maintenanceResult}
+        progressMessage={maintenance.maintenanceOp === "geocode" ? maintenance.geocodeProgress : null}
+        onCheck={maintenance.handleMaintenanceCheck}
+        onApply={maintenance.handleMaintenanceApply}
+        onDismiss={maintenance.dismissMaintenanceResult}
       />
 
       {activeTab === "new" ? (
         <ReviewQueueAuditPanel
-          audit={auditResult}
-          isLoading={preApproveAuditMutation.isPending}
-          error={auditError}
-          onDismiss={() => {
-            setAuditResult(null);
-            setAuditError(null);
-          }}
+          audit={maintenance.auditResult}
+          isLoading={maintenance.preApproveAuditMutation.isPending}
+          error={maintenance.auditError}
+          onDismiss={maintenance.dismissAudit}
         />
       ) : null}
 
-      {approveMessage ? (
+      {bulk.approveMessage ? (
         <Text variant="body1" tone="onCard" className={styles.message}>
-          {approveMessage}
+          {bulk.approveMessage}
         </Text>
       ) : null}
 
-      {deleteMessage ? (
+      {bulk.deleteMessage ? (
         <Text variant="body1" tone="onCard" className={styles.message}>
-          {deleteMessage}
+          {bulk.deleteMessage}
         </Text>
       ) : null}
 
-      {selectedIds.size > 0 ? (
+      {bulk.selectedIds.size > 0 ? (
         <div className={styles.bulkBar}>
-          <span className={styles.bulkBarLabel}>{selectedIds.size} selected</span>
+          <span className={styles.bulkBarLabel}>{bulk.selectedIds.size} selected</span>
           <label className={styles.bulkPriorityField}>
             <span className={styles.bulkPriorityLabel}>Priority</span>
             <SelectInput
               className={styles.bulkPrioritySelect}
-              value={bulkPriority}
-              onChange={(event) => setBulkPriority(event.target.value)}
+              value={bulk.bulkPriority}
+              onChange={(event) => bulk.setBulkPriority(event.target.value)}
               aria-label="Bulk display priority"
             >
               <option value="" disabled>
@@ -849,19 +327,19 @@ export function ReviewWorkspace({
           <Button
             variant="secondary"
             size="sm"
-            disabled={bulkActionPending || bulkPriority === ""}
+            disabled={bulkActionPending || bulk.bulkPriority === ""}
             onClick={() => {
-              const priority = Number(bulkPriority);
+              const priority = Number(bulk.bulkPriority);
               if (
                 window.confirm(
-                  `Set priority P${priority} on ${selectedIds.size} selected candidate(s)?`
+                  `Set priority P${priority} on ${bulk.selectedIds.size} selected candidate(s)?`
                 )
               ) {
-                bulkPriorityMutation.mutate({ ids: [...selectedIds], priority });
+                bulk.bulkPriorityMutation.mutate({ ids: [...bulk.selectedIds], priority });
               }
             }}
           >
-            {bulkPriorityMutation.isPending ? (
+            {bulk.bulkPriorityMutation.isPending ? (
               <Loader2 className="size-3.5 animate-spin" aria-hidden />
             ) : null}
             Set priority
@@ -871,9 +349,9 @@ export function ReviewWorkspace({
               variant="approve"
               size="sm"
               disabled={bulkActionPending}
-              onClick={() => approveSelectedMutation.mutate([...selectedIds])}
+              onClick={() => bulk.approveSelectedMutation.mutate([...bulk.selectedIds])}
             >
-              {approveSelectedMutation.isPending ? (
+              {bulk.approveSelectedMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
                 <CheckCircle2 className="size-3.5" aria-hidden />
@@ -886,9 +364,9 @@ export function ReviewWorkspace({
               variant="approve"
               size="sm"
               disabled={bulkActionPending}
-              onClick={() => approveSelectedUpdatesMutation.mutate([...selectedIds])}
+              onClick={() => bulk.approveSelectedUpdatesMutation.mutate([...bulk.selectedIds])}
             >
-              {approveSelectedUpdatesMutation.isPending ? (
+              {bulk.approveSelectedUpdatesMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />
               ) : (
                 <CheckCircle2 className="size-3.5" aria-hidden />
@@ -903,14 +381,14 @@ export function ReviewWorkspace({
             onClick={() => {
               if (
                 window.confirm(
-                  `Reject ${selectedIds.size} selected candidate(s)? They will move to the Rejected tab.`
+                  `Reject ${bulk.selectedIds.size} selected candidate(s)? They will move to the Rejected tab.`
                 )
               ) {
-                rejectSelectedMutation.mutate([...selectedIds]);
+                bulk.rejectSelectedMutation.mutate([...bulk.selectedIds]);
               }
             }}
           >
-            {rejectSelectedMutation.isPending ? (
+            {bulk.rejectSelectedMutation.isPending ? (
               <Loader2 className="size-3.5 animate-spin" aria-hidden />
             ) : (
               <X className="size-3.5" aria-hidden />
@@ -922,8 +400,8 @@ export function ReviewWorkspace({
             size="sm"
             disabled={bulkActionPending}
             onClick={() => {
-              if (window.confirm(`Delete ${selectedIds.size} candidate(s)? This cannot be undone.`)) {
-                deleteMutation.mutate({ ids: [...selectedIds], force: false });
+              if (window.confirm(`Delete ${bulk.selectedIds.size} candidate(s)? This cannot be undone.`)) {
+                bulk.deleteMutation.mutate({ ids: [...bulk.selectedIds], force: false });
               }
             }}
           >
@@ -937,23 +415,16 @@ export function ReviewWorkspace({
             onClick={() => {
               if (
                 window.confirm(
-                  `Force-delete ${selectedIds.size} candidate(s), including any approved rows?`
+                  `Force-delete ${bulk.selectedIds.size} candidate(s), including any approved rows?`
                 )
               ) {
-                deleteMutation.mutate({ ids: [...selectedIds], force: true });
+                bulk.deleteMutation.mutate({ ids: [...bulk.selectedIds], force: true });
               }
             }}
           >
             Force delete
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSelectedIds(new Set());
-              setBulkPriority("");
-            }}
-          >
+          <Button variant="ghost" size="sm" onClick={bulk.clearSelection}>
             Clear selection
           </Button>
         </div>
@@ -964,17 +435,17 @@ export function ReviewWorkspace({
           <CandidateList
           groups={listGroups}
           activeId={activeId}
-          isLoading={listLoading}
+          isLoading={candidatesQuery.isLoading}
           onSelect={onSelect}
           statusFilter={statusFilter}
-          selectedIds={selectedIds}
+          selectedIds={bulk.selectedIds}
           priorityOverrides={priorityOverrides}
           seriesDisplayPriorities={listSeriesDisplayPriorities}
           usePublishedPriority={activeTab === "approved"}
           searchMode={searchActive}
           searchQuery={searchQuery}
-          onToggleSelected={handleToggleSelected}
-          onSelectAll={handleSelectAllPage}
+          onToggleSelected={bulk.handleToggleSelected}
+          onSelectAll={bulk.handleSelectAllPage}
           />
         </div>
 
