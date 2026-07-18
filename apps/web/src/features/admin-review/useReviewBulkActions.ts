@@ -1,5 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction
+} from "react";
 
 import type { EventCandidate } from "@fresno-events/shared";
 
@@ -27,7 +33,7 @@ type UseReviewBulkActionsOptions = {
   activeTab: ReviewQueueTab;
   items: EventCandidate[];
   priorityOverrides: Record<string, number>;
-  setPriorityOverrides: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  setPriorityOverrides: Dispatch<SetStateAction<Record<string, number>>>;
   onAfterDecision: (candidateId?: string) => void;
 };
 
