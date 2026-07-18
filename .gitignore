@@ -28,3 +28,13 @@ dev-target.env
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
+
+# Local agent / Claude / Codex tool state (do not commit skill dumps)
+.agents/
+.codex/
+.impeccable/
+.claude/
+skills-lock.json
+
+# Supabase Studio scratch queries
+supabase/snippets/
