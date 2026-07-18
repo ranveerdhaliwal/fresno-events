@@ -9,14 +9,46 @@ alwaysApply: true
 
 **Tables:** `event_candidates` (review queue), `ingest_runs` (run metadata), `events` (only after admin approve).
 
-## Safe real-run flow
+## Full promote pipeline (local worker → cloud-dev DB)
 
-1. `pnpm ingest:dev` (user terminal)
-2. `pnpm ingest:preflight --source=<key>` — dry-run + `summary.validation.ok`
-3. `pnpm ingest:promote --source=<key>` — real persist
-4. Verify in Studio + `/admin`
+Prerequisite: `pnpm ingest:dev` on `:8788`.
 
-See [docs/INGEST_TESTING.md](docs/INGEST_TESTING.md).
+**Promote steps** (use `--no-enrich` on each promote; run global enrich once at the end):
+
+1. `pnpm ingest:promote --source=ticketmaster --no-enrich`
+2. `pnpm ingest:promote --source=venunite --no-enrich`
+3. `pnpm ingest:promote-all --no-enrich`
+
+**Post-promote steps** (always run after the three promotes — not automatic from `promote-all` alone):
+
+4. `pnpm ingest:post-promote` — runs in order:
+   - `ingest:detail-backfill --all` (Visit Fresno + ticket-site detail pages → price/address)
+   - `ingest:enrich --all` (AI enrichment backlog → `pending_review`; includes series priority harmonize)
+   - `db:backfill-addresses` (venue mailing-line normalize; not lat/lng geocode)
+
+Or one shot for promote + post-promote: `pnpm ingest:scheduled-local`.
+
+**What runs automatically vs manual**
+
+| Step | When it runs |
+| --- | --- |
+| Per-venue scrape detail (Strummers, Tower, Save Mart, …) | Inside `promote-all` / venue-ingest |
+| Occurrence / cross-source duplicate keys | At **persist** time; `pnpm ingest:relink` only after changing matching rules in `occurrence.ts` |
+| Series link / sibling priority | During **enrichment** (`harmonizeSeriesSuggestedPriority`) |
+| Venue **geocode** (lat/lng) | At **admin approve** (`upsertVenue`) or API `POST /review/ops/venue-geocode` — not ingest post-promote |
+| Global detail backfill + enrich + address backfill | **`ingest:post-promote`** (or `scheduled-local`) |
+
+After post-promote: reject away games (Go Bulldogs `"City, ST"`), then `pnpm review:bulk-approve` and `bulk-approve-changes-all` if needed.
+
+See [docs/INGEST_LOCAL_OPS.md](docs/INGEST_LOCAL_OPS.md) and [docs/INGEST_TESTING.md](docs/INGEST_TESTING.md).
+
+## Safe real-run flow (single source)
+
+1. `pnpm ingest:dev`
+2. `pnpm ingest:preflight --source=<key>`
+3. `pnpm ingest:promote --source=<key>`
+4. For Visit Fresno only: `pnpm ingest:detail-backfill --source=api:visitfresnocounty --all` then scoped enrich
+5. Verify in Studio + `/admin`
 
 ## Cleanup order (prefer UI, then SQL)
 
@@ -40,9 +72,9 @@ Source values: `api:visitfresnocounty`, `api:milb`, `api:downtownfresno`.
 
 ## Enrichment
 
-- Real ingest: enrichment runs in background after `/trigger` 200 (`waitUntil`)
+- `/trigger` returns before `waitUntil` enrichment finishes — do not assume backlog is drained until `pnpm ingest:enrich --all` completes
 - Preview: `pnpm ingest:enrich --dry-run --limit=5` (no DB PATCH)
-- Scoped: `--source=api:visitfresnocounty`
+- Scoped: `pnpm ingest:enrich --source=api:visitfresnocounty --all`
 
 ## Validation profiles
 
