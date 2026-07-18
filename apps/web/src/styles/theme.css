@@ -49,6 +49,13 @@
   --focus-ring: 3px solid var(--mustard);
   --selected-outline: 3px solid var(--mustard);
 
+  --radius-sm: 4px;
+
+  /* Admin / semantic status (light surfaces) */
+  --color-success: #2d6a4f;
+  --color-warning: #b45309;
+  --color-danger: #b42318;
+
   /* Tints used in a few components */
   --tint-mustard-18: rgba(242, 193, 78, 0.18);
   --tint-paper-65: color-mix(in srgb, var(--surface-card) 65%, transparent);

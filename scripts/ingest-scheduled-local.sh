@@ -72,9 +72,7 @@ run_step() {
 run_step pnpm ingest:promote --source=ticketmaster --no-enrich
 run_step pnpm ingest:promote --source=venunite --no-enrich
 run_step pnpm ingest:promote-all --no-enrich
-run_step pnpm ingest:detail-backfill --all
-run_step pnpm ingest:enrich --all
-run_step pnpm db:backfill-addresses
+run_step pnpm ingest:post-promote
 
 # shellcheck source=scripts/ingest-scheduled-maintenance.sh
 source "$REPO_ROOT/scripts/ingest-scheduled-maintenance.sh"

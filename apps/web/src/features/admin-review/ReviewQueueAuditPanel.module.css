@@ -32,11 +32,11 @@
 }
 
 .iconOk {
-  color: var(--color-success, #2d6a4f);
+  color: var(--color-success);
 }
 
 .iconWarn {
-  color: var(--color-warning, #b45309);
+  color: var(--color-warning);
 }
 
 .spin {
@@ -54,11 +54,11 @@
 }
 
 .error {
-  color: var(--color-danger, #b42318);
+  color: var(--color-danger);
 }
 
 .ok {
-  color: var(--color-success, #2d6a4f);
+  color: var(--color-success);
 }
 
 .issueList {
@@ -76,15 +76,17 @@
   padding: 8px 10px;
   border: 1px solid var(--border-on-page);
   background: var(--surface-inset);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .issue[data-severity="error"] {
-  border-left: 3px solid var(--color-danger, #b42318);
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--surface-inset));
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--border-on-page));
 }
 
 .issue[data-severity="warn"] {
-  border-left: 3px solid var(--color-warning, #b45309);
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--surface-inset));
+  border-color: color-mix(in srgb, var(--color-warning) 45%, var(--border-on-page));
 }
 
 .issueHeader {

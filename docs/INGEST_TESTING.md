@@ -13,9 +13,11 @@ Cloud dev Studio: [event_candidates table](https://supabase.com/dashboard/projec
 | `pnpm ingest:promote-all` | **Real** persist — all enabled venue sources |
 | `pnpm ingest:preflight --source=<key>` | Dry-run one source (venue key, `api:…`, `ticketmaster`, …) |
 | `pnpm ingest:promote --source=<key>` | **Real** persist one source |
-| `pnpm ingest:detail-backfill` | Visit Fresno HTML detail prices (when still pending) |
-| `pnpm ingest:enrich` | AI enrichment backlog (usually automatic after promote) |
-| `pnpm ingest:relink` | Occurrence relink maintenance (after full promote) |
+| `pnpm ingest:detail-backfill` | Visit Fresno / ticket-site detail pages (price, address) |
+| `pnpm ingest:enrich` | AI enrichment backlog — run `--all` after promote |
+| `pnpm ingest:post-promote` | **After all promotes:** detail-backfill `--all` + enrich `--all` + `db:backfill-addresses` |
+| `pnpm ingest:scheduled-local` | Full pipeline: 3 promotes + post-promote + relink/orphan maintenance (starts ingest worker if needed) |
+| `pnpm ingest:relink` | Occurrence relink maintenance (after full promote or matching-rule changes) |
 | `POST /review/ops/published-orphan-cleanup` | Remove duplicate published events (API; `/admin` → Queue maintenance; `pnpm review:orphan-cleanup`) |
 | `pnpm review:bulk-approve` | Approve all `pending_review` locally |
 
@@ -25,8 +27,8 @@ Cloud dev Studio: [event_candidates table](https://supabase.com/dashboard/projec
 
 ## Checklist
 
-1. `pnpm ingest:preflight-all` then `pnpm ingest:promote-all` (all venue sources)
-2. `pnpm ingest:preflight --source=ticketmaster` then `pnpm ingest:promote --source=ticketmaster`
+1. `pnpm ingest:preflight-all` then promotes with `--no-enrich`: ticketmaster → venunite → `promote-all`
+2. `pnpm ingest:post-promote` (detail backfill, enrich, venue addresses)
 3. `pnpm ingest:relink --dry-run` then `pnpm ingest:relink` (after promote; requires `pnpm ingest:dev`)
 4. Published orphan cleanup — preview then apply via `/admin` → Queue maintenance, or `POST /review/ops/published-orphan-cleanup` (requires `pnpm dev:api`). See [INGEST_LOCAL_OPS.md](INGEST_LOCAL_OPS.md) and [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md).
 5. Studio: filter `event_candidates` by `source`

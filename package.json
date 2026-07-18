@@ -25,6 +25,7 @@
     "db:backfill-addresses": "bash scripts/backfill-venue-addresses.sh",
     "ingest:preflight-all": "bash scripts/ingest-preflight-all.sh",
     "ingest:promote-all": "bash scripts/ingest-promote-all.sh",
+    "ingest:post-promote": "bash scripts/ingest-post-promote.sh",
     "ingest:scheduled-local": "bash scripts/ingest-scheduled-local.sh",
     "ingest:sources": "node scripts/ingest-list-sources.mjs",
     "db:push-cloud-dev": "bash scripts/db-push-review-to-cloud.sh",
