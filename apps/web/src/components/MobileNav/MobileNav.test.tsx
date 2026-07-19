@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { MobileNav } from "./MobileNav";
 
-function renderMobileNav() {
+function renderMobileNav(variant: "home" | "day" | "event" = "home") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
   });
@@ -13,7 +13,7 @@ function renderMobileNav() {
   const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/",
-    component: () => <MobileNav variant="home" />
+    component: () => <MobileNav variant={variant} title="DAY" />
   });
   const searchRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -54,16 +54,26 @@ function renderMobileNav() {
 }
 
 describe("MobileNav", () => {
-  it("opens the menu drawer from the home hamburger button", async () => {
-    const { router } = renderMobileNav();
+  it("slides the menu drawer open with a close control", async () => {
+    const { router } = renderMobileNav("home");
     await router.load();
 
-    expect(screen.queryByTestId("mobile-nav-menu")).not.toBeInTheDocument();
+    const menu = screen.getByTestId("mobile-nav-menu");
+    expect(menu).toHaveAttribute("aria-hidden", "true");
 
     await screen.getByRole("button", { name: "Open menu" }).click();
 
-    expect(screen.getByTestId("mobile-nav-menu")).toBeInTheDocument();
+    expect(menu).toHaveAttribute("aria-hidden", "false");
+    expect(screen.getByRole("button", { name: "Close navigation" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "EVENTS" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "SEARCH" })).toBeInTheDocument();
+  });
+
+  it("does not render a share arrow on event details", async () => {
+    const { router } = renderMobileNav("event");
+    await router.load();
+
+    expect(screen.getByText("EVENT DETAILS")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
   });
 });

@@ -94,6 +94,7 @@ export function toPublishedEventRowViewModel(hit: AdminEventListHit): EventRowVi
     imageUrl: hit.heroImageUrl,
     isFree: false,
     isLive: true,
+    timeStatus: "live",
     featuredBadge: "default",
     descriptionSnippet: "",
     venueAddress: hit.venueName,

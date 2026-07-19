@@ -47,11 +47,31 @@
 
 .split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 24px;
+  align-items: start;
   margin-top: 32px;
   padding-top: 24px;
-  border-top: 2px solid var(--border-default);
+  border-top: var(--divider-rule);
+}
+
+.weekList {
+  min-width: 0;
+}
+
+.detailCol {
+  position: sticky;
+  top: 14px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rowWrap {
+  display: contents;
 }
 
 .weekHeading {
@@ -78,14 +98,26 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1080px) {
   .split {
     grid-template-columns: 1fr;
   }
 
+  .detailCol {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
   .grid,
   .dowRow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .rowWrap :global([data-testid^="event-row-"]) {
+    display: none;
   }
 }
 

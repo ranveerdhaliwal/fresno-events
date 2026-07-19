@@ -13,7 +13,8 @@ vi.mock("@/lib/map-config", () => ({
 vi.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="leaflet-map">{children}</div>,
   TileLayer: () => null,
-  Marker: () => null
+  Marker: () => null,
+  ZoomControl: () => null
 }));
 
 vi.mock("leaflet", () => ({

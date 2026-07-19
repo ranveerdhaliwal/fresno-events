@@ -16,7 +16,7 @@
   padding: 20px 16px;
   margin: 0;
   text-align: center;
-  color: var(--text-label);
+  color: var(--text-secondary-on-card);
   font-weight: 600;
   background: var(--surface-card);
   border: var(--border-card-on-page);
@@ -25,7 +25,7 @@
 .viewAll {
   display: inline-block;
   margin-top: 10px;
-  color: var(--coral);
+  color: var(--coral-dark);
   font-weight: 700;
   text-decoration: none;
 }
@@ -77,6 +77,33 @@
 
 .ctaWrap {
   margin-top: 16px;
+}
+
+.endedBlock {
+  margin-top: 10px;
+}
+
+.endedLabel {
+  margin: 0 0 8px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.showMoreEnded {
+  width: 100%;
+  margin-top: 10px;
+  background: var(--surface-inset);
+  border: 1.5px dashed var(--border-on-page);
+  padding: 12px;
+  letter-spacing: 2px;
+  color: var(--text-on-page);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+}
+
+.showMoreEnded:hover {
+  color: var(--coral-dark);
 }
 
 @media (max-width: 1080px) {

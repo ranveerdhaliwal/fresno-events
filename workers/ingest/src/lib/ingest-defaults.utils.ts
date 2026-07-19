@@ -1,5 +1,6 @@
 import {
   resolveVenueLocationFields,
+  sanitizeEventTags,
   sanitizeIngestDescriptionText,
   applyDisplayPriceRounding,
   type NormalizedEvent
@@ -27,10 +28,12 @@ export function applyIngestDefaults(event: NormalizedEvent): NormalizedEvent {
     ? sanitizeIngestDescriptionText(withVenue.descriptionText)
     : withVenue.descriptionText;
 
-  const normalized: NormalizedEvent =
+  let normalized: NormalizedEvent =
     descriptionText !== withVenue.descriptionText
       ? { ...withVenue, ...(descriptionText ? { descriptionText } : {}) }
       : withVenue;
+
+  normalized = { ...normalized, tags: sanitizeEventTags(normalized.tags) };
 
   if (normalized.timeUnknown === true) {
     const { endTs, ...rest } = normalized;

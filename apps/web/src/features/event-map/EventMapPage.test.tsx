@@ -22,9 +22,10 @@ vi.mock("./EventMap", () => ({
 }));
 
 describe("EventMapPage", () => {
-  it("renders map page layout", async () => {
+  it("renders map page layout with a document-scroll list and map pane", async () => {
     await renderWithSiteRouter(<EventMapPage />);
     expect(screen.getByRole("heading", { name: "MAP" })).toBeInTheDocument();
+    expect(screen.getByTestId("event-map-page")).toBeInTheDocument();
     expect(screen.getByTestId("event-map-stub")).toBeInTheDocument();
   });
 });

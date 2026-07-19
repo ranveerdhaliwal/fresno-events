@@ -1,9 +1,6 @@
-import { RainbowStripe } from "@/components/RainbowStripe";
+import { PageChrome } from "@/components/PageChrome";
 import { Text } from "@/components/Text";
-import { TopNav } from "@/components/TopNav";
-import { MobileNav } from "@/components/MobileNav";
 import { AdSlot } from "@/components/AdSlot";
-import { SiteFooter } from "@/components/SiteFooter";
 import { FeaturedEvents } from "@/features/featured-events/FeaturedEvents";
 import { TodayStrip } from "@/features/today-strip/TodayStrip";
 import { UpcomingEvents } from "@/features/upcoming-events/UpcomingEvents";
@@ -16,15 +13,8 @@ export function HomePage() {
   useSeoHead(buildHomeSeo());
 
   return (
-    <div className={styles.page} data-testid="home-page">
-      <div className={styles.desktopChrome}>
-        <TopNav />
-        <RainbowStripe variant="desktop" />
-      </div>
-      <MobileNav variant="home" />
-      <RainbowStripe variant="mobile" />
-
-      <main className={styles.main}>
+    <PageChrome mobileNav={{ variant: "home" }}>
+      <div className={styles.home} data-testid="home-page">
         <Text variant="header1" tone="onPage" className={styles.pageTitle}>
           Events in Fresno &amp; the Central Valley
         </Text>
@@ -34,8 +24,7 @@ export function HomePage() {
         <section className={styles.upcomingSection}>
           <UpcomingEvents />
         </section>
-      </main>
-      <SiteFooter />
-    </div>
+      </div>
+    </PageChrome>
   );
 }

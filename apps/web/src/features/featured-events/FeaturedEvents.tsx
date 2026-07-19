@@ -1,8 +1,6 @@
-import { AdSlot } from "@/components/AdSlot";
 import { FeatureCard } from "@/components/FeatureCard";
 import { PopularList } from "@/components/PopularList";
 import { SectionTitle } from "@/components/SectionTitle";
-import { Text } from "@/components/Text";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 
 import { useHomepageCuration } from "./useHomepageCuration";
@@ -55,7 +53,6 @@ export function FeaturedEvents() {
             count={biggestMonth.length}
             renderAdminEdit={(eventId) => <AdminEditLink eventId={eventId} />}
           />
-          <AdSlot variant="card" />
         </aside>
       </div>
     </section>

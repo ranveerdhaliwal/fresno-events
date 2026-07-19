@@ -1,0 +1,45 @@
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.photo {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 30%;
+  background-repeat: no-repeat;
+  transform: scale(1.04);
+  filter: saturate(0.85) contrast(1.05);
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  /* Stronger navy page tint so the photo reads cooler/bluer. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-page) 68%, transparent) 0%,
+    color-mix(in srgb, var(--surface-page) 80%, transparent) 28%,
+    color-mix(in srgb, var(--surface-page) 92%, transparent) 62%,
+    color-mix(in srgb, var(--surface-page) 96%, transparent) 100%
+  );
+}
+
+.halftone {
+  position: absolute;
+  inset: 0;
+  background-image: var(--bg-halftone);
+  background-size: var(--bg-halftone-size);
+  background-position: var(--bg-halftone-position);
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo {
+    transform: none;
+  }
+}

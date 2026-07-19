@@ -1,6 +1,6 @@
 .section {
   padding: 28px 32px;
-  border-bottom: 1px solid var(--divider-on-page);
+  border-bottom: var(--divider-rule);
 }
 
 .loading {

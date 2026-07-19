@@ -1,10 +1,23 @@
 .page {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   padding-bottom: var(--safe-bottom);
 }
 
+.chrome {
+  position: relative;
+  z-index: 1;
+}
+
 .desktopChrome {
   display: block;
+}
+
+@media (max-width: 600px) {
+  .desktopChrome {
+    display: none;
+  }
 }
 
 .main {

@@ -4,6 +4,7 @@ import { Text } from "@/components/Text";
 import type { EventRowViewModel } from "@/lib/event-view-model";
 import { cn } from "@/lib/cn";
 import { isListTicketPriceLabel } from "@/lib/event-price.utils";
+import endedStyles from "@/styles/ended-event.module.css";
 
 import styles from "./EventCard.module.css";
 
@@ -12,10 +13,23 @@ export interface EventCardProps {
 }
 
 export function EventCard({ event }: EventCardProps) {
+  const past = event.timeStatus === "past";
+  const showEnded = past || event.flagLabel === "ENDED";
+
   return (
-    <Link to="/event/$slug" params={{ slug: event.slug }} className={styles.card} data-testid={`event-card-${event.slug}`}>
+    <Link
+      to="/event/$slug"
+      params={{ slug: event.slug }}
+      className={cn(styles.card, showEnded && endedStyles.cardPast, event.isLive && styles.live)}
+      data-testid={`event-card-${event.slug}`}
+    >
+      {showEnded ? (
+        <Text variant="eyebrow" tone="onCard" as="span" className={endedStyles.cardFlag}>
+          ENDED
+        </Text>
+      ) : null}
       <div className={styles.date}>
-        <Text variant="eyebrow" tone="accent" as="span" className={styles.dow}>
+        <Text variant="eyebrow" tone="onCard" as="span" className={styles.dow}>
           {event.dayShort}
         </Text>
         <Text variant="header2" tone="onCard" as="span" className={styles.dnum}>
@@ -23,7 +37,7 @@ export function EventCard({ event }: EventCardProps) {
         </Text>
       </div>
       <div className={styles.body}>
-        <Text variant="header3" tone="onCard" as="h4">
+        <Text variant="header3" tone="onCard" as="span">
           {event.title}
         </Text>
         <Text variant="body3" tone="mutedOnCard" as="p" className={styles.meta}>

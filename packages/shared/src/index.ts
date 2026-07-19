@@ -112,11 +112,13 @@ export {
   resolveMapPinEmoji,
   type MapPinEmojiInput
 } from "./map-pin-emoji.js";
+export { airQualityIconFor } from "./air-quality-icon.js";
 export {
   decodeHtmlEntities,
   sanitizeIngestDescriptionText,
   stripBracketedLinkPlaceholders
 } from "./description-text.utils.js";
+export { sanitizeEventTags } from "./event-tags.utils.js";
 export {
   buildBreadcrumbJsonLd,
   buildCalendarDescription,

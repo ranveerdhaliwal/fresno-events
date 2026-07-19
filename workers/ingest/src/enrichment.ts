@@ -1,5 +1,5 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
-import { formatIngestExclusionNotes, getIngestExclusion } from "@fresno-events/shared";
+import { formatIngestExclusionNotes, getIngestExclusion, sanitizeEventTags } from "@fresno-events/shared";
 
 import { enrichCandidate, getAiBackend } from "@/ai";
 import {
@@ -547,8 +547,8 @@ function applyEnrichment(
     mutated = true;
   }
   if (enrichment.tags.length > 0) {
-    const merged = Array.from(new Set([...(event.tags ?? []), ...enrichment.tags]));
-    if (merged.length !== (event.tags?.length ?? 0)) {
+    const merged = sanitizeEventTags([...(event.tags ?? []), ...enrichment.tags]);
+    if (merged.length !== (event.tags?.length ?? 0) || merged.some((t, i) => t !== event.tags?.[i])) {
       next.tags = merged;
       mutated = true;
     }

@@ -3,22 +3,20 @@ import type { DatePreset } from "@/lib/date-presets";
 
 import styles from "./EventMap.module.css";
 
-const DATE_CHIPS: Array<{ id: DatePreset | null; label: string }> = [
-  { id: null, label: "All" },
+const DATE_CHIPS: Array<{ id: DatePreset; label: string }> = [
+  { id: "week", label: "This week" },
   { id: "tonight", label: "Tonight" },
   { id: "tomorrow", label: "Tomorrow" },
-  { id: "weekend", label: "Weekend" },
-  { id: "week", label: "This week" }
+  { id: "weekend", label: "Weekend" }
 ];
 
 export interface EventMapFiltersProps {
   q: string;
-  datePreset: DatePreset | null;
+  datePreset: DatePreset;
   omittedNoCoords: number;
   pinCount: number;
   onQueryChange: (value: string) => void;
-  onDatePresetChange: (value: DatePreset | null) => void;
-  onNearMe: () => void;
+  onDatePresetChange: (value: DatePreset) => void;
 }
 
 export function EventMapFilters({
@@ -27,11 +25,10 @@ export function EventMapFilters({
   omittedNoCoords,
   pinCount,
   onQueryChange,
-  onDatePresetChange,
-  onNearMe
+  onDatePresetChange
 }: EventMapFiltersProps) {
   return (
-    <div className={styles.filters}>
+    <div className={styles.filters} data-testid="event-map-filters">
       <input
         className={styles.searchInput}
         value={q}
@@ -49,7 +46,6 @@ export function EventMapFilters({
             {chip.label}
           </FilterChip>
         ))}
-        <FilterChip onClick={onNearMe}>Near Fresno</FilterChip>
       </div>
       <span className={styles.meta}>
         {pinCount} pins

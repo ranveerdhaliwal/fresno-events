@@ -119,6 +119,8 @@ export interface LocalContextAirQuality {
   ok: true;
   aqi: number;
   category: string;
+  /** Emoji for the nav chip; client falls back via airQualityIconFor if missing. */
+  icon?: string;
 }
 
 export interface LocalContextUnavailable {

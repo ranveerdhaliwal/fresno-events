@@ -1,4 +1,5 @@
 import type { ImagePaletteKey } from "@/lib/image-palette";
+import type { EventTimeStatus } from "@/lib/event-time";
 
 export type FeaturedBadge = "tonight" | "weekend" | "default";
 export type RowPriority = 0 | 1 | 2 | 3 | 4 | 5;
@@ -28,6 +29,8 @@ export interface EventRowViewModel {
   listVenueLogoPadding?: number;
   isFree: boolean;
   isLive: boolean;
+  /** past / live / upcoming relative to now (Pacific-aware end fallback). */
+  timeStatus: EventTimeStatus;
   featuredBadge: FeaturedBadge;
   descriptionSnippet: string;
   venueAddress: string;

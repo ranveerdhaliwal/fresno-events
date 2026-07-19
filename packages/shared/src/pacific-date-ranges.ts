@@ -137,7 +137,7 @@ export function resolvePacificDateWindow(preset: DateWindowPreset, now = new Dat
       return {
         fromIso: todayIso,
         untilIso: todayIso,
-        from: now,
+        from: pacificStartOfDay(todayIso),
         until: pacificEndOfDay(todayIso)
       };
     case "thisWeek": {
@@ -145,7 +145,7 @@ export function resolvePacificDateWindow(preset: DateWindowPreset, now = new Dat
       return {
         fromIso: todayIso,
         untilIso,
-        from: now,
+        from: pacificStartOfDay(todayIso),
         until: pacificEndOfDay(untilIso)
       };
     }

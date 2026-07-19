@@ -19,10 +19,11 @@
   --shadow-coral-lg: 5px 5px 0 color-mix(in srgb, var(--coral) 92%, transparent);
   --shadow-coral-hover: 7px 7px 0 color-mix(in srgb, var(--coral) 92%, transparent);
 
-  --border-thin: 1px solid var(--border-default);
-  --border-card: 1.5px solid var(--border-default);
-  --border-thick: 2px solid var(--border-default);
-  --border-hero: 3px solid var(--coral);
+  --border-thin: 3px solid var(--border-default);
+  --border-card: 3px solid var(--border-default);
+  --border-thick: 3.5px solid var(--border-default);
+  --border-hero: 4px solid var(--coral);
+  --divider-rule: 3.5px solid var(--divider-on-page);
 
   --page-max: 1280px;
   --nav-height: 68px;

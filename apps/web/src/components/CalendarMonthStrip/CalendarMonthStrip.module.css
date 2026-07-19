@@ -50,8 +50,8 @@
 }
 
 .selected {
-  background: var(--coral);
-  color: var(--surface-card);
+  background: var(--coral-active);
+  color: #fff;
   outline: 3px solid var(--mustard);
   outline-offset: -3px;
 }

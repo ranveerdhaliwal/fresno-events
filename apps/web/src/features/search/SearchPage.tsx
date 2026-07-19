@@ -2,12 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
-import { EventRow } from "@/components/EventRow";
 import { FilterChip } from "@/components/FilterChip";
 import { PageChrome } from "@/components/PageChrome";
 import { SectionTitle } from "@/components/SectionTitle";
 import { Text } from "@/components/Text";
-import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
+import { EventBrowseSplit } from "@/features/event-browse/EventBrowseSplit";
+import {
+  filterOutBeforePacificToday,
+  filterOutPastItems
+} from "@/features/event-browse/active-ended-events.utils";
+import { useBrowseEventSelect } from "@/hooks/useIsMobile";
 import { SearchPageSkeleton } from "./SearchPageSkeleton";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 import { toIsoDateLocal } from "@/lib/event-time";
@@ -27,6 +31,12 @@ export function SearchPage() {
   const [draft, setDraft] = useState(urlQuery);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<SearchFilter>("All");
+  const handleSelect = useBrowseEventSelect({
+    onSelectInSplit: setSelectedId,
+    onOpenEvent: (slug) => {
+      void navigate({ to: "/event/$slug", params: { slug } });
+    }
+  });
 
   useSeoHead(useMemo(() => buildSearchSeo(urlQuery), [urlQuery]));
 
@@ -56,23 +66,25 @@ export function SearchPage() {
   }, [browseQuery.data, isSearching, searchQuery.data]);
 
   const filteredItems = useMemo(() => {
+    const now = new Date();
+    // Search never shows ended events; days before today are always hidden.
+    let items = filterOutPastItems(filterOutBeforePacificToday(sourceItems, now), now);
     if (filter === "All") {
-      return sourceItems;
+      return items;
     }
-    const today = new Date();
-    const todayIso = today.toISOString().slice(0, 10);
+    const todayIso = toIsoDateLocal(now);
     if (filter === "Today") {
-      return sourceItems.filter((item) => toIsoDateLocal(new Date(item.event.startTs)) === todayIso);
+      return items.filter((item) => toIsoDateLocal(new Date(item.event.startTs)) === todayIso);
     }
-    const day = today.getDay();
+    const day = now.getDay();
     const daysUntilSaturday = (6 - day + 7) % 7;
-    const saturday = new Date(today);
-    saturday.setDate(today.getDate() + daysUntilSaturday);
+    const saturday = new Date(now);
+    saturday.setDate(now.getDate() + daysUntilSaturday);
     const sunday = new Date(saturday);
     sunday.setDate(saturday.getDate() + 1);
-    const satIso = saturday.toISOString().slice(0, 10);
-    const sunIso = sunday.toISOString().slice(0, 10);
-    return sourceItems.filter((item) => {
+    const satIso = toIsoDateLocal(saturday);
+    const sunIso = toIsoDateLocal(sunday);
+    return items.filter((item) => {
       const iso = toIsoDateLocal(new Date(item.event.startTs));
       return iso === satIso || iso === sunIso;
     });
@@ -120,31 +132,22 @@ export function SearchPage() {
         ) : null}
 
         {!isLoading && !error ? (
-          <div className={styles.split}>
-            <div className={styles.listCol}>
-              <section className={styles.section}>
-                <Text variant="header2" tone="onPage" as="h2">
-                  {isSearching ? `Results (${rows.length})` : `This week (${rows.length})`}
-                </Text>
-                {rows.length === 0 ? (
-                  <Text variant="body2" tone="label" className={styles.hint}>
-                    {isSearching ? "No events matched your search." : "No events this week yet."}
-                  </Text>
-                ) : (
-                  <div className={styles.list}>
-                    {rows.map((row) => (
-                      <EventRow
-                        key={row.id}
-                        event={row}
-                        isSelected={selected?.id === row.id}
-                        onSelect={() => setSelectedId(row.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {isSearching && searchQuery.data && searchQuery.data.venues.length > 0 ? (
+          <EventBrowseSplit
+            rows={rows}
+            selected={selected}
+            onSelect={handleSelect}
+            listHeader={
+              <Text variant="header2" tone="onPage" as="h2" className={styles.listHeading}>
+                {isSearching ? `Results (${rows.length})` : `This week (${rows.length})`}
+              </Text>
+            }
+            empty={
+              <Text variant="body2" tone="label" className={styles.hint}>
+                {isSearching ? "No events matched your search." : "No events this week yet."}
+              </Text>
+            }
+            listFooter={
+              isSearching && searchQuery.data && searchQuery.data.venues.length > 0 ? (
                 <section className={styles.section}>
                   <h2>Venues ({searchQuery.data.venues.length})</h2>
                   <ul className={styles.venueList}>
@@ -157,10 +160,9 @@ export function SearchPage() {
                     ))}
                   </ul>
                 </section>
-              ) : null}
-            </div>
-            <UpcomingDetailPanel event={selected} />
-          </div>
+              ) : null
+            }
+          />
         ) : null}
       </main>
     </PageChrome>

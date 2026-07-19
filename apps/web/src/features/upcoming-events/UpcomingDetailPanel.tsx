@@ -32,6 +32,8 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
   }
 
   const logoPadding = heroImagePadding(event.imageUrl);
+  const description = event.descriptionSnippet || event.tagline;
+  const whereLine = [event.venueName, event.venueAddress || event.neighborhood].filter(Boolean).join(" · ");
 
   return (
     <div className={styles.panel} data-testid="upcoming-detail-panel">
@@ -55,16 +57,6 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
         </div>
       </div>
       <div className={styles.body}>
-        <Text variant="header2" tone="onCard" as="h3" className={styles.title}>
-          <Link to="/event/$slug" params={{ slug: event.slug }}>
-            {event.title}
-          </Link>
-        </Text>
-        {event.descriptionSnippet ? (
-          <Text variant="body2" tone="mutedOnCard" className={styles.description}>
-            {event.descriptionSnippet}
-          </Text>
-        ) : null}
         {event.tags.length > 0 ? (
           <div className={styles.tags}>
             {event.tags.map((tag) => (
@@ -74,8 +66,21 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
             ))}
           </div>
         ) : null}
+
+        <Text variant="header2" tone="onCard" as="h3" className={styles.title}>
+          <Link to="/event/$slug" params={{ slug: event.slug }}>
+            {event.title}
+          </Link>
+        </Text>
+
+        {description ? (
+          <Text variant="body2" tone="mutedOnCard" className={styles.description}>
+            {description}
+          </Text>
+        ) : null}
+
         <dl className={styles.facts}>
-          <div>
+          <div className={styles.factRow}>
             <Text variant="eyebrow" tone="onCard" as="dt">
               When
             </Text>
@@ -83,17 +88,16 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
               {event.dateLabel} · {event.timeLabel}
             </Text>
           </div>
-          <div>
+          <div className={styles.factRow}>
             <Text variant="eyebrow" tone="onCard" as="dt">
               Where
             </Text>
             <Text variant="body1" tone="onCard" as="dd" className={styles.factValue}>
-              {event.venueName}
-              {event.venueAddress ? ` · ${event.venueAddress}` : event.neighborhood ? ` · ${event.neighborhood}` : null}
+              {whereLine}
             </Text>
           </div>
           {event.priceLabel ? (
-            <div>
+            <div className={styles.factRow}>
               <Text variant="eyebrow" tone="onCard" as="dt">
                 Price
               </Text>
@@ -103,6 +107,7 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
             </div>
           ) : null}
         </dl>
+
         <div className={styles.actions}>
           <Button to="/event/$slug" params={{ slug: event.slug }} variant="cta" className={styles.detailsButton}>
             VIEW DETAILS

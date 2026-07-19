@@ -1,4 +1,5 @@
 import type { LocalContextAirQuality, LocalContextResponse, LocalContextWeather } from "@fresno-events/shared";
+import { airQualityIconFor } from "@fresno-events/shared";
 
 import type { Env } from "@/env";
 import { resolveGoogleMapsPlatformApiKey } from "@/lib/google-maps-platform";
@@ -83,7 +84,8 @@ async function fetchAirQuality(apiKey: string): Promise<LocalContextAirQuality |
     return {
       ok: true,
       aqi: Math.round(index.aqi),
-      category: index.category ?? "Unknown"
+      category: index.category ?? "Unknown",
+      icon: airQualityIconFor(Math.round(index.aqi), index.category ?? "Unknown")
     };
   } catch {
     return { ok: false };

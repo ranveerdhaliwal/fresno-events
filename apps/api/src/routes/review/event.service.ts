@@ -3,6 +3,7 @@ import {
   eventContentSignature,
   normalizeVenueStreetAddress,
   parseLineup,
+  sanitizeEventTags,
   type Event,
   type EventCandidate,
   type NormalizedEvent
@@ -383,7 +384,7 @@ async function insertApprovedEventWithSlug(
         timezone: normalized.timezone ?? "America/Los_Angeles",
         category: normalized.category ?? "community",
         subcategories: normalized.subcategories ?? [],
-        tags: normalized.tags ?? [],
+        tags: sanitizeEventTags(normalized.tags),
         price_min: normalized.priceMin ?? null,
         price_max: normalized.priceMax ?? null,
         currency: normalized.currency ?? "USD",

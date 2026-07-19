@@ -17,11 +17,27 @@ vi.mock("react-leaflet", () => ({
   Popup: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>
 }));
 
+vi.mock("./EventMapClusterGroup", () => ({
+  EventMapClusterGroup: ({ children }: { children: React.ReactNode }) => <>{children}</>
+}));
+
 vi.mock("leaflet", () => ({
   default: {
-    divIcon: vi.fn(() => ({}))
+    icon: vi.fn(() => ({})),
+    divIcon: vi.fn(() => ({})),
+    markerClusterGroup: vi.fn(() => ({
+      addLayer: vi.fn(),
+      removeLayer: vi.fn(),
+      clearLayers: vi.fn()
+    }))
   },
-  divIcon: vi.fn(() => ({}))
+  icon: vi.fn(() => ({})),
+  divIcon: vi.fn(() => ({})),
+  markerClusterGroup: vi.fn(() => ({
+    addLayer: vi.fn(),
+    removeLayer: vi.fn(),
+    clearLayers: vi.fn()
+  }))
 }));
 
 import { EventMap } from "./EventMap";

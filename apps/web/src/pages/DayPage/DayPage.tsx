@@ -2,15 +2,16 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AdSlot } from "@/components/AdSlot";
-import { DayDateCarousel } from "@/components/DayDateCarousel";
+import { ForwardDayStrip } from "@/components/DayStrip/ForwardDayStrip";
 import { PageChrome } from "@/components/PageChrome";
 import { PopularList } from "@/components/PopularList";
 import { SectionTitle } from "@/components/SectionTitle";
 import { Text } from "@/components/Text";
 import { DaySchedule } from "@/features/day-schedule/DaySchedule";
-import { useTodayEvents } from "@/features/featured-events/useTodayEvents";
+import { useDayEvents } from "@/features/day-schedule/useDayEvents";
+import { useForwardDayEvents } from "@/features/today-strip/useForwardDayEvents";
 import { toPopularViewModels } from "@/lib/event-view-model";
-import { dayBoundsPacific, parseDayParam } from "@/lib/parse-day-param";
+import { parseDayParam } from "@/lib/parse-day-param";
 import { formatEventDate, toIsoDateLocal } from "@/lib/event-time";
 import { buildDaySeo } from "@/lib/seo/page-seo";
 import { useSeoHead } from "@/lib/seo/useSeoHead";
@@ -34,7 +35,8 @@ export function DayPage() {
   const [viewDate, setViewDate] = useState(routeDate);
   const skipRouteSyncRef = useRef(false);
 
-  const { data: weekData } = useTodayEvents();
+  const { data: rangeData } = useForwardDayEvents();
+  const { data: dayData } = useDayEvents(viewDate);
 
   useEffect(() => {
     if (skipRouteSyncRef.current) {
@@ -44,12 +46,9 @@ export function DayPage() {
     setViewDate(routeDate);
   }, [routeDate]);
 
-  const handleViewDateChange = useCallback((nextIso: string) => {
-    setViewDate(nextIso);
-  }, []);
-
-  const syncRouteDate = useCallback(
+  const handleViewDateChange = useCallback(
     (nextIso: string) => {
+      setViewDate(nextIso);
       if (nextIso === routeDate) {
         return;
       }
@@ -68,24 +67,15 @@ export function DayPage() {
 
   const eventCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const item of weekData?.items ?? []) {
+    for (const item of rangeData?.items ?? []) {
       const iso = toIsoDateLocal(new Date(item.event.startTs));
       counts.set(iso, (counts.get(iso) ?? 0) + 1);
     }
     return counts;
-  }, [weekData]);
+  }, [rangeData]);
 
-  const popular = useMemo(() => {
-    const { from, until } = dayBoundsPacific(viewDate);
-    const dayItems =
-      weekData?.items.filter((item) => {
-        const t = new Date(item.event.startTs).getTime();
-        return t >= from.getTime() && t <= until.getTime();
-      }) ?? [];
-    return toPopularViewModels(dayItems, 5);
-  }, [viewDate, weekData]);
-
-  const eventCount = popular.length > 0 ? popular.length : weekData?.items.length ?? 0;
+  const popular = useMemo(() => toPopularViewModels(dayData?.items ?? [], 5), [dayData]);
+  const eventCount = dayData?.items.length ?? 0;
 
   useSeoHead(useMemo(() => buildDaySeo(viewDate, eventCount), [viewDate, eventCount]));
 
@@ -112,10 +102,9 @@ export function DayPage() {
           </div>
         </header>
 
-        <DayDateCarousel
+        <ForwardDayStrip
           selectedIso={viewDate}
           onSelectDate={handleViewDateChange}
-          onRouteSync={syncRouteDate}
           eventCounts={eventCounts}
         />
 

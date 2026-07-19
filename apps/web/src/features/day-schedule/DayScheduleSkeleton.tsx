@@ -5,7 +5,6 @@ import { UpcomingDetailPanelSkeleton } from "@/components/UpcomingDetailPanelSke
 import styles from "./DaySchedule.module.css";
 
 const PERIODS = [
-  { id: "live", title: "LIVE OR ONGOING", script: "right now" },
   { id: "morning", title: "MORNING", script: "early" },
   { id: "afternoon", title: "AFTERNOON", script: "midday" },
   { id: "evening", title: "EVENING & NIGHT", script: "after dark" }
@@ -17,12 +16,7 @@ export function DayScheduleSkeleton() {
       <div className={styles.listCol}>
         {PERIODS.map((period) => (
           <section key={period.id} className={styles.section}>
-            <SecHead
-              title={period.title}
-              script={period.script}
-              count={0}
-              variant={period.id === "live" ? "live" : "default"}
-            />
+            <SecHead title={period.title} script={period.script} count={0} />
             <div className={styles.list}>
               <EventRowSkeleton />
               <EventRowSkeleton />

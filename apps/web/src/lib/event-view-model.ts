@@ -2,11 +2,21 @@ import type { Event, EventListItem } from "@fresno-events/shared";
 import { clampEventPriority, daysFromIsoThroughSunday } from "@fresno-events/shared";
 
 import { eventIsFree, formatListPrice } from "@/lib/event-price.utils";
-import { formatEventDate, formatMonthDay, formatMonthLong, formatShortTime, isTonight, isWeekend, toIsoDateLocal } from "@/lib/event-time";
+import {
+  deriveEventTimeStatus,
+  formatEventDate,
+  formatMonthDay,
+  formatMonthLong,
+  formatShortTime,
+  isTonight,
+  isWeekend,
+  toIsoDateLocal
+} from "@/lib/event-time";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { isTeamLogoHeroUrl } from "@/lib/hero-image.utils";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
 import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
+import { resolvePublicEventTags } from "@/lib/public-event-tags.utils";
 
 export type {
   DayStripTile,
@@ -90,6 +100,9 @@ export function deriveFeaturedBadge(event: Event, now = new Date()): FeaturedBad
 }
 
 export function deriveFlagLabel(event: Event, now = new Date()): string | null {
+  const timeStatus = deriveEventTimeStatus(event.startTs, event.endTs, now);
+  if (timeStatus === "live") return "LIVE";
+  if (timeStatus === "past") return "ENDED";
   if (event.priority === 0) return "PROMOTED";
   if (isTonight(event.startTs, now)) return "TONIGHT";
   if (event.priority <= 2) return "BIG";
@@ -103,6 +116,7 @@ export function toEventRowViewModel(item: EventListItem, now = new Date()): Even
   const start = new Date(event.startTs);
   const imageUrl = resolveMediaUrl(heroImage?.cdnUrl ?? null);
   const teamLogo = isTeamLogoHeroUrl(imageUrl);
+  const timeStatus = deriveEventTimeStatus(event.startTs, event.endTs, now);
 
   return {
     id: event.id,
@@ -128,11 +142,12 @@ export function toEventRowViewModel(item: EventListItem, now = new Date()): Even
     imageUrl,
     ...(teamLogo ? { showVenueLogoInList: true, listVenueLogoPadding: 10 } : {}),
     isFree: eventIsFree(event),
-    isLive: false,
+    isLive: timeStatus === "live",
+    timeStatus,
     featuredBadge: deriveFeaturedBadge(event, now),
     descriptionSnippet: deriveDescriptionSnippet(event),
     venueAddress: formatVenueAddressLine(venue),
-    tags: event.tags ?? [],
+    tags: resolvePublicEventTags({ tags: event.tags, subcategories: event.subcategories }),
     ticketUrl: event.ticketUrl ?? null,
     externalUrl: event.externalUrl ?? null
   };

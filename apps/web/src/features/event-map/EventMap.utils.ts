@@ -1,4 +1,5 @@
 import type { EventListItem } from "@fresno-events/shared";
+import { compareEventsByPriorityStart } from "@fresno-events/shared";
 
 import type { DatePreset } from "@/lib/date-presets";
 import { resolveDatePreset } from "@/lib/date-presets";
@@ -46,19 +47,15 @@ export function filterEventsForMap(
   items: EventListItem[],
   options: {
     q?: string;
-    datePreset?: DatePreset | null;
+    datePreset: DatePreset;
     nearMe?: { lat: number; lng: number; radiusKm: number } | null;
   }
 ): EventListItem[] {
-  let filtered = items;
-
-  if (options.datePreset) {
-    const range = resolveDatePreset(options.datePreset);
-    filtered = filtered.filter((item) => {
-      const start = new Date(item.event.startTs).getTime();
-      return start >= range.from.getTime() && start <= range.until.getTime();
-    });
-  }
+  const range = resolveDatePreset(options.datePreset);
+  let filtered = items.filter((item) => {
+    const start = new Date(item.event.startTs).getTime();
+    return start >= range.from.getTime() && start <= range.until.getTime();
+  });
 
   if (options.q?.trim()) {
     const needle = options.q.trim().toLowerCase();
@@ -81,7 +78,7 @@ export function filterEventsForMap(
     });
   }
 
-  return filtered;
+  return [...filtered].sort(compareEventsByPriorityStart);
 }
 
 export function defaultNearMeCenter() {

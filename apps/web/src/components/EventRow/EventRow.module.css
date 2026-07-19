@@ -44,6 +44,19 @@
   border-width: 2px;
 }
 
+.past {
+  opacity: 0.62;
+}
+
+.past:hover {
+  opacity: 0.78;
+}
+
+.past .rowTitle {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
 .rowImg {
   width: 80px;
   height: 80px;
@@ -129,7 +142,7 @@
 }
 
 .priceFree {
-  color: var(--olive);
+  color: var(--olive-dark);
 }
 
 .priceTicketHint {
@@ -162,6 +175,11 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.flagPast {
+  background: var(--ink);
+  opacity: 0.85;
 }
 
 .flagLive .liveDot {

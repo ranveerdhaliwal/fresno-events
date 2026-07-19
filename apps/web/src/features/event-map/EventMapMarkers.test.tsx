@@ -13,14 +13,20 @@ vi.mock("@/lib/map-config", () => ({
 
 vi.mock("leaflet", () => ({
   default: {
+    icon: vi.fn(() => ({})),
     divIcon: vi.fn(() => ({}))
   },
+  icon: vi.fn(() => ({})),
   divIcon: vi.fn(() => ({}))
 }));
 
 vi.mock("react-leaflet", () => ({
   Marker: ({ children }: { children?: React.ReactNode }) => <div data-testid="leaflet-marker">{children}</div>,
   Popup: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>
+}));
+
+vi.mock("./EventMapClusterGroup", () => ({
+  EventMapClusterGroup: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }));
 
 import { groupEventsByVenue } from "./EventMap.utils";

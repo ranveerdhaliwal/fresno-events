@@ -41,7 +41,7 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
         <Text variant="body2" tone="mutedOnCard" as="p">
           Your ad could reach Fresno event-goers every week.
         </Text>
-        <Text variant="eyebrow" tone="accent" as="span" className={styles.ctaLink}>
+        <Text variant="eyebrow" tone="onCard" as="span" className={styles.ctaLink}>
           LEARN MORE
         </Text>
       </div>
@@ -60,7 +60,7 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
         <Text variant="body2" tone="mutedOnCard" as="p" className={styles.sideCopy}>
           Your business here — reach event-goers weekly.
         </Text>
-        <Text variant="eyebrow" tone="accent" as="span" className={styles.ctaLink}>
+        <Text variant="eyebrow" tone="onCard" as="span" className={styles.ctaLink}>
           LEARN MORE
         </Text>
       </div>
@@ -83,7 +83,7 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
           Promote your business on What Up Fresno.
         </Text>
       </div>
-      <Text variant="eyebrow" tone="accent" as="span" className={styles.cta}>
+      <Text variant="eyebrow" tone="inverse" as="span" className={styles.cta}>
         GET STARTED
       </Text>
     </div>

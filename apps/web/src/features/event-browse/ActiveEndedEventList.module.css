@@ -1,0 +1,52 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rowWrap {
+  display: contents;
+}
+
+.empty {
+  padding: 20px 16px;
+  margin: 0;
+  text-align: center;
+  color: var(--text-secondary-on-card);
+  font-weight: 600;
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
+}
+
+.endedBlock {
+  margin-top: 10px;
+}
+
+.endedLabel {
+  margin: 0 0 8px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.showMoreEnded {
+  width: 100%;
+  margin-top: 10px;
+  background: var(--surface-inset);
+  border: 1.5px dashed var(--border-on-page);
+  padding: 12px;
+  letter-spacing: 2px;
+  color: var(--text-on-page);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+}
+
+.showMoreEnded:hover {
+  color: var(--coral);
+}

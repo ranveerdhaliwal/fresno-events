@@ -2,31 +2,49 @@ import L from "leaflet";
 import { useMemo } from "react";
 import { Marker, Popup } from "react-leaflet";
 import { Link } from "@tanstack/react-router";
-
-import { getCategoryEmoji } from "@/lib/category-icons";
+import { resolveMapPinEmoji } from "@fresno-events/shared";
 
 import type { VenueEventGroup } from "./EventMap.utils";
+import { escapeHtml } from "./EventMapMarkers.utils";
 
-function emojiIcon(emoji: string) {
+function emojiPinIcon(emoji: string, label: string) {
+  const safeLabel = escapeHtml(label);
   return L.divIcon({
-    className: "",
-    html: `<span style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;font-size:20px;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.25))">${emoji}</span>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30]
+    className: "fresno-map-emoji-pin",
+    html: `<span class="fresno-map-emoji-pin__dot" role="img" aria-label="${safeLabel}"><span class="fresno-map-emoji-pin__emoji" aria-hidden="true">${emoji}</span></span>`,
+    iconSize: [48, 48],
+    iconAnchor: [24, 48],
+    popupAnchor: [0, -44]
   });
+}
+
+function emojiForGroup(group: VenueEventGroup): string {
+  const primary = group.events[0];
+  if (!primary) {
+    return "📍";
+  }
+  const resolved = resolveMapPinEmoji({
+    category: primary.event.category,
+    title: primary.event.title,
+    tags: primary.event.tags,
+    subcategories: primary.event.subcategories,
+    ...(primary.event.mapPinEmoji != null ? { mapPinEmoji: primary.event.mapPinEmoji } : {})
+  });
+  return resolved ?? "📍";
 }
 
 export function EventMapMarkers({ groups }: { groups: VenueEventGroup[] }) {
   const icons = useMemo(() => {
     const cache = new Map<string, L.DivIcon>();
-    return (category: VenueEventGroup["category"]) => {
-      const key = category;
-      const existing = cache.get(key);
+    return (group: VenueEventGroup) => {
+      const emoji = emojiForGroup(group);
+      const cacheKey = `${emoji}|${group.venueName}`;
+      const existing = cache.get(cacheKey);
       if (existing) {
         return existing;
       }
-      const icon = emojiIcon(getCategoryEmoji(category));
-      cache.set(key, icon);
+      const icon = emojiPinIcon(emoji, `${group.venueName}, ${group.events.length} events`);
+      cache.set(cacheKey, icon);
       return icon;
     };
   }, []);
@@ -34,7 +52,13 @@ export function EventMapMarkers({ groups }: { groups: VenueEventGroup[] }) {
   return (
     <>
       {groups.map((group) => (
-        <Marker key={group.venueId} position={[group.lat, group.lng]} icon={icons(group.category)}>
+        <Marker
+          key={group.venueId}
+          position={[group.lat, group.lng]}
+          icon={icons(group)}
+          title={group.venueName}
+          alt={group.venueName}
+        >
           <Popup>
             <strong>{group.venueName}</strong>
             <ul style={{ margin: "8px 0 0", paddingLeft: 16 }}>

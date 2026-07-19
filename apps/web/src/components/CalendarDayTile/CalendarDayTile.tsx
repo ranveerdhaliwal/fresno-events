@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
+import { useMemo } from "react";
 
 import { Text } from "@/components/Text";
 import { cn } from "@/lib/cn";
 
-import { pacificDowShort } from "./CalendarDayTile.utils";
+import { collapseCalendarPreview, pacificDowShort } from "./CalendarDayTile.utils";
 import type { CalendarDayTileProps } from "./CalendarDayTile.types";
 import styles from "./CalendarDayTile.module.css";
 
@@ -18,6 +19,7 @@ export function CalendarDayTile({
 }: CalendarDayTileProps) {
   const dayNum = isoDate.slice(8);
   const dow = pacificDowShort(isoDate);
+  const collapsed = useMemo(() => collapseCalendarPreview(preview), [preview]);
 
   return (
     <Link
@@ -30,34 +32,47 @@ export function CalendarDayTile({
         !inMonth && styles.outOfMonth
       )}
       data-testid={`calendar-day-${isoDate}`}
-      aria-label={`${dow} ${dayNum}, ${total} events`}
     >
       <div className={styles.dateCorner}>
         <Text variant="eyebrow" tone="inherit" as="span" className={styles.dow}>
           {dow}
         </Text>
-        <Text variant="header3" tone="inherit" as="span" className={styles.dnum}>
+        <Text variant="header1" tone="inherit" as="span" className={styles.dnum}>
           {dayNum}
         </Text>
       </div>
       <div className={styles.body}>
         {total === 0 ? (
-          <Text variant="body3" tone="mutedOnCard" as="p" className={styles.empty}>
+          <Text variant="body3" tone="inherit" as="p" className={styles.empty}>
             No events
           </Text>
         ) : (
           <ul className={styles.previewList}>
-            {preview.map((item) => (
-              <li key={item.event.id}>
-                <Text variant="body3" tone="onCard" as="span">
-                  {item.event.title}
+            {collapsed.map((item) => (
+              <li key={item.id} className={styles.previewRow}>
+                {item.thumbUrl ? (
+                  <img
+                    src={item.thumbUrl}
+                    alt=""
+                    className={styles.thumb}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <span className={styles.thumbFallback} aria-hidden="true" />
+                )}
+                <Text variant="body3" tone="onCard" as="span" className={styles.previewTitle}>
+                  {item.title}
+                  {item.occurrenceCount > 1 ? (
+                    <span className={styles.occCount}> ×{item.occurrenceCount}</span>
+                  ) : null}
                 </Text>
               </li>
             ))}
           </ul>
         )}
         {hidden > 0 ? (
-          <Text variant="body3" tone="accent" as="span" className={styles.more}>
+          <Text variant="body3" tone="inherit" as="span" className={styles.more}>
             +{hidden} more →
           </Text>
         ) : null}

@@ -48,8 +48,8 @@
 }
 
 .today {
-  background: var(--coral);
-  color: var(--surface-card);
+  background: var(--coral-active);
+  color: #fff;
 }
 
 .weekend {
@@ -57,8 +57,8 @@
 }
 
 .today.weekend {
-  background: var(--coral);
-  color: var(--surface-card);
+  background: var(--coral-active);
+  color: #fff;
 }
 
 .dow {

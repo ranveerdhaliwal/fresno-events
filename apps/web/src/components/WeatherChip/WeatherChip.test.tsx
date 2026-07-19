@@ -25,4 +25,18 @@ describe("WeatherChip", () => {
     expect(screen.getByTestId("weather-chip")).toHaveTextContent("82°F");
     expect(screen.getByText(/Sunny/)).toBeInTheDocument();
   });
+
+  it("opens a Fresno weather Google search in a new tab", () => {
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WeatherChip />
+      </QueryClientProvider>
+    );
+
+    const link = screen.getByRole("link", { name: /fresno weather/i });
+    expect(link).toHaveAttribute("href", "https://www.google.com/search?q=fresno%20weather");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
 });

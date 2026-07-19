@@ -69,7 +69,7 @@ export function toNormalizedEvent(event: TicketmasterEvent): NormalizedEvent[] {
         event.classifications?.flatMap((classification) =>
           [classification.segment?.name, classification.genre?.name, classification.subGenre?.name].filter(isString)
         ) ?? [],
-      tags: ["ticketmaster", "api"],
+      tags: [],
       currency: priceRange?.currency ?? "USD",
       ...(event.info ? { descriptionText: event.info } : {}),
       ...(venue.address?.line1 ? { venueAddress: venue.address.line1 } : {}),

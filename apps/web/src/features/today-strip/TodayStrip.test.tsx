@@ -5,14 +5,15 @@ import { screen } from "@/tests/render";
 
 import { TodayStrip } from "./TodayStrip";
 
-vi.mock("@/features/featured-events/useWeekThroughSunday", () => ({
-  useWeekThroughSunday: () => ({ data: { items: [] } })
+vi.mock("./useForwardDayEvents", () => ({
+  useForwardDayEvents: () => ({ data: { items: [] } })
 }));
 
 describe("TodayStrip", () => {
-  it("renders lineup section", async () => {
+  it("renders lineup section without filter chips", async () => {
     await renderWithSiteRouter(<TodayStrip />);
     expect(screen.getByTestId("lineup-section")).toBeInTheDocument();
     expect(screen.getByText("LINEUP")).toBeInTheDocument();
+    expect(screen.queryByText("THIS MONTH")).not.toBeInTheDocument();
   });
 });

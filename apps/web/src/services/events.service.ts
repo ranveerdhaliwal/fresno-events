@@ -40,11 +40,12 @@ export async function listWeekEvents(options: {
   from: Date;
   until: Date;
   signal?: AbortSignal;
+  limit?: number;
 }): Promise<EventListResult> {
   return listEvents({
     from: options.from,
     until: options.until,
-    limit: 50,
+    limit: options.limit ?? 50,
     ...(options.signal ? { signal: options.signal } : {})
   });
 }
