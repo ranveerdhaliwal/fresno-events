@@ -162,7 +162,7 @@ export function resolveVenuniteDescriptionText(
 }
 
 export function buildVenuniteTags(event: VenuniteEvent, detail?: VenuniteEventDetail | null): string[] {
-  const tags = new Set<string>(["venunite", "api", `upstream:${event.sourceModule}`]);
+  const tags = new Set<string>(["venunite", `upstream:${event.sourceModule}`]);
   const slug = event.slug?.trim();
   if (slug) {
     tags.add(`venunite_slug:${slug}`);

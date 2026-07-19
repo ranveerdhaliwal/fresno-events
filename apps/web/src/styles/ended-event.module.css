@@ -1,0 +1,39 @@
+/**
+ * Ended-event presentation (shared by list row + mobile card).
+ * Kept separate so we can tune a11y without thrashing the main row stylesheet.
+ */
+
+.past {
+  opacity: 0.92;
+  background: color-mix(in srgb, var(--surface-card) 92%, var(--ink));
+}
+
+.past:hover {
+  opacity: 1;
+}
+
+.flag {
+  background: var(--mustard);
+  color: var(--ink);
+  opacity: 1;
+}
+
+.cardFlag {
+  position: absolute;
+  top: -8px;
+  left: 10px;
+  background: var(--mustard);
+  color: var(--ink);
+  border: var(--border-card);
+  padding: 2px 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  box-shadow: var(--shadow-xs);
+  z-index: 1;
+}
+
+.cardPast {
+  position: relative;
+  opacity: 0.92;
+  background: color-mix(in srgb, var(--surface-card) 92%, var(--ink));
+}

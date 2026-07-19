@@ -9,17 +9,19 @@ describe("EventMapFilters", () => {
     renderWithProviders(
       <EventMapFilters
         q=""
-        datePreset={null}
+        datePreset="week"
         omittedNoCoords={0}
         pinCount={12}
         onQueryChange={vi.fn()}
         onDatePresetChange={vi.fn()}
-        onNearMe={vi.fn()}
       />
     );
 
     expect(screen.getByRole("textbox", { name: "Map filter" })).toBeInTheDocument();
     expect(screen.getByText("12 pins")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "This week" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tonight" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "All" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Near Fresno" })).not.toBeInTheDocument();
   });
 });

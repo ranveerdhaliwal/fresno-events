@@ -36,8 +36,9 @@ async function renderFooter() {
 }
 
 describe("SiteFooter", () => {
-  it("renders privacy policy link", async () => {
+  it("renders privacy policy link and rainbow stripe", async () => {
     await renderFooter();
     expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByTestId("rainbow-stripe")).toBeInTheDocument();
   });
 });

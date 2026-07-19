@@ -25,6 +25,10 @@
   margin-bottom: 16px;
 }
 
+.listHeading {
+  margin: 0 0 12px;
+}
+
 .split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;

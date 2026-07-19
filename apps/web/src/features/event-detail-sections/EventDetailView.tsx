@@ -11,9 +11,12 @@ import { ContextStrip } from "@/components/ContextStrip";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
 import { EventShareCard } from "@/components/EventShareCard";
 import { VenueMiniMap } from "@/components/VenueMiniMap";
+import { ActiveEndedEventList } from "@/features/event-browse/ActiveEndedEventList";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { deriveTagline, eventIsFree, formatDetailPrice, toEventRowViewModel } from "@/lib/event-view-model";
 import { heroImageFit, heroImagePadding } from "@/lib/hero-image.utils";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
+import { resolvePublicEventTags } from "@/lib/public-event-tags.utils";
 import { buildEventIntroSentence, buildGoogleMapsSearchUrl } from "@fresno-events/shared";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { formatCountdownLabel, formatEventDate, formatShortTime, toIsoDateLocal } from "@/lib/event-time";
@@ -24,11 +27,13 @@ import styles from "./EventDetailView.module.css";
 import { EventDetailSkeleton } from "./EventDetailSkeleton";
 
 export function EventDetailView({ data }: { data: EventDetailResult }) {
+  const isMobile = useIsMobile();
   const { detail } = data;
   const { event, venue, heroImage } = detail;
   const paletteKey = paletteKeyForCategory(event.category, event.id);
   const imageUrl = resolveMediaUrl(heroImage?.cdnUrl ?? null);
   const tagline = deriveTagline(event);
+  const publicTags = resolvePublicEventTags({ tags: event.tags, subcategories: event.subcategories });
   const dayIso = toIsoDateLocal(new Date(event.startTs));
   const logoPadding = heroImagePadding(imageUrl);
 
@@ -57,9 +62,11 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
         </Link>
         <span className={styles.sep}>/</span>
         <span className={styles.current}>{event.title}</span>
-        <Link to="/day/$date" params={{ date: dayIso }} className={styles.back}>
-          ← BACK TO DAY
-        </Link>
+        {!isMobile ? (
+          <Link to="/day/$date" params={{ date: dayIso }} className={styles.back}>
+            ← BACK TO DAY
+          </Link>
+        ) : null}
       </div>
 
       <div className={styles.heroWrap}>
@@ -104,7 +111,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
         </div>
       </div>
 
-      <ContextStrip dayIso={dayIso} countdown={formatCountdownLabel(event.startTs)} />
+      <ContextStrip countdown={formatCountdownLabel(event.startTs)} />
 
       <div className={styles.quickFacts}>
         <div className={styles.fact}>
@@ -271,9 +278,13 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               count={relatedRows.length}
             />
             <div className={styles.relatedList}>
-              {relatedRows.map((row) => (
-                <EventRow key={row.id} event={row} slug={row.slug} adminAction={<AdminEditLink eventId={row.id} />} />
-              ))}
+              <ActiveEndedEventList
+                items={detail.relatedEvents}
+                dayIso={dayIso}
+                linkRows
+                renderAdminAction={(eventId) => <AdminEditLink eventId={eventId} />}
+                emptyMessage="No other events this day."
+              />
             </div>
             <SeeAllDayCta date={dayIso} count={relatedRows.length + 1} />
           </section>
@@ -307,19 +318,20 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               </div>
             </div>
           </div>
-          <div className={styles.sideCard}>
-            <Text variant="eyebrow" tone="labelOnCard" as="h3">
-              TAGS
-            </Text>
-            <div className={styles.tags}>
-              {event.tags.map((tag) => (
-                <Text key={tag} variant="eyebrow" tone="labelOnCard" as="span">
-                  {tag}
-                </Text>
-              ))}
+          {publicTags.length > 0 ? (
+            <div className={styles.sideCard}>
+              <Text variant="eyebrow" tone="labelOnCard" as="h3">
+                TAGS
+              </Text>
+              <div className={styles.tags}>
+                {publicTags.map((tag) => (
+                  <Text key={tag} variant="eyebrow" tone="labelOnCard" as="span">
+                    {tag}
+                  </Text>
+                ))}
+              </div>
             </div>
-          </div>
-          <EventShareCard title={event.title} url={shareUrl} />
+          ) : null}          <EventShareCard title={event.title} url={shareUrl} />
           <AdSlot variant="side" />
         </aside>
       </div>

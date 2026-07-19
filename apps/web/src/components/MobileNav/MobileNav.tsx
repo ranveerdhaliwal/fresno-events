@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Menu, Search, X } from "lucide-react";
 
 import { Text } from "@/components/Text";
+import { cn } from "@/lib/cn";
 
 import styles from "./MobileNav.module.css";
 
@@ -24,6 +25,7 @@ export function MobileNav({ variant = "home", title }: MobileNavProps) {
   const menuId = useId();
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const openMenu = useCallback(() => setMenuOpen(true), []);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -53,12 +55,12 @@ export function MobileNav({ variant = "home", title }: MobileNavProps) {
             <button
               type="button"
               className={styles.iconBtn}
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-label="Open menu"
               aria-expanded={menuOpen}
               aria-controls={menuId}
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={openMenu}
             >
-              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+              <Menu size={22} />
             </button>
             <Link to="/" className={styles.logoCenter}>
               <img src="/brand/fresno-logo.png" alt="What Up Fresno" height={40} />
@@ -87,17 +89,35 @@ export function MobileNav({ variant = "home", title }: MobileNavProps) {
             <Text variant="navLabel" tone="onNav" as="span" className={styles.title}>
               EVENT DETAILS
             </Text>
-            <button type="button" className={styles.iconBtn} aria-label="Share">
-              ↗
-            </button>
+            <span className={styles.iconSpacer} aria-hidden />
           </>
         )}
       </header>
 
-      {variant === "home" && menuOpen ? (
-        <div className={styles.menuRoot} data-testid="mobile-nav-menu">
-          <button type="button" className={styles.menuBackdrop} aria-label="Close menu" onClick={closeMenu} />
+      {variant === "home" ? (
+        <div
+          className={cn(styles.menuRoot, menuOpen && styles.menuOpen)}
+          data-testid="mobile-nav-menu"
+          aria-hidden={!menuOpen}
+          {...(!menuOpen ? { inert: true } : {})}
+        >
+          <button
+            type="button"
+            className={styles.menuBackdrop}
+            aria-label="Close menu"
+            tabIndex={menuOpen ? 0 : -1}
+            onClick={closeMenu}
+          />
           <nav id={menuId} className={styles.menuPanel} aria-label="Site">
+            <button
+              type="button"
+              className={styles.menuClose}
+              aria-label="Close navigation"
+              tabIndex={menuOpen ? 0 : -1}
+              onClick={closeMenu}
+            >
+              <X size={22} />
+            </button>
             {menuLinks.map((link) => (
               <Link
                 key={link.to}
@@ -106,6 +126,7 @@ export function MobileNav({ variant = "home", title }: MobileNavProps) {
                 className={styles.menuLink}
                 activeProps={{ className: styles.menuLinkActive }}
                 activeOptions={{ exact: link.exact }}
+                tabIndex={menuOpen ? 0 : -1}
                 onClick={closeMenu}
               >
                 <Text variant="navLabel" tone="inherit" as="span">

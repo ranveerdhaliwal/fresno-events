@@ -9,7 +9,6 @@
   padding: 0 16px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: var(--border-hero);
 }
 
 .iconBtn {
@@ -23,6 +22,12 @@
   align-items: center;
   justify-content: center;
   text-decoration: none;
+}
+
+.iconSpacer {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
 }
 
 .logoCenter {
@@ -45,6 +50,11 @@
   position: fixed;
   inset: 0;
   z-index: 40;
+  pointer-events: none;
+}
+
+.menuOpen {
+  pointer-events: auto;
 }
 
 .menuBackdrop {
@@ -53,6 +63,12 @@
   border: 0;
   background: rgba(0, 0, 0, 0.45);
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.menuOpen .menuBackdrop {
+  opacity: 1;
 }
 
 .menuPanel {
@@ -67,11 +83,31 @@
     var(--surface-nav) 12px
   );
   color: var(--text-on-nav);
-  padding: calc(var(--nav-height-mobile) + 12px) 20px 24px;
+  padding: 16px 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
+  transform: translateX(-100%);
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.menuOpen .menuPanel {
+  transform: translateX(0);
+}
+
+.menuClose {
+  align-self: flex-end;
+  background: transparent;
+  border: 0;
+  color: var(--text-on-nav);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
 }
 
 .menuLink,
@@ -95,5 +131,12 @@
 @media (max-width: 600px) {
   .nav {
     display: flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menuBackdrop,
+  .menuPanel {
+    transition: none;
   }
 }

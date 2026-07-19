@@ -1,15 +1,18 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { isoDateInPacificMonth, pacificTodayIso } from "@fresno-events/shared";
 
 import { CalendarDayTile } from "@/components/CalendarDayTile";
 import { isPacificWeekend } from "@/components/CalendarDayTile/CalendarDayTile.utils";
 import { CalendarMonthStrip } from "@/components/CalendarMonthStrip";
+import { EventCard } from "@/components/EventCard";
+import { EventRow } from "@/components/EventRow";
 import { PageChrome } from "@/components/PageChrome";
 import { SectionTitle } from "@/components/SectionTitle";
 import { Text } from "@/components/Text";
-import { EventRow } from "@/components/EventRow";
 import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
+import { useBrowseEventSelect } from "@/hooks/useIsMobile";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 import { buildCalendarSeo } from "@/lib/seo/page-seo";
 import { useSeoHead } from "@/lib/seo/useSeoHead";
@@ -27,12 +30,20 @@ export interface CalendarPageProps {
 }
 
 export function CalendarPage({ year, month }: CalendarPageProps) {
+  const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const todayIso = pacificTodayIso();
   useSeoHead(useMemo(() => buildCalendarSeo(year, month), [year, month]));
   const { data, isLoading } = useQuery({
     queryKey: eventsKeys.calendar(year, month),
     queryFn: ({ signal }) => getCalendarMonth(year, month, signal)
+  });
+
+  const handleSelect = useBrowseEventSelect({
+    onSelectInSplit: setSelectedId,
+    onOpenEvent: (slug) => {
+      void navigate({ to: "/event/$slug", params: { slug } });
+    }
   });
 
   const monthLabel = useMemo(
@@ -88,7 +99,7 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
 
             <CalendarMonthStrip selectedYear={year} selectedMonth={month} />
 
-            <div className={styles.split}>
+            <div className={styles.split} data-testid="calendar-browse-split">
               <div className={styles.weekList}>
                 <SectionTitle script="this" size="sm" as="h2" className={styles.weekHeading}>
                   MONTH BY WEEK
@@ -103,22 +114,29 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
                         No events yet
                       </Text>
                     ) : (
-                      week.preview.map((item) => {
-                        const row = toEventRowViewModel(item);
-                        return (
-                          <EventRow
-                            key={row.id}
-                            event={row}
-                            isSelected={selected?.id === row.id}
-                            onSelect={() => setSelectedId(row.id)}
-                          />
-                        );
-                      })
+                      <div className={styles.list}>
+                        {week.preview.map((item) => {
+                          const row = toEventRowViewModel(item);
+                          return (
+                            <div key={row.id} className={styles.rowWrap}>
+                              <EventRow
+                                event={row}
+                                isSelected={selected?.id === row.id}
+                                isLive={row.isLive}
+                                onSelect={() => handleSelect(row.id, row.slug)}
+                              />
+                              <EventCard event={row} />
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </section>
                 ))}
               </div>
-              <UpcomingDetailPanel event={selected} />
+              <div className={styles.detailCol}>
+                <UpcomingDetailPanel event={selected} />
+              </div>
             </div>
           </>
         )}

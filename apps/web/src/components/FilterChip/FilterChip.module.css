@@ -21,14 +21,14 @@
 }
 
 .chipActive {
-  background: var(--coral);
+  background: var(--coral-active);
   border-color: var(--border-default);
 }
 
 .chipActive .label {
-  color: var(--surface-card);
+  color: #fff;
 }
 
 .chipActive:hover {
-  background: color-mix(in srgb, var(--coral) 88%, var(--ink));
+  background: color-mix(in srgb, var(--coral-active) 88%, var(--ink));
 }

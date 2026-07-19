@@ -24,6 +24,7 @@ export interface EventRowModifierInput extends EventRowLayoutInput {
   forceVisible: boolean;
   isSelected?: boolean | undefined;
   isLive?: boolean | undefined;
+  isPast?: boolean | undefined;
 }
 
 export interface EventRowModifiers {
@@ -38,6 +39,7 @@ export interface EventRowModifiers {
   p5ShowImage: boolean;
   selected: boolean;
   live: boolean;
+  past: boolean;
 }
 
 export function getEventRowModifiers(input: EventRowModifierInput): EventRowModifiers {
@@ -54,6 +56,7 @@ export function getEventRowModifiers(input: EventRowModifierInput): EventRowModi
     p5WithLogo: input.priority === 5 && Boolean(input.showVenueLogoInList),
     p5ShowImage: p5ListLayout,
     selected: Boolean(input.isSelected),
-    live: Boolean(input.isLive)
+    live: Boolean(input.isLive),
+    past: Boolean(input.isPast)
   };
 }

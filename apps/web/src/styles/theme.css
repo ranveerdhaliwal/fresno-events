@@ -25,9 +25,11 @@
 
   /* Brand */
   --coral: var(--color-coral);
+  --coral-active: var(--color-coral-active);
   --coral-dark: var(--color-coral-dark);
   --mustard: var(--color-mustard);
   --olive: var(--color-olive);
+  --olive-dark: var(--color-olive-dark);
   --ink: var(--color-ink);
 
   /* Borders / dividers */

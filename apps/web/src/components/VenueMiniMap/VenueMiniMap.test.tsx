@@ -11,7 +11,8 @@ vi.mock("@/lib/map-config", () => ({
 vi.mock("react-leaflet", () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="leaflet-map">{children}</div>,
   TileLayer: () => null,
-  Marker: () => null
+  Marker: () => null,
+  ZoomControl: () => null
 }));
 
 vi.mock("leaflet", () => ({
@@ -27,9 +28,7 @@ import { VenueMiniMap } from "./VenueMiniMap";
 
 describe("VenueMiniMap", () => {
   it("renders map container", async () => {
-    await renderWithSiteRouter(
-      <VenueMiniMap lat={36.7378} lng={-119.7871} category="music" title="Jazz Night" tags={[]} subcategories={[]} />
-    );
+    await renderWithSiteRouter(<VenueMiniMap lat={36.7378} lng={-119.7871} />);
 
     expect(screen.getByTestId("leaflet-map")).toBeInTheDocument();
   });

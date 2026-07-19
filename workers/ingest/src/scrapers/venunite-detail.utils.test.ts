@@ -79,6 +79,7 @@ describe("venunite-detail.utils", () => {
     expect(mapped?.venueAddress).toContain("Van Ness");
     expect(mapped?.venueLat).toBe(36.7377);
     expect(mapped?.tags).toContain("venunite_slug:workshop-documentary-filmmaking");
+    expect(mapped?.tags).not.toContain("api");
     expect(mapped?.ticketUrl).toContain("eventbrite.com");
   });
 

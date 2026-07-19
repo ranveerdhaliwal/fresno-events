@@ -3,6 +3,8 @@ import { useLocalContext } from "@/hooks/useLocalContext";
 
 import styles from "./WeatherChip.module.css";
 
+const FRESNO_WEATHER_SEARCH_URL = "https://www.google.com/search?q=fresno%20weather";
+
 export function WeatherChip() {
   const { data } = useLocalContext();
   const weather = data?.weather;
@@ -12,10 +14,20 @@ export function WeatherChip() {
   }
 
   return (
-    <span className={styles.chip} data-testid="weather-chip">
+    <a
+      className={styles.chip}
+      data-testid="weather-chip"
+      href={FRESNO_WEATHER_SEARCH_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Fresno weather — search Google in a new tab"
+    >
+      <span className={styles.icon} aria-hidden>
+        {weather.icon}
+      </span>
       <Text variant="body3" tone="onCard" as="span">
-        {weather.icon} {weather.tempF}°F · {weather.condition}
+        {weather.tempF}°F · {weather.condition}
       </Text>
-    </span>
+    </a>
   );
 }

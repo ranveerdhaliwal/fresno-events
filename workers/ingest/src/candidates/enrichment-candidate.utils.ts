@@ -1,4 +1,5 @@
 import type { EventCandidateStatus, EventCategory, NormalizedEvent } from "@fresno-events/shared";
+import { sanitizeEventTags } from "@fresno-events/shared";
 
 import { needsDetailBackfill } from "@/candidates/detail-status.utils";
 
@@ -134,10 +135,10 @@ export function summarizeEnrichmentDelta(
 
   const mergedTags =
     enrichment.tags.length > 0
-      ? Array.from(new Set([...(before.tags ?? []), ...enrichment.tags]))
-      : [...(before.tags ?? [])];
-  const tagsAdded = enrichment.tags.filter((t) => !(before.tags ?? []).includes(t));
-  const tagsChanged = mergedTags.length !== (before.tags ?? []).length;
+      ? sanitizeEventTags([...(before.tags ?? []), ...enrichment.tags])
+      : sanitizeEventTags(before.tags ?? []);
+  const tagsAdded = sanitizeEventTags(enrichment.tags).filter((t) => !(before.tags ?? []).includes(t));
+  const tagsChanged = mergedTags.join("\0") !== (before.tags ?? []).join("\0");
 
   const normalizedEventPatched = titleChanged || categoryChanged || tagsChanged;
 

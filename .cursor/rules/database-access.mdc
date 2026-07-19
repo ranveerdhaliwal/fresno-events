@@ -17,6 +17,8 @@ Confirm target: `dev-target.env` `DEV_TARGET` or `.dev.vars` `SUPABASE_URL` — 
 
 ## Local Postgres — use Docker / CLI (not MCP)
 
+**Before any local DB / Docker command:** probe whether the daemon is up (`docker info`). ComfyUI and other GPU work share this host — do not start Docker unless local Postgres is actually required. Full policy: [docker-local-db.mdc](docker-local-db.mdc).
+
 Local stack: `pnpm db:start` then `pnpm db:reset` / `pnpm db:status`.
 
 - **Connection:** `postgresql://postgres:postgres@127.0.0.1:54322/postgres`

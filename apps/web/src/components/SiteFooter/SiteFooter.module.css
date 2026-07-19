@@ -1,7 +1,9 @@
-.footer {
+.wrap {
   margin-top: 48px;
+}
+
+.footer {
   padding: 28px 32px 32px;
-  border-top: 1.5px dashed var(--border-on-page);
   background: color-mix(in srgb, var(--surface-inset) 70%, transparent);
 }
 

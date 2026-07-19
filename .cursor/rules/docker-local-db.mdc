@@ -1,0 +1,47 @@
+---
+description: Check Docker before local DB/Supabase work — ComfyUI and other projects share the host Docker daemon.
+alwaysApply: true
+---
+
+# Docker (local DB) — check first, start only when needed
+
+This machine often runs **ComfyUI / other GPU work** that fights with Docker. Do **not** assume Docker is up, and do **not** start it unless fresno-events actually needs the local stack.
+
+## When local Docker is needed
+
+Only for local Postgres / Supabase:
+
+- `pnpm db:start` / `db:reset` / `db:status`
+- `pnpm db:pull-cloud-dev` / `db:push-cloud-dev`
+- `docker exec … psql` against `supabase_db_what-up-fresno`
+- Local Studio / migrations against Docker Postgres
+
+**Not needed** when `DEV_TARGET=cloud-dev` and work is only cloud SQL (Supabase MCP), UI against cloud API, or ingest writing to cloud.
+
+## Before any Docker / `db:*` command
+
+1. **Probe first** (do not start yet):
+
+```bash
+docker info >/dev/null 2>&1 && echo docker_up || echo docker_down
+docker ps --filter name=supabase_db --format '{{.Names}} {{.Status}}' 2>/dev/null
+```
+
+2. If **docker_down**: tell the user Docker is off (ComfyUI coexistence). Ask before starting the daemon / `pnpm db:start`. Prefer **cloud-dev MCP** when that unblocks the task and target allows it.
+3. If **docker_up** but no `supabase_db_*` container: only then `pnpm db:start` (or ask if unclear).
+4. If the container is already healthy: use it; do not restart.
+
+## Starting Docker (only with need + user OK when Comfy may be running)
+
+- Prefer asking once: “Local DB needs Docker — OK to start it?” when ComfyUI / heavy GPU work may be active.
+- If the user already asked for local DB work explicitly, starting the stack is implied — still probe first and report status.
+
+## Access paths
+
+| Need | How |
+| --- | --- |
+| Local SQL | Shell: `docker exec supabase_db_what-up-fresno psql …` (after probe) |
+| Cloud-dev SQL | Supabase MCP `execute_sql` — **no Docker** |
+| Docker MCP Toolkit (`MCP_DOCKER`) | Gateway: `docker mcp gateway run --profile docker_mcp` (in `.cursor/mcp.json`). **Requires Docker Desktop running** + at least one catalog server added to the `docker_mcp` profile. Until servers are added, the gateway connects but exposes no tools. Prefer Shell `docker` / `pnpm db:*` for Fresno local DB if MCP tools are empty. |
+
+Do not leave Docker running “just in case” after a one-off local DB task unless the user wants it left up.

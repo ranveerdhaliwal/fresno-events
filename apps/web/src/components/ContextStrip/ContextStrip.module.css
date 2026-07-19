@@ -1,18 +1,13 @@
 .strip {
   display: none;
   background: var(--surface-inset);
-  border-bottom: 1px solid var(--divider-on-page);
+  border-bottom: var(--divider-rule);
   padding: 10px 16px;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-on-page);
-}
-
-.strip a {
-  color: var(--coral);
-  text-decoration: none;
 }
 
 @media (max-width: 600px) {

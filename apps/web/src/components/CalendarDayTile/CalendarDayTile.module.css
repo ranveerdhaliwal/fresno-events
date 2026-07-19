@@ -22,18 +22,24 @@
 }
 
 .today {
-  background: var(--coral);
-  color: var(--surface-card);
+  background: var(--coral-active);
+  color: #fff;
 }
 
 .today.weekend {
-  background: var(--coral);
-  color: var(--surface-card);
+  background: var(--coral-active);
+  color: #fff;
 }
 
 .outOfMonth {
-  opacity: 0.42;
   box-shadow: none;
+  /* Warm paper mix (not navy) so full-strength ink stays WCAG AA. */
+  background: color-mix(in srgb, var(--surface-card) 78%, var(--surface-muted));
+  color: var(--text-primary);
+}
+
+.outOfMonth.weekend {
+  background: color-mix(in srgb, var(--mustard) 70%, var(--surface-card));
 }
 
 .dateCorner {
@@ -44,13 +50,11 @@
 }
 
 .dow {
-  font-size: 10px;
   letter-spacing: 1.5px;
   display: block;
 }
 
 .dnum {
-  font-size: 28px;
   line-height: 1;
   margin-top: 2px;
   display: block;
@@ -68,7 +72,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 11px;
   font-weight: 600;
   line-height: 1.35;
   display: grid;
@@ -77,26 +80,44 @@
 
 .previewList li {
   overflow: hidden;
+}
+
+.previewRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.thumb,
+.thumbFallback {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid color-mix(in srgb, currentColor 35%, transparent);
+  object-fit: cover;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.previewTitle {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.occCount {
+  font-weight: 800;
+}
+
 .empty {
   margin: 0;
-  font-size: 11px;
   font-weight: 600;
-  color: color-mix(in srgb, currentColor 55%, transparent);
 }
 
 .more {
   margin-top: auto;
   padding-top: 6px;
-  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: color-mix(in srgb, currentColor 85%, transparent);
-}
-
-.today .more {
-  color: color-mix(in srgb, currentColor 95%, transparent);
 }

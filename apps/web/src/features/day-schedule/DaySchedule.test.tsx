@@ -13,6 +13,7 @@ describe("DaySchedule", () => {
   it("renders schedule sections", async () => {
     await renderWithSiteRouter(<DaySchedule isoDate="2026-06-10" onNavigateEvent={() => undefined} />);
     expect(screen.getByTestId("day-schedule")).toBeInTheDocument();
-    expect(screen.getByText("LIVE OR ONGOING")).toBeInTheDocument();
+    expect(screen.getByText("MORNING")).toBeInTheDocument();
+    expect(screen.queryByText("LIVE OR ONGOING")).not.toBeInTheDocument();
   });
 });

@@ -20,7 +20,11 @@ async function loadSection(
     until: window.until,
     limit: 100
   });
-  const { preview, total, hidden } = selectEventPreview(result.items);
+  // Today: show the full day (past, live, and later). Other presets keep preview caps.
+  const { preview, total, hidden } =
+    preset === "today"
+      ? { preview: result.items, total: result.items.length, hidden: 0 }
+      : selectEventPreview(result.items);
   return {
     preview,
     total,

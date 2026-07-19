@@ -15,5 +15,26 @@ describe("EventCard", () => {
 
     expect(screen.getByTestId(`event-card-${event.slug}`)).toBeInTheDocument();
     expect(screen.getByText(event.title)).toBeInTheDocument();
+    // Title is not a heading — avoids heading-order a11y fails next to page h1/h2.
+    expect(screen.getByText(event.title).tagName).toBe("SPAN");
+  });
+
+  it("labels ended events clearly", async () => {
+    const base = getMockEventList()[0]!;
+    const event = toEventRowViewModel(
+      {
+        ...base,
+        event: {
+          ...base.event,
+          startTs: "2020-01-01T18:00:00.000Z",
+          endTs: "2020-01-01T20:00:00.000Z"
+        }
+      },
+      new Date("2026-07-18T20:00:00.000Z")
+    );
+
+    await renderWithSiteRouter(<EventCard event={event} />);
+
+    expect(screen.getByText("ENDED")).toBeInTheDocument();
   });
 });

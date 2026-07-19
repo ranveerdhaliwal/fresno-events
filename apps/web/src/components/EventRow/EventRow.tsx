@@ -8,6 +8,7 @@ import { isListTicketPriceLabel } from "@/lib/event-price.utils";
 import type { EventRowProps } from "./EventRow.types";
 import { getEventRowLayoutFlags, getEventRowModifiers } from "./EventRow.utils";
 import styles from "./EventRow.module.css";
+import endedStyles from "@/styles/ended-event.module.css";
 
 export function EventRow({
   event,
@@ -22,6 +23,8 @@ export function EventRow({
   forceVisible = false,
   adminAction
 }: EventRowProps) {
+  const live = isLive ?? event.isLive;
+  const past = event.timeStatus === "past";
   const { showRowImage } = getEventRowLayoutFlags({
     showImage,
     showP5ListImage,
@@ -35,7 +38,8 @@ export function EventRow({
     showVenueLogoInList: event.showVenueLogoInList,
     forceVisible,
     isSelected,
-    isLive
+    isLive: live,
+    isPast: past
   });
 
   const className = cn(
@@ -50,14 +54,20 @@ export function EventRow({
     modifiers.p5WithLogo && styles.p5WithLogo,
     modifiers.p5ShowImage && styles.p5ShowImage,
     modifiers.selected && styles.selected,
-    modifiers.live && styles.live
+    modifiers.live && styles.live,
+    modifiers.past && endedStyles.past
   );
 
   const content = (
     <>
       {event.flagLabel ? (
-        <Text variant="eyebrow" tone="inverse" as="span" className={cn(styles.flag, isLive && styles.flagLive)}>
-          {isLive && <span className={styles.liveDot} aria-hidden />}
+        <Text
+          variant="eyebrow"
+          tone={past ? "onCard" : "inverse"}
+          as="span"
+          className={cn(styles.flag, live && styles.flagLive, past && endedStyles.flag)}
+        >
+          {live && <span className={styles.liveDot} aria-hidden />}
           {event.flagLabel}
         </Text>
       ) : null}
@@ -86,7 +96,7 @@ export function EventRow({
         </div>
       ) : null}
       <div className={styles.rowBody}>
-        <Text variant="header3" tone="onCard" as="h4" className={styles.rowTitle}>
+        <Text variant="header3" tone="onCard" as="span" className={styles.rowTitle}>
           {event.title}
         </Text>
         <div className={styles.rowMeta}>

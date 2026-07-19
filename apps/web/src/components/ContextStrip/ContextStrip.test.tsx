@@ -6,11 +6,11 @@ import { screen } from "@/tests/render";
 import { ContextStrip } from "./ContextStrip";
 
 describe("ContextStrip", () => {
-  it("renders back link and countdown", async () => {
-    await renderWithSiteRouter(<ContextStrip dayIso="2026-06-10" countdown="in 2 days" />);
+  it("renders countdown without a back-to-day link", async () => {
+    await renderWithSiteRouter(<ContextStrip countdown="in 2 days" />);
 
     expect(screen.getByTestId("context-strip")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Back to day/i })).toHaveAttribute("href", "/day/2026-06-10");
+    expect(screen.queryByRole("link", { name: /Back to day/i })).not.toBeInTheDocument();
     expect(screen.getByText("in 2 days")).toBeInTheDocument();
   });
 });

@@ -14,7 +14,7 @@
 .emptyScript {
   transform: rotate(-3deg);
   display: inline-block;
-  font-size: 44px;
+  font-size: 28px;
 }
 
 .badge,
@@ -23,7 +23,7 @@
   border: var(--border-card);
   padding: 4px 10px;
   box-shadow: var(--shadow-xs);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2px;
 }
 
@@ -51,10 +51,10 @@
 }
 
 .title {
-  font-size: 24px;
+  font-size: 20px;
   letter-spacing: 0.035em;
   line-height: 1.1;
-  margin: 0 0 14px;
+  margin: 0 0 12px;
 }
 
 .title a {
@@ -63,7 +63,7 @@
 }
 
 .title a:hover {
-  color: var(--coral);
+  color: var(--coral-dark);
 }
 
 .description {
@@ -78,24 +78,39 @@
 .tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: 4px;
+  margin: 0 0 10px;
 }
 
 .tag {
   background: var(--mustard);
   border: 1px solid var(--border-default);
-  padding: 3px 8px;
-  font-size: 10px;
+  padding: 2px 6px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
+  line-height: 1.25;
+  transform: scale(0.88);
+  transform-origin: left center;
 }
 
 .facts {
   margin: 0 0 20px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
+}
+
+.factRow {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid color-mix(in srgb, var(--border-default) 55%, transparent);
+}
+
+.factRow:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .facts dt {

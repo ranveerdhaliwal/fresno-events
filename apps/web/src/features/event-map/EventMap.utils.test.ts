@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { EventListItem } from "@fresno-events/shared";
 
-import { groupEventsByVenue } from "./EventMap.utils";
+import { filterEventsForMap, groupEventsByVenue } from "./EventMap.utils";
 
-function item(id: string, venueId: string, lat?: number, lng?: number): EventListItem {
+function item(
+  id: string,
+  venueId: string,
+  opts?: { lat?: number; lng?: number; priority?: number; startTs?: string }
+): EventListItem {
   return {
     event: {
       id,
@@ -13,7 +17,7 @@ function item(id: string, venueId: string, lat?: number, lng?: number): EventLis
       sourceRefs: {},
       title: `Event ${id}`,
       venueId,
-      startTs: "2026-07-01T02:00:00.000Z",
+      startTs: opts?.startTs ?? "2026-07-19T02:00:00.000Z",
       timezone: "America/Los_Angeles",
       category: "music",
       subcategories: [],
@@ -22,7 +26,7 @@ function item(id: string, venueId: string, lat?: number, lng?: number): EventLis
       status: "scheduled",
       galleryImageIds: [],
       allArtistIds: [],
-      priority: 5,
+      priority: opts?.priority ?? 5,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z"
     },
@@ -34,8 +38,8 @@ function item(id: string, venueId: string, lat?: number, lng?: number): EventLis
       socials: {},
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      ...(lat != null ? { lat } : {}),
-      ...(lng != null ? { lng } : {})
+      ...(opts?.lat != null ? { lat: opts.lat } : {}),
+      ...(opts?.lng != null ? { lng: opts.lng } : {})
     }
   };
 }
@@ -43,9 +47,9 @@ function item(id: string, venueId: string, lat?: number, lng?: number): EventLis
 describe("groupEventsByVenue", () => {
   it("groups events at the same venue with coordinates", () => {
     const groups = groupEventsByVenue([
-      item("a", "v1", 36.7, -119.8),
-      item("b", "v1", 36.7, -119.8),
-      item("c", "v2", 36.8, -119.7)
+      item("a", "v1", { lat: 36.7, lng: -119.8 }),
+      item("b", "v1", { lat: 36.7, lng: -119.8 }),
+      item("c", "v2", { lat: 36.8, lng: -119.7 })
     ]);
     expect(groups).toHaveLength(2);
     expect(groups.find((group) => group.venueId === "v1")?.events).toHaveLength(2);
@@ -54,5 +58,25 @@ describe("groupEventsByVenue", () => {
   it("skips venues without coordinates", () => {
     const groups = groupEventsByVenue([item("a", "v1")]);
     expect(groups).toHaveLength(0);
+  });
+});
+
+describe("filterEventsForMap", () => {
+  it("defaults to this week and sorts by priority then start", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-18T20:00:00.000Z"));
+
+    const sorted = filterEventsForMap(
+      [
+        item("late-p5", "v1", { priority: 5, startTs: "2026-07-19T04:00:00.000Z" }),
+        item("early-p2", "v1", { priority: 2, startTs: "2026-07-20T04:00:00.000Z" }),
+        item("earlier-p2", "v1", { priority: 2, startTs: "2026-07-19T02:00:00.000Z" }),
+        item("far", "v1", { priority: 1, startTs: "2026-08-01T02:00:00.000Z" })
+      ],
+      { datePreset: "week" }
+    );
+
+    expect(sorted.map((row) => row.event.id)).toEqual(["earlier-p2", "early-p2", "late-p5"]);
+    vi.useRealTimers();
   });
 });

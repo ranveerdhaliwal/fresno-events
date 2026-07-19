@@ -1,10 +1,16 @@
 /* Brand palette (immutable across themes) */
 
 :root {
+  /* Brand fill / CTAs — keep vivid */
   --color-coral: #d85a3c;
-  --color-coral-dark: #b3401c;
+  /* Fills that carry white text (selected chips, today tiles, CTAs) — WCAG AA */
+  --color-coral-active: #b3401c;
+  /* Text-on-cream accents — darkened for WCAG AA on warm paper */
+  --color-coral-dark: #7a2e12;
   --color-mustard: #f2c14e;
   --color-olive: #6b8e4e;
+  /* Text-on-cream “FREE” / olive accents — AA on warm paper */
+  --color-olive-dark: #3a5228;
 
   /* Near-black used for borders + nav in both themes */
   --color-ink: #14181d;

@@ -28,7 +28,7 @@
   --theme-border-on-page: rgba(232, 217, 184, 0.45);
   --theme-divider-on-page: rgba(232, 217, 184, 0.35);
   /* Cards on navy page: cream-tinted edge + offset shadow so right/bottom pop */
-  --theme-border-card-on-page: 1.5px solid color-mix(in srgb, var(--theme-text-on-page) 42%, var(--color-ink));
+  --theme-border-card-on-page: 3px solid color-mix(in srgb, var(--theme-text-on-page) 42%, var(--color-ink));
   --theme-shadow-card-on-page: 5px 5px 0 rgba(232, 217, 184, 0.38);
 
   /* --- Effects --- */

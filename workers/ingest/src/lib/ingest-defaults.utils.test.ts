@@ -57,4 +57,12 @@ describe("applyIngestDefaults", () => {
     expect(result.priceMin).toBe(32);
     expect(result.priceMax).toBe(35);
   });
+
+  it("strips api tag before persist", () => {
+    const result = applyIngestDefaults({
+      ...base,
+      tags: ["api", "live", "API"]
+    });
+    expect(result.tags).toEqual(["live"]);
+  });
 });

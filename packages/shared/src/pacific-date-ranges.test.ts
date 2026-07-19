@@ -43,5 +43,14 @@ describe("pacific-date-ranges", () => {
     const window = resolvePacificDateWindow("thisWeek", new Date("2026-06-07T18:00:00-07:00"));
     expect(window.fromIso).toBe("2026-06-07");
     expect(window.untilIso).toBe("2026-06-13");
+    expect(window.from.getTime()).toBeLessThan(new Date("2026-06-07T18:00:00-07:00").getTime());
+  });
+
+  it("starts today window at Pacific midnight, not wall-clock now", () => {
+    const now = new Date("2026-06-07T18:00:00-07:00");
+    const window = resolvePacificDateWindow("today", now);
+    expect(window.fromIso).toBe("2026-06-07");
+    expect(window.untilIso).toBe("2026-06-07");
+    expect(window.from.getTime()).toBeLessThan(now.getTime());
   });
 });

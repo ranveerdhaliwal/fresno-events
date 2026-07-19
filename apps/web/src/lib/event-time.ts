@@ -55,10 +55,33 @@ export function toIsoDateLocal(value: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export type EventTimeStatus = "past" | "live" | "upcoming";
+
+export function resolveEventEnd(startTs: string, endTs?: string | null): Date {
+  if (endTs) {
+    return new Date(endTs);
+  }
+  return new Date(new Date(startTs).getTime() + 2 * 60 * 60 * 1000);
+}
+
 export function isLiveNow(startTs: string, endTs: string | undefined, now = new Date()): boolean {
   const start = new Date(startTs);
-  const end = endTs ? new Date(endTs) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  const end = resolveEventEnd(startTs, endTs);
   return start <= now && now < end;
+}
+
+export function deriveEventTimeStatus(
+  startTs: string,
+  endTs: string | undefined,
+  now = new Date()
+): EventTimeStatus {
+  if (isLiveNow(startTs, endTs, now)) {
+    return "live";
+  }
+  if (resolveEventEnd(startTs, endTs) <= now) {
+    return "past";
+  }
+  return "upcoming";
 }
 
 export function bucketPeriod(startTs: string, endTs: string | undefined, now = new Date()): DayPeriod {
@@ -87,8 +110,17 @@ export function formatCountdownLabel(startTs: string, now = new Date()): string 
 }
 
 export function isTonight(startTs: string, now = new Date()): boolean {
-  const eventDate = new Date(startTs);
-  return eventDate.toDateString() === now.toDateString() && eventDate.getHours() >= 17;
+  const eventIso = toIsoDateLocal(new Date(startTs));
+  const todayIso = toIsoDateLocal(now);
+  if (eventIso !== todayIso) {
+    return false;
+  }
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: TIME_ZONE }).format(
+      new Date(startTs)
+    )
+  );
+  return hour >= 17;
 }
 
 export function isWeekend(date: Date): boolean {

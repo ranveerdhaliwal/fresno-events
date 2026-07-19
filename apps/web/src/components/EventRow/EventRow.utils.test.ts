@@ -37,18 +37,30 @@ describe("getEventRowLayoutFlags", () => {
 });
 
 describe("getEventRowModifiers", () => {
-  it("marks selected and live rows", () => {
+  it("marks selected, live, and past rows", () => {
     const modifiers = getEventRowModifiers({
       showImage: true,
       showP5ListImage: false,
       priority: 2,
       forceVisible: false,
       isSelected: true,
-      isLive: true
+      isLive: true,
+      isPast: false
     });
 
     expect(modifiers.p2).toBe(true);
     expect(modifiers.selected).toBe(true);
     expect(modifiers.live).toBe(true);
+    expect(modifiers.past).toBe(false);
+
+    expect(
+      getEventRowModifiers({
+        showImage: true,
+        showP5ListImage: false,
+        priority: 3,
+        forceVisible: false,
+        isPast: true
+      }).past
+    ).toBe(true);
   });
 });

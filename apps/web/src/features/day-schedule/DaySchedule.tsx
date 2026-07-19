@@ -3,24 +3,36 @@ import { useMemo, useState } from "react";
 import { EventCard } from "@/components/EventCard";
 import { EventRow } from "@/components/EventRow";
 import { SecHead } from "@/components/SecHead";
-import { ShowMore } from "@/components/ShowMore";
 import { Text } from "@/components/Text";
-import { bucketPeriod, isLiveNow, type DayPeriod } from "@/lib/event-time";
+import { useBrowseEventSelect } from "@/hooks/useIsMobile";
+import { bucketPeriod, type DayPeriod } from "@/lib/event-time";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
 import { DayScheduleSkeleton } from "./DayScheduleSkeleton";
 import { useDayEvents } from "./useDayEvents";
 import styles from "./DaySchedule.module.css";
 
-const PERIODS: { id: DayPeriod; title: string; script?: string }[] = [
-  { id: "live", title: "LIVE OR ONGOING", script: "right now" },
+const PERIODS: { id: Exclude<DayPeriod, "live">; title: string; script?: string }[] = [
   { id: "morning", title: "MORNING", script: "early" },
   { id: "afternoon", title: "AFTERNOON", script: "midday" },
   { id: "evening", title: "EVENING & NIGHT", script: "after dark" }
 ];
 
-function isMobileViewport() {
-  return typeof window !== "undefined" && window.matchMedia("(max-width: 600px)").matches;
+function schedulePeriod(startTs: string, endTs: string | undefined, now: Date): Exclude<DayPeriod, "live"> {
+  const period = bucketPeriod(startTs, endTs, now);
+  if (period === "live") {
+    const hour = Number(
+      new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: "America/Los_Angeles"
+      }).format(new Date(startTs))
+    );
+    if (hour < 12) return "morning";
+    if (hour < 17) return "afternoon";
+    return "evening";
+  }
+  return period;
 }
 
 export interface DayScheduleProps {
@@ -32,23 +44,24 @@ export function DaySchedule({ isoDate, onNavigateEvent }: DayScheduleProps) {
   const { data, isLoading } = useDayEvents(isoDate);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const now = new Date();
+  const handleSelect = useBrowseEventSelect({
+    onSelectInSplit: setSelectedId,
+    onOpenEvent: onNavigateEvent
+  });
 
   const rows = useMemo(() => {
     if (!data) return [];
-    return data.items.map((item) => {
-      const row = toEventRowViewModel(item, now);
-      return { ...row, isLive: isLiveNow(item.event.startTs, item.event.endTs, now) };
-    });
+    return data.items.map((item) => toEventRowViewModel(item, now));
   }, [data, now]);
 
   const byPeriod = useMemo(() => {
-    const map = new Map<DayPeriod, typeof rows>();
+    const map = new Map<Exclude<DayPeriod, "live">, typeof rows>();
     for (const period of PERIODS) {
       map.set(period.id, []);
     }
     if (!data) return map;
     for (const item of data.items) {
-      const period = bucketPeriod(item.event.startTs, item.event.endTs, now);
+      const period = schedulePeriod(item.event.startTs, item.event.endTs, now);
       const row = rows.find((r) => r.id === item.event.id);
       if (row) {
         const list = map.get(period) ?? [];
@@ -61,14 +74,6 @@ export function DaySchedule({ isoDate, onNavigateEvent }: DayScheduleProps) {
 
   const selected = rows.find((r) => r.id === selectedId) ?? rows[0] ?? null;
 
-  const handleSelect = (id: string, slug: string) => {
-    if (isMobileViewport()) {
-      onNavigateEvent(slug);
-      return;
-    }
-    setSelectedId(id);
-  };
-
   if (isLoading) {
     return <DayScheduleSkeleton />;
   }
@@ -78,18 +83,16 @@ export function DaySchedule({ isoDate, onNavigateEvent }: DayScheduleProps) {
       <div className={styles.listCol}>
         {PERIODS.map((period) => {
           const events = byPeriod.get(period.id) ?? [];
-          const live = period.id === "live";
           return (
             <section key={period.id} className={styles.section}>
               <SecHead
                 title={period.title}
                 {...(period.script ? { script: period.script } : {})}
                 count={events.length}
-                variant={live ? "live" : "default"}
               />
               {events.length === 0 ? (
                 <Text variant="body2" tone="mutedOnPage" className={styles.empty}>
-                  {live ? "Nothing live right now — check back closer to showtime." : "No events in this block yet."}
+                  No events in this block yet.
                 </Text>
               ) : (
                 <div className={styles.list}>
@@ -106,7 +109,6 @@ export function DaySchedule({ isoDate, onNavigateEvent }: DayScheduleProps) {
                   ))}
                 </div>
               )}
-              {events.length > 0 ? <ShowMore /> : null}
             </section>
           );
         })}

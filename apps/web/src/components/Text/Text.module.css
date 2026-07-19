@@ -109,15 +109,15 @@
 }
 
 .toneAccent {
-  color: var(--coral);
+  color: var(--coral-dark);
 }
 
 .toneMutedOnPage {
-  color: color-mix(in srgb, var(--text-on-page) 82%, transparent);
+  color: color-mix(in srgb, var(--text-on-page) 92%, transparent);
 }
 
 .toneMutedOnCard {
-  color: var(--text-secondary-on-card);
+  color: color-mix(in srgb, var(--text-primary) 78%, transparent);
 }
 
 .toneLabel {
@@ -129,7 +129,8 @@
 }
 
 .toneInverse {
-  color: var(--surface-card);
+  /* Pure white for text on coral-active fills (cream-on-coral fails WCAG). */
+  color: #fff;
 }
 
 .toneInherit {

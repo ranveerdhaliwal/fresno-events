@@ -121,6 +121,7 @@ export function toCandidateEventRowViewModel(
       : {}),
     isFree: false,
     isLive: false,
+    timeStatus: "upcoming",
     featuredBadge: "default",
     descriptionSnippet: normalized.descriptionText?.slice(0, 120) ?? "",
     venueAddress: candidate.venueName,
