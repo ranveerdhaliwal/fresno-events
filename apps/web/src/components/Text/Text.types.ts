@@ -20,6 +20,7 @@ export const TEXT_TONES = [
   "onCard",
   "onNav",
   "accent",
+  "brand",
   "mutedOnPage",
   "mutedOnCard",
   "label",

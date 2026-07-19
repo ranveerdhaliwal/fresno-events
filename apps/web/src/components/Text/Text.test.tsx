@@ -19,11 +19,14 @@ describe("Text", () => {
     expect(node.className).toContain(styles.toneOnCard);
   });
 
-  it("defaults page headings to on-page tone", () => {
-    renderWithProviders(<Text variant="header1">Review queue</Text>);
+  it("uses brand tone for vivid coral on page scripts", () => {
+    renderWithProviders(
+      <Text variant="script" tone="brand" data-testid="brand-script">
+        what&apos;s
+      </Text>
+    );
 
-    const heading = screen.getByRole("heading", { level: 1, name: "Review queue" });
-    expect(heading.className).toContain(styles.header1);
-    expect(heading.className).toContain(styles.toneOnPage);
+    const node = screen.getByTestId("brand-script");
+    expect(node.className).toContain(styles.toneBrand);
   });
 });
