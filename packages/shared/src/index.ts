@@ -94,6 +94,7 @@ export {
   PACIFIC_TZ,
   addDaysToIsoDate,
   daysFromIsoThroughSunday,
+  nextSaturdayIso,
   pacificEndOfDay,
   pacificMonthBounds,
   pacificStartOfDay,

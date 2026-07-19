@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
+import { DateChip } from "@/components/DateChip";
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import { Text } from "@/components/Text";
 import { cn } from "@/lib/cn";
@@ -9,6 +10,7 @@ import type { EventRowProps } from "./EventRow.types";
 import { getEventRowLayoutFlags, getEventRowModifiers } from "./EventRow.utils";
 import styles from "./EventRow.module.css";
 import endedStyles from "@/styles/ended-event.module.css";
+import patternStyles from "@/styles/patterns.module.css";
 
 export function EventRow({
   event,
@@ -44,6 +46,7 @@ export function EventRow({
 
   const className = cn(
     styles.row,
+    patternStyles.hoverLift,
     modifiers.forceVisible && styles.forceVisible,
     modifiers.p0 && styles.p0,
     modifiers.p1 && styles.p1,
@@ -71,17 +74,13 @@ export function EventRow({
           {event.flagLabel}
         </Text>
       ) : null}
-      <div className={styles.rowDate}>
-        <Text variant="eyebrow" tone="accent" as="span" className={styles.day}>
-          {event.dayShort}
-        </Text>
-        <Text variant="header3" tone="onCard" as="span" className={styles.num}>
-          {event.dayNum}
-        </Text>
-        <Text variant="body3" tone="mutedOnCard" as="span" className={styles.month}>
-          {event.monthShort}
-        </Text>
-      </div>
+      <DateChip
+        variant="row"
+        dayShort={event.dayShort}
+        dayNum={event.dayNum}
+        monthShort={event.monthShort}
+        className={styles.rowDate}
+      />
       {showRowImage ? (
         <div className={styles.rowImg}>
           <PlaceholderImage

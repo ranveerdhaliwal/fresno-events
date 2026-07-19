@@ -3,11 +3,12 @@ import { useMemo, useState } from "react";
 
 import type { EventListItem } from "@fresno-events/shared";
 
-import { EventCard } from "@/components/EventCard";
-import { EventRow } from "@/components/EventRow";
+import { EmptyState } from "@/components/EmptyState";
+import { SelectableEventRow } from "@/components/SelectableEventRow";
 import { Text } from "@/components/Text";
 import { cn } from "@/lib/cn";
 import { toEventRowViewModel, type EventRowViewModel } from "@/lib/event-view-model";
+import patternStyles from "@/styles/patterns.module.css";
 
 import {
   filterItemsOnPacificDate,
@@ -47,22 +48,17 @@ function RowList({
   const selected = rows.find((row) => row.id === selectedId) ?? null;
 
   return (
-    <div className={styles.list}>
+    <div className={patternStyles.list}>
       {rows.map((row) => (
-        <div key={row.id} className={styles.rowWrap}>
-          <EventRow
-            event={row}
-            isSelected={selected?.id === row.id}
-            isLive={row.isLive}
-            {...(onSelect
-              ? { onSelect: () => onSelect(row.id, row.slug) }
-              : linkRows
-                ? { slug: row.slug }
-                : {})}
-            {...(renderAdminAction ? { adminAction: renderAdminAction(row.id) } : {})}
-          />
-          {onSelect ? <EventCard event={row} /> : null}
-        </div>
+        <SelectableEventRow
+          key={row.id}
+          event={row}
+          isSelected={selected?.id === row.id}
+          isLive={row.isLive}
+          linkRows={linkRows}
+          {...(onSelect ? { onSelect } : {})}
+          {...(renderAdminAction ? { adminAction: renderAdminAction(row.id) } : {})}
+        />
       ))}
     </div>
   );
@@ -103,9 +99,9 @@ export function ActiveEndedEventList({
 
   if (!hasRows) {
     return (
-      <Text variant="body2" tone="mutedOnCard" className={cn(styles.empty, className)} data-testid="active-ended-empty">
+      <EmptyState {...(className ? { className } : {})} data-testid="active-ended-empty">
         {emptyMessage}
-      </Text>
+      </EmptyState>
     );
   }
 

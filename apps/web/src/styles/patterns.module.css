@@ -1,0 +1,74 @@
+/**
+ * Shared visual patterns extracted from duplicated component/feature CSS.
+ * Consumers import this module and apply classes directly in TSX via
+ * `cn(styles.foo, patternStyles.hoverLift)` — the codebase has no existing
+ * `composes:` usage, so this matches the established `cn()` convention.
+ */
+
+/* Cream card sitting on the navy/cream page background (rows, tiles, chips). */
+.cardOnPage {
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
+  box-shadow: var(--shadow-card-on-page);
+}
+
+/* Postcard "lift" on hover for cardOnPage-style surfaces. Theme-aware via
+   --shadow-hover-card instead of a hardcoded dim-theme rgba value. */
+.hoverLift {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.hoverLift:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-hover-card);
+}
+
+/* Centered placeholder message on a cream card (empty list states). */
+.emptyOnCard {
+  padding: 20px 16px;
+  margin: 0;
+  text-align: center;
+  color: var(--text-secondary-on-card);
+  font-weight: 600;
+  background: var(--surface-card);
+  border: var(--border-card-on-page);
+}
+
+/* List + sticky detail split used by Upcoming, Search, Day schedule, and Calendar. */
+.browseSplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.detailCol {
+  position: sticky;
+  top: 14px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rowWrap {
+  display: contents;
+}
+
+@media (max-width: 1080px) {
+  .browseSplit {
+    grid-template-columns: 1fr;
+  }
+
+  .detailCol {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .rowWrap :global([data-testid^="event-row-"]) {
+    display: none;
+  }
+}

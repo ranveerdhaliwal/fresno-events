@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 
-import { EventCard } from "@/components/EventCard";
-import { EventRow } from "@/components/EventRow";
 import { SecHead } from "@/components/SecHead";
+import { SelectableEventRow } from "@/components/SelectableEventRow";
 import { Text } from "@/components/Text";
 import { useBrowseEventSelect } from "@/hooks/useIsMobile";
 import { bucketPeriod, type DayPeriod } from "@/lib/event-time";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
+import patternStyles from "@/styles/patterns.module.css";
 import { DayScheduleSkeleton } from "./DayScheduleSkeleton";
 import { useDayEvents } from "./useDayEvents";
 import styles from "./DaySchedule.module.css";
@@ -79,7 +79,7 @@ export function DaySchedule({ isoDate, onNavigateEvent }: DayScheduleProps) {
   }
 
   return (
-    <div className={styles.split} data-testid="day-schedule">
+    <div className={patternStyles.browseSplit} data-testid="day-schedule">
       <div className={styles.listCol}>
         {PERIODS.map((period) => {
           const events = byPeriod.get(period.id) ?? [];
@@ -95,17 +95,15 @@ export function DaySchedule({ isoDate, onNavigateEvent }: DayScheduleProps) {
                   No events in this block yet.
                 </Text>
               ) : (
-                <div className={styles.list}>
+                <div className={patternStyles.list}>
                   {events.map((row) => (
-                    <div key={row.id} className={styles.rowWrap}>
-                      <EventRow
-                        event={row}
-                        isSelected={selected?.id === row.id}
-                        isLive={row.isLive}
-                        onSelect={() => handleSelect(row.id, row.slug)}
-                      />
-                      <EventCard event={row} />
-                    </div>
+                    <SelectableEventRow
+                      key={row.id}
+                      event={row}
+                      isSelected={selected?.id === row.id}
+                      isLive={row.isLive}
+                      onSelect={handleSelect}
+                    />
                   ))}
                 </div>
               )}
@@ -113,7 +111,7 @@ export function DaySchedule({ isoDate, onNavigateEvent }: DayScheduleProps) {
           );
         })}
       </div>
-      <div className={styles.detailCol}>
+      <div className={patternStyles.detailCol}>
         <UpcomingDetailPanel event={selected} />
       </div>
     </div>

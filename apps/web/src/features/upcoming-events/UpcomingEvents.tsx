@@ -1,11 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
-import { EventCard } from "@/components/EventCard";
-import { EventRow } from "@/components/EventRow";
+import { EmptyState } from "@/components/EmptyState";
 import { FilterChip } from "@/components/FilterChip";
 import { SectionTitle } from "@/components/SectionTitle";
-import { Text } from "@/components/Text";
+import { SelectableEventRow } from "@/components/SelectableEventRow";
 import { WeekBlockHeader } from "@/components/WeekBlockHeader";
 import { ActiveEndedEventList } from "@/features/event-browse/ActiveEndedEventList";
 import {
@@ -16,6 +15,7 @@ import { useBrowseEventSelect } from "@/hooks/useIsMobile";
 import { calendarSearchCurrent } from "@/lib/calendar-search.utils";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 import { formatEventDate, toIsoDateLocal } from "@/lib/event-time";
+import patternStyles from "@/styles/patterns.module.css";
 import type { EventSectionBucket } from "@fresno-events/shared";
 
 import { useEventSections } from "./useEventSections";
@@ -57,21 +57,17 @@ function SectionBlock({
     <section className={styles.sectionBlock}>
       <WeekBlockHeader label={label} {...(dateLabel !== undefined ? { dateLabel } : {})} />
       {rows.length === 0 ? (
-        <Text variant="body2" tone="mutedOnCard" className={styles.empty}>
-          No events scheduled
-        </Text>
+        <EmptyState>No events scheduled</EmptyState>
       ) : (
-        <div className={styles.list}>
+        <div className={patternStyles.list}>
           {rows.map((row) => (
-            <div key={row.id} className={styles.rowWrap}>
-              <EventRow
-                event={row}
-                isSelected={selectedId === row.id}
-                isLive={row.isLive}
-                onSelect={() => onSelect(row.id, row.slug)}
-              />
-              <EventCard event={row} />
-            </div>
+            <SelectableEventRow
+              key={row.id}
+              event={row}
+              isSelected={selectedId === row.id}
+              isLive={row.isLive}
+              onSelect={onSelect}
+            />
           ))}
         </div>
       )}
@@ -159,7 +155,7 @@ export function UpcomingEvents() {
         ))}
       </div>
 
-      <div className={styles.split}>
+      <div className={patternStyles.browseSplit}>
         <div className={styles.listCol}>
           {showToday ? (
             <section className={styles.sectionBlock}>
@@ -194,7 +190,7 @@ export function UpcomingEvents() {
             />
           ) : null}
         </div>
-        <div className={styles.detailCol}>
+        <div className={patternStyles.detailCol}>
           <UpcomingDetailPanel event={selected} />
         </div>
       </div>

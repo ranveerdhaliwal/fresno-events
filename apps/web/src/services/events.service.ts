@@ -20,7 +20,6 @@ export async function listDayEvents(isoDate: string, signal?: AbortSignal): Prom
 }
 
 export const eventsService = {
-  listTodayEvents,
   listWeekEvents,
   listWeekThroughSunday,
   listDayEvents,
@@ -31,10 +30,6 @@ export const eventsService = {
   getCalendarMonth,
   getVenueDetail
 };
-
-export async function listTodayEvents(signal?: AbortSignal): Promise<EventListResult> {
-  return listEvents({ limit: 12, ...(signal ? { signal } : {}) });
-}
 
 export async function listWeekEvents(options: {
   from: Date;

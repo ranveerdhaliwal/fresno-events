@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { collapseCalendarPreview, pacificDowShort } from "./CalendarDayTile.utils";
 import type { CalendarDayTileProps } from "./CalendarDayTile.types";
 import styles from "./CalendarDayTile.module.css";
+import patternStyles from "@/styles/patterns.module.css";
 
 export function CalendarDayTile({
   isoDate,
@@ -27,6 +28,7 @@ export function CalendarDayTile({
       params={{ date: isoDate }}
       className={cn(
         styles.tile,
+        patternStyles.hoverLift,
         isToday && styles.today,
         isWeekend && styles.weekend,
         !inMonth && styles.outOfMonth

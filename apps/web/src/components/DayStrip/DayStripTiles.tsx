@@ -3,6 +3,7 @@ import { Text } from "@/components/Text";
 import type { DayStripTile } from "@/lib/event-view-model";
 
 import styles from "./DayStrip.module.css";
+import patternStyles from "@/styles/patterns.module.css";
 
 export interface DayStripTilesProps {
   tiles: DayStripTile[];
@@ -33,6 +34,7 @@ export function DayStripTiles({ tiles, selectedIso, onSelectDate, tileWidth }: D
       {tiles.map((tile) => {
         const className = cn(
           styles.tile,
+          patternStyles.hoverLift,
           tile.isToday && styles.today,
           tile.isWeekend && styles.weekend,
           selectedIso === tile.isoDate && styles.selected

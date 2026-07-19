@@ -1,4 +1,4 @@
-import { EventRow } from "@/components/EventRow";
+import { AdminEventRow } from "@/components/AdminEventRow";
 import { EventRowSkeleton } from "@/components/EventRowSkeleton";
 import { SecHead } from "@/components/SecHead";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
@@ -98,7 +98,7 @@ export function PublishedEventList({
                     onClick={(event) => event.stopPropagation()}
                     aria-label={`Select ${hit.title}`}
                   />
-                  <EventRow
+                  <AdminEventRow
                     event={row}
                     isSelected={hit.id === activeId}
                     onSelect={() => onSelect(hit.id)}
