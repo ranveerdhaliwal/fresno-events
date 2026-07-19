@@ -315,7 +315,7 @@ function createMockResult(options: { from?: Date; until?: Date } = {}): EventLis
 
 async function createMockHomepageResult(signal?: AbortSignal): Promise<HomepageCurationResult> {
   const list = await listWeekThroughSunday(signal);
-  const featured = list.items.slice(0, 5).map((item, index) => ({
+  const featured = list.items.slice(0, 6).map((item, index) => ({
     position: index + 1,
     source: "auto" as const,
     item

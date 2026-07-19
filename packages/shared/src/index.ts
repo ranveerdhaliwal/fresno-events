@@ -80,8 +80,13 @@ export {
 } from "./event-preview.js";
 export {
   dedupeEventsByContent,
+  dedupeEventsByListingGroup,
+  diversifyHomepageFeatured,
   eventContentSignature,
-  type EventContentSignatureInput
+  eventListingGroupKey,
+  isSportsEvent,
+  type EventContentSignatureInput,
+  type EventListingGroupInput
 } from "./event-dedupe.js";
 export {
   groupPublishedEventsByContent,

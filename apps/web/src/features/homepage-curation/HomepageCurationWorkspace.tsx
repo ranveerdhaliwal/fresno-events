@@ -16,7 +16,7 @@ import styles from "./HomepageCurationWorkspace.module.css";
 import { HomepageCurationWorkspaceSkeleton } from "./HomepageCurationWorkspaceSkeleton";
 
 const SECTIONS: Array<{ id: HomepageSection; label: string; positions: number[] }> = [
-  { id: "featured", label: "Featured grid (this week through Sunday)", positions: [1, 2, 3, 4, 5] }
+  { id: "featured", label: "Featured grid (this week through Sunday)", positions: [1, 2, 3, 4, 5, 6] }
 ];
 
 interface DraftSlot {
