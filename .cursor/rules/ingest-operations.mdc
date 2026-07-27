@@ -24,9 +24,21 @@ Prerequisite: `pnpm ingest:dev` on `:8788`.
 4. `pnpm ingest:post-promote` — runs in order:
    - `ingest:detail-backfill --all` (Visit Fresno + ticket-site detail pages → price/address)
    - `ingest:enrich --all` (AI enrichment backlog → `pending_review`; includes series priority harmonize)
+   - `review:reject-exclusions --apply` (Go Bulldogs away games, Shen Yun, …)
    - `db:backfill-addresses` (venue mailing-line normalize; not lat/lng geocode)
 
-Or one shot for promote + post-promote: `pnpm ingest:scheduled-local`.
+**Maintenance before bulk approve** (requires `pnpm dev:api` for orphan step):
+
+5. `pnpm ingest:relink --dry-run` then `pnpm ingest:relink`
+6. `pnpm review:orphan-cleanup --dry-run` then apply if `wouldDelete > 0`
+
+**Cursor / agent review** (see [INGEST_LOCAL_OPS.md](docs/INGEST_LOCAL_OPS.md) § Agent runbook):
+
+7. Query `pending_review` — flag dupes, bad venues, missing coords on marquee shows
+8. `GET /review/candidates/pre-approve-audit` — must be 0 blocking issues
+9. `pnpm review:bulk-approve` when queue looks good
+
+Or one shot for promote + post-promote + maintenance shell: `pnpm ingest:scheduled-local` (steps 1–6; agent review still manual).
 
 **What runs automatically vs manual**
 
@@ -36,9 +48,10 @@ Or one shot for promote + post-promote: `pnpm ingest:scheduled-local`.
 | Occurrence / cross-source duplicate keys | At **persist** time; `pnpm ingest:relink` only after changing matching rules in `occurrence.ts` |
 | Series link / sibling priority | During **enrichment** (`harmonizeSeriesSuggestedPriority`) |
 | Venue **geocode** (lat/lng) | At **admin approve** (`upsertVenue`) or API `POST /review/ops/venue-geocode` — not ingest post-promote |
-| Global detail backfill + enrich + address backfill | **`ingest:post-promote`** (or `scheduled-local`) |
+| Global detail backfill + enrich + reject-exclusions + address backfill | **`ingest:post-promote`** (or `scheduled-local`) |
+| Occurrence relink + orphan cleanup | **`ingest:scheduled-local`** maintenance block, or manual steps 5–6 |
 
-After post-promote: reject away games (Go Bulldogs `"City, ST"`), then `pnpm review:bulk-approve` and `bulk-approve-changes-all` if needed.
+After post-promote + relink: run **agent review** (§ below), then `pnpm review:bulk-approve` and `bulk-approve-changes-all` if needed.
 
 See [docs/INGEST_LOCAL_OPS.md](docs/INGEST_LOCAL_OPS.md) and [docs/INGEST_TESTING.md](docs/INGEST_TESTING.md).
 

@@ -222,4 +222,28 @@ describe("suggestEventPriority — guards", () => {
       )
     ).toBeNull();
   });
+
+  it("Ticketmaster Bulldogs volleyball at Save Mart → P4 (not arena default P2)", () => {
+    expect(
+      suggestEventPriority(
+        input({
+          source: "ticketmaster",
+          title: "Fresno State Bulldogs Womens Volleyball vs. UC Irvine Anteaters",
+          venueName: "Save Mart Center"
+        })
+      )?.priority
+    ).toBe(4);
+  });
+
+  it("Ticketmaster Bulldogs football → P3", () => {
+    expect(
+      suggestEventPriority(
+        input({
+          source: "ticketmaster",
+          title: "Fresno State Bulldogs Football vs. San Diego State",
+          venueName: "Save Mart Center"
+        })
+      )?.priority
+    ).toBe(3);
+  });
 });
