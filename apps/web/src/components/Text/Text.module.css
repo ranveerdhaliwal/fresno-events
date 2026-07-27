@@ -109,7 +109,13 @@
 }
 
 .toneAccent {
+  /* Cream-card accents — darkened for WCAG AA on warm paper */
   color: var(--coral-dark);
+}
+
+.toneBrand {
+  /* Vivid brand coral for scripts/links on navy page surfaces */
+  color: var(--coral);
 }
 
 .toneMutedOnPage {

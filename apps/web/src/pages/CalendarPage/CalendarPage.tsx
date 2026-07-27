@@ -6,18 +6,19 @@ import { isoDateInPacificMonth, pacificTodayIso } from "@fresno-events/shared";
 import { CalendarDayTile } from "@/components/CalendarDayTile";
 import { isPacificWeekend } from "@/components/CalendarDayTile/CalendarDayTile.utils";
 import { CalendarMonthStrip } from "@/components/CalendarMonthStrip";
-import { EventCard } from "@/components/EventCard";
-import { EventRow } from "@/components/EventRow";
 import { PageChrome } from "@/components/PageChrome";
 import { SectionTitle } from "@/components/SectionTitle";
+import { SelectableEventRow } from "@/components/SelectableEventRow";
 import { Text } from "@/components/Text";
 import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
 import { useBrowseEventSelect } from "@/hooks/useIsMobile";
+import { cn } from "@/lib/cn";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 import { buildCalendarSeo } from "@/lib/seo/page-seo";
 import { useSeoHead } from "@/lib/seo/useSeoHead";
 import { getCalendarMonth } from "@/services/events.service";
 import { eventsKeys } from "@/services/events.queryKeys";
+import patternStyles from "@/styles/patterns.module.css";
 
 import { CalendarPageSkeleton } from "./CalendarPageSkeleton";
 import styles from "./CalendarPage.module.css";
@@ -99,7 +100,7 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
 
             <CalendarMonthStrip selectedYear={year} selectedMonth={month} />
 
-            <div className={styles.split} data-testid="calendar-browse-split">
+            <div className={cn(patternStyles.browseSplit, styles.monthSplit)} data-testid="calendar-browse-split">
               <div className={styles.weekList}>
                 <SectionTitle script="this" size="sm" as="h2" className={styles.weekHeading}>
                   MONTH BY WEEK
@@ -114,19 +115,17 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
                         No events yet
                       </Text>
                     ) : (
-                      <div className={styles.list}>
+                      <div className={patternStyles.list}>
                         {week.preview.map((item) => {
                           const row = toEventRowViewModel(item);
                           return (
-                            <div key={row.id} className={styles.rowWrap}>
-                              <EventRow
-                                event={row}
-                                isSelected={selected?.id === row.id}
-                                isLive={row.isLive}
-                                onSelect={() => handleSelect(row.id, row.slug)}
-                              />
-                              <EventCard event={row} />
-                            </div>
+                            <SelectableEventRow
+                              key={row.id}
+                              event={row}
+                              isSelected={selected?.id === row.id}
+                              isLive={row.isLive}
+                              onSelect={handleSelect}
+                            />
                           );
                         })}
                       </div>
@@ -134,7 +133,7 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
                   </section>
                 ))}
               </div>
-              <div className={styles.detailCol}>
+              <div className={patternStyles.detailCol}>
                 <UpcomingDetailPanel event={selected} />
               </div>
             </div>

@@ -1,3 +1,5 @@
+import { addDaysToIsoDate, pacificEndOfDay, pacificStartOfDay } from "@fresno-events/shared";
+
 import { toIsoDateLocal } from "@/lib/event-time";
 
 /** Normalizes /day/2026-05-22 or short /day/22 to ISO date in Pacific. */
@@ -22,13 +24,9 @@ export function parseDayParam(date: string, anchor = new Date()): string {
 }
 
 export function dayBoundsPacific(isoDate: string): { from: Date; until: Date } {
-  const from = new Date(`${isoDate}T00:00:00-07:00`);
-  const until = new Date(`${isoDate}T23:59:59.999-07:00`);
-  return { from, until };
+  return { from: pacificStartOfDay(isoDate), until: pacificEndOfDay(isoDate) };
 }
 
 export function addDaysIso(isoDate: string, delta: number): string {
-  const date = new Date(`${isoDate}T12:00:00-07:00`);
-  date.setDate(date.getDate() + delta);
-  return toIsoDateLocal(date);
+  return addDaysToIsoDate(isoDate, delta);
 }

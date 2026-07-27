@@ -6,6 +6,7 @@ import { Text } from "@/components/Text";
 import { cn } from "@/lib/cn";
 
 import styles from "./CalendarMonthStrip.module.css";
+import patternStyles from "@/styles/patterns.module.css";
 
 export interface CalendarMonthStripProps {
   selectedYear: number;
@@ -28,7 +29,7 @@ export function CalendarMonthStrip({ selectedYear, selectedMonth }: CalendarMont
               key={`${tile.year}-${tile.month}`}
               to="/calendar"
               search={{ year: tile.year, month: tile.month }}
-              className={cn(styles.tile, isSelected && styles.selected)}
+              className={cn(styles.tile, patternStyles.hoverLift, isSelected && styles.selected)}
               aria-current={isSelected ? "page" : undefined}
             >
               <Text variant="eyebrow" tone="inherit" as="span" className={styles.short}>

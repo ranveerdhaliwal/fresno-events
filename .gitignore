@@ -38,3 +38,9 @@ skills-lock.json
 
 # Supabase Studio scratch queries
 supabase/snippets/
+
+# Accidental Lighthouse Chrome profile dirs (Windows path names dropped into WSL cwd)
+C:/Users/
+\\\\wsl.localhost/
+lighthouse.*/
+**/lighthouse.*/

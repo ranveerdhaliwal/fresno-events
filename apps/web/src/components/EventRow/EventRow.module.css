@@ -27,12 +27,6 @@
   font: inherit;
 }
 
-.row:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 6px 6px 0 rgba(232, 217, 184, 0.45);
-  background: var(--surface-card);
-}
-
 .selected {
   outline: 4px solid var(--mustard);
   outline-offset: -3px;
@@ -64,42 +58,7 @@
   overflow: hidden;
 }
 
-.rowDate {
-  background: var(--surface-card);
-  border: var(--border-card);
-  border-radius: 6px;
-  min-width: 84px;
-  min-height: 78px;
-  padding: 8px 8px 10px;
-  text-align: center;
-  box-shadow: var(--shadow-xs);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.day {
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  display: block;
-}
-
-.num {
-  font-size: 22px;
-  line-height: 1;
-  margin-top: 2px;
-  display: block;
-}
-
-.month {
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1.25;
-  margin-top: 4px;
-  display: block;
-  white-space: nowrap;
-}
-
+/* .rowDate base styling lives in DateChip (variant=row); kept as a marker class for the .p0 override below. */
 .rowBody {
   min-width: 0;
 }

@@ -1,24 +1,14 @@
 .card {
   position: relative;
-  top: 0;
-  left: 0;
   background: var(--surface-card);
   border: var(--border-card-on-page);
   box-shadow: var(--shadow-card-on-page);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: top 0.15s ease, left 0.15s ease, box-shadow 0.15s ease;
   text-decoration: none;
   color: var(--text-primary);
   -webkit-tap-highlight-color: transparent;
-}
-
-.card:hover {
-  top: -2px;
-  left: -2px;
-  box-shadow: 7px 7px 0 rgba(232, 217, 184, 0.42);
-  background: var(--surface-card);
 }
 
 .card:focus-visible {

@@ -70,7 +70,7 @@ export function daysFromIsoThroughSunday(fromIso: string): string[] {
   return days;
 }
 
-function nextSaturdayIso(fromIso: string): string {
+export function nextSaturdayIso(fromIso: string): string {
   const [year, month, day] = fromIso.split("-").map(Number);
   const dow = new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay();
   const daysUntilSaturday = (6 - dow + 7) % 7;

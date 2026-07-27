@@ -1,0 +1,52 @@
+.chip {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+/* EventCard: compact dow+num chip. */
+.card {
+  border: var(--border-card);
+  background: var(--surface-chip);
+  padding: 6px 4px;
+  box-shadow: var(--shadow-xs);
+}
+
+/* EventRow: larger dow+num+month box. */
+.row {
+  background: var(--surface-card);
+  border: var(--border-card);
+  border-radius: var(--radius-sm);
+  min-width: 84px;
+  min-height: 78px;
+  padding: 8px 8px 10px;
+  box-shadow: var(--shadow-xs);
+  justify-content: center;
+}
+
+.dow {
+  letter-spacing: 1.5px;
+  display: block;
+}
+
+.row .dow {
+  letter-spacing: 2px;
+}
+
+.num {
+  line-height: 1;
+  display: block;
+}
+
+.row .num {
+  margin-top: 2px;
+}
+
+.month {
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin-top: 4px;
+  display: block;
+  white-space: nowrap;
+}

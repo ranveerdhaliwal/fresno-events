@@ -11,25 +11,6 @@
   align-items: center;
 }
 
-.date {
-  border: var(--border-card);
-  background: var(--surface-chip);
-  text-align: center;
-  padding: 6px 4px;
-  box-shadow: var(--shadow-xs);
-}
-
-.dow {
-  letter-spacing: 1.5px;
-  color: var(--text-primary);
-  display: block;
-}
-
-.dnum {
-  line-height: 1;
-  display: block;
-}
-
 .body h4 {
   margin: 0;
   font-size: 13px;

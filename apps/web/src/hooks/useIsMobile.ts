@@ -1,5 +1,7 @@
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
+
+import { useMediaQuery } from "./useMediaQuery";
 
 /** Matches CSS `@media (max-width: 600px)` used across the web app. */
 export const MOBILE_MAX_WIDTH_PX = 600;
@@ -11,20 +13,6 @@ export const MOBILE_MEDIA_QUERY = `(max-width: ${MOBILE_MAX_WIDTH_PX}px)`;
  */
 export const BROWSE_STACK_MAX_WIDTH_PX = 1080;
 export const BROWSE_STACK_MEDIA_QUERY = `(max-width: ${BROWSE_STACK_MAX_WIDTH_PX}px)`;
-
-function subscribeToQuery(query: string, onChange: () => void): () => void {
-  const media = window.matchMedia(query);
-  media.addEventListener("change", onChange);
-  return () => media.removeEventListener("change", onChange);
-}
-
-function useMediaQuery(query: string): boolean {
-  return useSyncExternalStore(
-    (onChange) => subscribeToQuery(query, onChange),
-    () => window.matchMedia(query).matches,
-    () => false
-  );
-}
 
 /** True when the viewport is at the mobile breakpoint (≤600px). */
 export function useIsMobile(): boolean {

@@ -24,6 +24,7 @@ export function FeaturedEventsSkeleton() {
             <FeatureCardSkeleton variant="small" />
             <FeatureCardSkeleton variant="small" />
             <FeatureCardSkeleton variant="small" />
+            <FeatureCardSkeleton variant="small" />
           </div>
         </div>
         <aside className={styles.side}>

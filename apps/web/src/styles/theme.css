@@ -17,10 +17,14 @@
   --text-label: var(--theme-text-label);
   --text-label-muted: var(--theme-text-label-muted);
   --text-label-on-card: var(--theme-text-label-on-card);
+  /* Muted body text on cards/admin surfaces (form hints, secondary copy). Alias
+     of --text-secondary-on-card so it stays theme-aware instead of a fixed gray. */
+  --text-muted: var(--text-secondary-on-card);
 
   /* Cards sitting on the page background */
   --border-card-on-page: var(--theme-border-card-on-page);
   --shadow-card-on-page: var(--theme-shadow-card-on-page);
+  --shadow-hover-card: var(--theme-shadow-hover-card);
   --hover-row-on-card: var(--theme-hover-row-on-card);
 
   /* Brand */

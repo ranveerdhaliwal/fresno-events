@@ -1,17 +1,18 @@
 import { ShieldAlert } from "lucide-react";
 
 import { formatErrorBannerContent } from "./ErrorBanner.utils";
+import styles from "./ErrorBanner.module.css";
 
 export function ErrorBanner({ error }: { error: unknown }) {
   const { message, status } = formatErrorBannerContent(error);
 
   return (
-    <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100">
-      <div className="flex items-center gap-2 text-rose-200">
-        <ShieldAlert className="size-4" />
-        <span className="font-medium">Request failed</span>
+    <div className={styles.banner}>
+      <div className={styles.head}>
+        <ShieldAlert size={16} aria-hidden />
+        <span className={styles.title}>Request failed</span>
       </div>
-      <p className="mt-1">
+      <p className={styles.message}>
         {message}
         {status ? ` (HTTP ${status})` : ""}
       </p>

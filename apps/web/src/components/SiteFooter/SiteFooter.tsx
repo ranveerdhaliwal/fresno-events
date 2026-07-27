@@ -20,7 +20,7 @@ export function SiteFooter() {
             <Text variant="body2" tone="mutedOnPage" as="p" className={styles.tagline}>
               Fresno &amp; Central Valley events
             </Text>
-            <Text variant="script" tone="accent" scriptStyle="footer" as="p" className={styles.script}>
+            <Text variant="script" tone="brand" scriptStyle="footer" as="p" className={styles.script}>
               greetings from the central valley
             </Text>
           </div>

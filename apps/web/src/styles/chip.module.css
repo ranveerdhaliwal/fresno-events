@@ -1,0 +1,32 @@
+/* Shared pill-chip base for small info chips that link out (WeatherChip, AirQualityChip). */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-card);
+  border: var(--border-card);
+  border-radius: 999px;
+  padding: 6px 12px;
+  box-shadow: var(--shadow-xs);
+  white-space: nowrap;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--coral);
+}
+
+.icon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1100px) {
+  .chip {
+    padding: 6px 10px;
+  }
+}

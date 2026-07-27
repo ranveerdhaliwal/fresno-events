@@ -23,6 +23,7 @@
   --theme-divider-on-page: rgba(26, 26, 26, 0.12);
   --theme-border-card-on-page: 3px solid #1a1a1a;
   --theme-shadow-card-on-page: 5px 5px 0 #1a1a1a;
+  --theme-shadow-hover-card: 6px 6px 0 #1a1a1a;
 
   --theme-shadow-color: #1a1a1a;
   --theme-shadow-opacity: 1;

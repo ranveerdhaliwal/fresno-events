@@ -1,0 +1,23 @@
+.banner {
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 45%, var(--border-on-page));
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--surface-card));
+  padding: 16px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-danger);
+}
+
+.title {
+  font-weight: 600;
+}
+
+.message {
+  margin: 4px 0 0;
+}
