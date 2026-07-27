@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { formatIngestExclusionNotes, getIngestExclusion } from "./ingest-exclusions.js";
+import {
+  formatIngestExclusionNotes,
+  getIngestExclusion,
+  isGobulldogsAwayGame
+} from "./ingest-exclusions.js";
 
 describe("ingest-exclusions", () => {
   it("rejects Shen Yun by title", () => {
@@ -17,5 +21,40 @@ describe("ingest-exclusions", () => {
 
   it("allows unrelated events", () => {
     expect(getIngestExclusion({ title: "Mrs. Doubtfire" })).toBeNull();
+  });
+
+  it("rejects Fresno State away games by title pattern", () => {
+    expect(
+      getIngestExclusion({
+        source: "api:gobulldogs",
+        title: "Football at San Diego State"
+      })?.id
+    ).toBe("gobulldogs-away");
+    expect(
+      getIngestExclusion({
+        source: "api:gobulldogs",
+        title: "Cross Country at Gaucho Twilight"
+      })?.id
+    ).toBe("gobulldogs-away");
+  });
+
+  it("keeps Fresno State home and invitational games", () => {
+    expect(
+      getIngestExclusion({
+        source: "api:gobulldogs",
+        title: "Women's Soccer vs Oregon State"
+      })
+    ).toBeNull();
+    expect(
+      getIngestExclusion({
+        source: "api:gobulldogs",
+        title: "Women's Volleyball: UC Irvine vs. New Mexico State"
+      })
+    ).toBeNull();
+  });
+
+  it("does not treat non-gobulldogs titles with 'at' as away games", () => {
+    expect(isGobulldogsAwayGame({ source: "api:milb", title: "Fresno Grizzlies at Visalia Rawhide" })).toBe(false);
+    expect(getIngestExclusion({ source: "api:milb", title: "Fresno Grizzlies at Visalia Rawhide" })).toBeNull();
   });
 });

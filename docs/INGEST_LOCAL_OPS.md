@@ -55,16 +55,19 @@ pnpm dev:api
 
 | Step | Command | What it does |
 | --- | --- | --- |
+| 0 | `pnpm env:status` | Confirm `DEV_TARGET=cloud-dev` and Supabase URL |
 | 1 | `pnpm ingest:promote --source=ticketmaster --no-enrich` | TM Discovery API → `event_candidates` |
 | 2 | `pnpm ingest:promote --source=venunite --no-enrich` | VenuNite API → candidates |
-| 3 | `pnpm ingest:promote-all --no-enrich` | All 12 venue modules (scrape + in-venue detail + enrich) |
-| 4 | `pnpm ingest:detail-backfill --all` | Visit Fresno / ticket-site detail pages → price & address |
-| 5 | `pnpm ingest:enrich --all` | AI enrich backlog → `pending_review` |
-| 6 | `pnpm db:backfill-addresses` | Normalize venue addresses / geocode gaps |
-| 7 | `pnpm ingest:relink --dry-run` then `pnpm ingest:relink` | Recompute `occurrence_key` / `occurrence_id` and cross-source duplicate links on **all** candidates (requires `pnpm ingest:dev`) |
-| 8 | Orphan cleanup — preview then apply (requires `pnpm dev:api`) | Remove duplicate **published** `events` rows (same title, venue, start); see below |
+| 3 | `pnpm ingest:promote-all --no-enrich` | All 12 venue modules (scrape + in-venue detail) |
+| 4 | `pnpm ingest:post-promote` | Detail backfill + enrich + **reject-exclusions** + venue addresses |
+| 5 | `pnpm ingest:relink --dry-run` then `pnpm ingest:relink` | Recompute `occurrence_key` / cross-source duplicate links |
+| 6 | Orphan cleanup — preview then apply (requires `pnpm dev:api`) | Remove duplicate **published** `events` rows |
 
-**Step 8 — orphan cleanup (pick one):**
+**Shortcut:** `pnpm ingest:post-promote` replaces old steps 4–6 (detail / enrich / addresses) in one command. **Shortcut for full run:** `pnpm ingest:scheduled-local` runs steps 1–6 + maintenance.
+
+**Do not skip `--no-enrich` on promote steps** — run enrichment once via `ingest:post-promote` so Gemini is used instead of broken local Workers AI.
+
+**Step 6 — orphan cleanup (pick one):**
 
 ```bash
 # CLI (preview)
@@ -78,7 +81,7 @@ curl -X POST "http://127.0.0.1:8790/review/ops/published-orphan-cleanup" \
 
 Or in **`/admin` → Queue maintenance → Published orphan cleanup** → **Preview**, then **Clean up**.
 
-Run step 7 after every full promote (re-promote alone does not refresh stale `occurrence_id` on existing rows). Run step 8 after relink and **before** bulk approve when sources were approved in different orders — otherwise pre-approve audit may flag `published_content_duplicate`. See [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md).
+Run step 5 after every full promote (re-promote alone does not refresh stale `occurrence_id` on existing rows). Run step 6 after relink and **before** bulk approve when sources were approved in different orders — otherwise pre-approve audit may flag `published_content_duplicate`. See [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md).
 
 **Then:** review queue (see **Cursor review** below) → `pnpm review:bulk-approve` or `/admin`.
 
@@ -107,17 +110,109 @@ The script exits non-zero if maintenance preview/apply fails — read the cursor
 
 ## Cursor review (instead of only `/admin`)
 
-After ingest finishes, use **Cursor Agent** on the Mac mini (or dev machine) to vet the queue before bulk approve. The agent can query cloud-dev via Supabase MCP and apply rejects/fixes you’d do by hand.
+After ingest finishes, use **Cursor Agent** (or any model with Supabase MCP + shell) to vet the queue before bulk approve.
 
-**Prerequisites:** `pnpm env:cloud-dev`. `ingest:scheduled-local` starts ingest + API workers automatically.
+**Prerequisites:** `pnpm env:cloud-dev`, `pnpm ingest:dev` on `:8788`, `pnpm dev:api` on `:8790` for audit endpoints.
+
+### Agent runbook (copy-paste for lesser models)
+
+**1. Confirm target**
+
+```bash
+pnpm env:status   # DEV_TARGET=cloud-dev, SUPABASE_URL → *.supabase.co
+```
+
+**2. Queue snapshot** (Supabase MCP `execute_sql` on cloud-dev)
+
+```sql
+SELECT status, count(*)::int AS n FROM event_candidates GROUP BY 1 ORDER BY 1;
+SELECT source, count(*)::int AS n FROM event_candidates WHERE status = 'pending_review' GROUP BY 1 ORDER BY n DESC;
+```
+
+**3. Auto-reject known exclusions** (also runs inside `ingest:post-promote`)
+
+```bash
+pnpm review:reject-exclusions          # dry-run
+pnpm review:reject-exclusions --apply  # Go Bulldogs away games, Shen Yun, …
+```
+
+**4. Relink** (if not already run via `ingest:scheduled-local`)
+
+```bash
+pnpm ingest:relink --dry-run   # errors must be 0
+pnpm ingest:relink
+```
+
+**5. Spot-check pending rows** — flag and manually reject when needed:
+
+```sql
+-- Exact dupes (same title + venue + start)
+SELECT normalized_event->>'title', normalized_event->>'venueName',
+       normalized_event->>'startTs', count(*)::int
+FROM event_candidates WHERE status = 'pending_review'
+GROUP BY 1,2,3 HAVING count(*) > 1;
+
+-- Cross-source dupes still both pending (example: bodie TM + Strummers)
+SELECT id, source, normalized_event->>'title', canonical_candidate_id
+FROM event_candidates
+WHERE status = 'pending_review'
+  AND occurrence_id IN (
+    SELECT occurrence_id FROM event_candidates
+    WHERE status = 'pending_review' GROUP BY 1 HAVING count(*) > 1
+  );
+
+-- Bad venue fields (phone as venue, city-only)
+SELECT id, source, normalized_event->>'title', normalized_event->>'venueName'
+FROM event_candidates
+WHERE status = 'pending_review'
+  AND (normalized_event->>'venueName' ~ '^[0-9]{3}-' OR normalized_event->>'venueName' IN ('Clovis', 'Fresno'));
+```
+
+**Reject duplicates:** keep higher-priority source (Ticketmaster / venue scrape over Visit Fresno / VenuNite). Use `/admin` or `POST /review/candidates/bulk-reject`.
+
+**6. Pre-approve audit** (must pass before bulk approve)
+
+```bash
+curl -fsS "http://127.0.0.1:8790/review/candidates/pre-approve-audit" \
+  -H "Authorization: Bearer $ADMIN_REVIEW_TOKEN"
+# Expect: ok:true, issues: [] (or only warnings you accept)
+```
+
+**7. Bulk approve**
+
+```bash
+pnpm review:bulk-approve
+```
+
+**8. Priority sanity check** (cloud-dev requires `--allow-remote`)
+
+```bash
+pnpm priority:rerank -- --allow-remote          # dry-run
+pnpm priority:rerank -- --allow-remote --apply  # fix Strummers P2→P4, arena P1→P2, etc.
+```
+
+**Known acceptable gaps (do not block approve):**
+
+- P5 recurring listings (trivia, karaoke, farmers markets) often lack price/image — OK
+- Visit Fresno scavenger-hunt series (one row per day) — OK
+- Go Bulldogs home games may lack price until ticket link exists — OK
+- Civic Academy rows may have phone-as-venue from Visit Fresno feed — fix later or approve with note
+
+**Reject / fix before approve:**
+
+- Go Bulldogs **away** games (`Sport at Opponent`) — auto via `review:reject-exclusions`
+- Two `pending_review` rows for same show night after relink — reject the weaker source
+- `pre-approve-audit` blocking issues (slug collision, published duplicate)
+
+---
 
 **After `pnpm ingest:scheduled-local` — read the review manifest first:**
 
-> Open `/tmp/fresno-ingest-scheduled/run-<stamp>-cursor-review.txt` and the matching `.log`. For each `>>>` step, confirm preflight/validation ok, relink `errors=0`, orphan `wouldDelete` matches expectations (and is under the max), no `ingest_runs` stuck `running`. Then query cloud-dev `event_candidates` where `status = 'pending_review'`. Reject out-of-area away games (Go Bulldogs with venue `"City, CA"`). Fix home Fresno State games to Bulldog Soccer Stadium. If maintenance and queue look good, run `pnpm review:bulk-approve`.
+> Open `/tmp/fresno-ingest-scheduled/run-<stamp>-cursor-review.txt` and the matching `.log`. For each `>>>` step, confirm preflight/validation ok, relink `errors=0`, orphan `wouldDelete` matches expectations (and is under the max), no `ingest_runs` stuck `running`. Then follow the **Agent runbook** above. If maintenance and queue look good, run `pnpm review:bulk-approve`.
 
 **Manual pipeline — example prompt:**
 
-> Query cloud-dev `event_candidates` where `status = 'pending_review'`. Reject out-of-area away games (Go Bulldogs with venue `"City, CA"`). Fix home Fresno State games to Bulldog Soccer Stadium with address `5250 N Barton Ave`. Flag rows missing coords, price, or images. Then run `pnpm review:bulk-approve` if the rest looks good.
+> Run the Agent runbook in INGEST_LOCAL_OPS.md: queue snapshot, reject-exclusions, relink if needed, spot-check dupes, pre-approve-audit, then bulk-approve if clean.
 
 The agent can run the same SQL/API steps as this doc; you stay in one thread instead of clicking through 180+ rows in `/admin`.
 

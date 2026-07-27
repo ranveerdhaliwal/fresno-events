@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Post-promote maintenance: detail pages, AI enrichment backlog, venue addresses.
+# Post-promote maintenance: detail pages, AI enrichment backlog, ingest exclusions, venue addresses.
 #
 # Run after promote-all + ticketmaster + venunite (ingest worker must be up).
 # Does NOT re-scrape sources. For the full local pipeline including promotes, use:
@@ -52,7 +52,12 @@ fi
 
 run_step bash "$REPO_ROOT/scripts/ingest-detail-backfill.sh" "${DETAIL_ARGS[@]}"
 run_step bash "$REPO_ROOT/scripts/ingest-enrich.sh" "${ENRICH_ARGS[@]}"
+if [[ "$DRY_RUN" != "true" ]]; then
+  run_step bash "$REPO_ROOT/scripts/review-reject-exclusions.sh" --apply
+else
+  run_step bash "$REPO_ROOT/scripts/review-reject-exclusions.sh" --dry-run
+fi
 run_step bash "$REPO_ROOT/scripts/backfill-venue-addresses.sh" "${ADDRESS_ARGS[@]}"
 
 echo ""
-echo "Post-promote complete (detail-backfill, enrich, venue-address backfill)."
+echo "Post-promote complete (detail-backfill, enrich, reject-exclusions, venue-address backfill)."

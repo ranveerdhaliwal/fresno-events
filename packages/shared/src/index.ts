@@ -69,6 +69,7 @@ export {
 export {
   formatIngestExclusionNotes,
   getIngestExclusion,
+  isGobulldogsAwayGame,
   type IngestExclusion,
   type IngestExclusionInput
 } from "./ingest-exclusions.js";

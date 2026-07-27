@@ -88,6 +88,10 @@ function isBigFresnoFairVenue(ctx: RuleContext): boolean {
   return /big fresno fair/i.test(ctx.venueName);
 }
 
+function isFresnoStateAthletics(ctx: RuleContext): boolean {
+  return /\b(fresno state|bulldogs)\b/.test(ctx.titleLower);
+}
+
 /** National / arena-scale headliners → P2 at any venue (fair, Save Mart, etc.). */
 const MAJOR_HEADLINER_PATTERN =
   /\b(ashanti|soul for real|nate bargatze|weird al|yankovic|jamie foxx|gabriel iglesias|jason aldean|lil wayne|gene simmons|pepe aguilar|grupo frontera|zz top|los lobos|brit floyd|jason bonham|fey)\b/i;
@@ -135,6 +139,24 @@ const EDITORIAL_RULES: readonly KeywordRule[] = [
     priority: 3,
     kind: "editorial",
     match: (ctx) => /\bfifa\b.*\bworld cup\b|\bworld cup\b.*\bwatch\b/i.test(ctx.titleLower)
+  },
+  {
+    id: "fresno-state-football",
+    label: "Fresno State football",
+    priority: 3,
+    kind: "editorial",
+    match: (ctx) => isFresnoStateAthletics(ctx) && /\bfootball\b/.test(ctx.titleLower)
+  },
+  {
+    id: "fresno-state-athletics",
+    label: "Fresno State athletics",
+    priority: 4,
+    kind: "editorial",
+    match: (ctx) =>
+      isFresnoStateAthletics(ctx) &&
+      /\b(volleyball|soccer|basketball|baseball|softball|wrestling|equestrian|cross country|tennis|golf|track|swimming)\b/.test(
+        ctx.titleLower
+      )
   }
 ];
 
