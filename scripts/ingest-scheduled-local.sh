@@ -69,10 +69,25 @@ run_step() {
   "$@"
 }
 
+scheduled_record_step() {
+  local name="$1"
+  local status="$2"
+  local detail="${3:-}"
+  SCHEDULED_REVIEW_STEPS+=("${name}|${status}|${detail}")
+}
+
 run_step pnpm ingest:promote --source=ticketmaster --no-enrich
+scheduled_record_step "promote-ticketmaster" "ok" ""
 run_step pnpm ingest:promote --source=venunite --no-enrich
+scheduled_record_step "promote-venunite" "ok" ""
 run_step pnpm ingest:promote-all --no-enrich
-run_step pnpm ingest:post-promote
+scheduled_record_step "promote-all" "ok" "venue-ingest"
+if run_step pnpm ingest:post-promote; then
+  scheduled_record_step "post-promote" "ok" "detail-backfill, enrich, reject-exclusions, addresses"
+else
+  scheduled_record_step "post-promote" "failed" ""
+  exit 1
+fi
 
 # shellcheck source=scripts/ingest-scheduled-maintenance.sh
 source "$REPO_ROOT/scripts/ingest-scheduled-maintenance.sh"

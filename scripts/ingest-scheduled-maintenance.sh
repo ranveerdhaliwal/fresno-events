@@ -34,13 +34,6 @@ scheduled_ensure_api_worker() {
   return 1
 }
 
-scheduled_record_step() {
-  local name="$1"
-  local status="$2"
-  local detail="${3:-}"
-  SCHEDULED_REVIEW_STEPS+=("${name}|${status}|${detail}")
-}
-
 scheduled_run_relink_maintenance() {
   echo ""
   echo ">>> pnpm ingest:relink --dry-run"
@@ -124,9 +117,11 @@ scheduled_emit_cursor_review() {
     echo "Log file: ${LOG}"
     echo "DEV_TARGET: ${DEV_TARGET:-unknown} (from dev-target.env)"
     echo ""
-    echo "Verify each step in the log above. Maintenance steps use preview-then-apply:"
+    echo "Verify each step in the log above."
+    echo "  - post-promote: detail-backfill, enrich, reject-exclusions (away games, Shen Yun), venue addresses"
     echo "  - relink: dry-run must show errors=0 before apply"
     echo "  - orphan cleanup: apply only when wouldDelete>0 and under max (${INGEST_SCHEDULED_MAX_ORPHAN_DELETE:-50})"
+    echo "After maintenance: agent runbook (INGEST_LOCAL_OPS.md) → pre-approve-audit → bulk-approve → bulk-approve-changes if needed"
     echo ""
     echo "Step results:"
     local row name status detail
