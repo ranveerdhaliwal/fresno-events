@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 
-import { EventCard } from "@/components/EventCard";
-import { EventRow } from "@/components/EventRow";
+import { SelectableEventRow } from "@/components/SelectableEventRow";
 import { UpcomingDetailPanel } from "@/features/upcoming-events/UpcomingDetailPanel";
 import type { EventRowViewModel } from "@/lib/event-view-model";
 import { cn } from "@/lib/cn";
+import patternStyles from "@/styles/patterns.module.css";
 
 import styles from "./EventBrowseSplit.module.css";
 
@@ -29,29 +29,27 @@ export function EventBrowseSplit({
   listFooter
 }: EventBrowseSplitProps) {
   return (
-    <div className={cn(styles.split, className)} data-testid="event-browse-split">
+    <div className={cn(patternStyles.browseSplit, className)} data-testid="event-browse-split">
       <div className={styles.listCol}>
         {listHeader}
         {rows.length === 0 ? (
           empty
         ) : (
-          <div className={styles.list}>
+          <div className={patternStyles.list}>
             {rows.map((row) => (
-              <div key={row.id} className={styles.rowWrap}>
-                <EventRow
-                  event={row}
-                  isSelected={selected?.id === row.id}
-                  isLive={row.isLive}
-                  onSelect={() => onSelect(row.id, row.slug)}
-                />
-                <EventCard event={row} />
-              </div>
+              <SelectableEventRow
+                key={row.id}
+                event={row}
+                isSelected={selected?.id === row.id}
+                isLive={row.isLive}
+                onSelect={onSelect}
+              />
             ))}
           </div>
         )}
         {listFooter}
       </div>
-      <div className={styles.detailCol}>
+      <div className={patternStyles.detailCol}>
         <UpcomingDetailPanel event={selected} />
       </div>
     </div>

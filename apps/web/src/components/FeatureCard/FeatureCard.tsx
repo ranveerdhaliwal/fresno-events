@@ -9,6 +9,7 @@ import { isListTicketPriceLabel } from "@/lib/event-price.utils";
 
 import { formatFeaturedBadgeLabel, shouldShowFeaturedBadge } from "./FeatureCard.utils";
 import styles from "./FeatureCard.module.css";
+import patternStyles from "@/styles/patterns.module.css";
 
 export interface FeatureCardProps {
   card: FeatureCardViewModel;
@@ -22,7 +23,7 @@ export function FeatureCard({ card, variant = "small" }: FeatureCardProps) {
     <Link
       to="/event/$slug"
       params={{ slug: card.slug }}
-      className={cn(styles.card, variant === "hero" && styles.hero)}
+      className={cn(styles.card, patternStyles.hoverLift, variant === "hero" && styles.hero)}
       data-testid={`feature-card-${card.slug}`}
     >
       <div className={styles.image}>

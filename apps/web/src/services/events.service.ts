@@ -20,7 +20,6 @@ export async function listDayEvents(isoDate: string, signal?: AbortSignal): Prom
 }
 
 export const eventsService = {
-  listTodayEvents,
   listWeekEvents,
   listWeekThroughSunday,
   listDayEvents,
@@ -31,10 +30,6 @@ export const eventsService = {
   getCalendarMonth,
   getVenueDetail
 };
-
-export async function listTodayEvents(signal?: AbortSignal): Promise<EventListResult> {
-  return listEvents({ limit: 12, ...(signal ? { signal } : {}) });
-}
 
 export async function listWeekEvents(options: {
   from: Date;
@@ -320,7 +315,7 @@ function createMockResult(options: { from?: Date; until?: Date } = {}): EventLis
 
 async function createMockHomepageResult(signal?: AbortSignal): Promise<HomepageCurationResult> {
   const list = await listWeekThroughSunday(signal);
-  const featured = list.items.slice(0, 5).map((item, index) => ({
+  const featured = list.items.slice(0, 6).map((item, index) => ({
     position: index + 1,
     source: "auto" as const,
     item

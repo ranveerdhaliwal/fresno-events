@@ -1,6 +1,6 @@
 import { memo } from "react";
 
-import { EventRow } from "@/components/EventRow";
+import { AdminEventRow } from "@/components/AdminEventRow";
 import { EventRowSkeleton } from "@/components/EventRowSkeleton";
 import { SecHead } from "@/components/SecHead";
 import { getEventDisplayPriorityLabel } from "@fresno-events/shared";
@@ -125,7 +125,7 @@ export const CandidateList = memo(function CandidateList({
                     onClick={(e) => e.stopPropagation()}
                     aria-label={`Select ${candidate.title}`}
                   />
-                  <EventRow
+                  <AdminEventRow
                     event={row}
                     isSelected={candidate.id === activeId}
                     onSelect={() => onSelect(candidate.id)}

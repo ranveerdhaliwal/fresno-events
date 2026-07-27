@@ -1,7 +1,12 @@
 /**
  * Tags safe to show end users. Strips ingest/source plumbing that leaks into
  * event.tags (e.g. "ticketmaster", "venunite_slug:…").
- * Note: "api" is stripped at ingest/persist — not filtered here.
+ *
+ * Display-time filter: computed on read, on top of whatever is already
+ * stored — it never rewrites `event.tags`. This is distinct from the
+ * persist-time filter in `packages/shared/src/event-tags.utils.ts`
+ * (`sanitizeEventTags`), which runs once before write and strips only the
+ * plumbing tag that must never reach the DB ("api"; stripped there, not here).
  */
 
 const BLOCKED_EXACT = new Set([

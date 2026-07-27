@@ -2,7 +2,10 @@ import {
   addDaysToIsoDate,
   compareEventsByPriorityStart,
   dedupeEventsByContent,
+  dedupeEventsByListingGroup,
   eventContentSignature,
+  eventListingGroupKey,
+  isSportsEvent,
   pacificEndOfDay,
   pacificStartOfDay,
   pacificTodayIso,
@@ -23,7 +26,9 @@ import { supabaseRequest } from "@/lib/supabase-client";
 const HOMEPAGE_LIST_FROM_MS = 6 * 60 * 60 * 1000;
 const HOMEPAGE_FEATURED_LOOKAHEAD_DAYS = 7;
 const SCHEDULED_STATUSES = new Set<EventStatus>(["scheduled", "sold_out", "postponed"]);
-const SLOTS_PER_SECTION = 5;
+/** Featured grid: 2 heroes + 4 small cards. */
+export const FEATURED_SLOTS_PER_SECTION = 6;
+const BIGGEST_MONTH_LIMIT = 10;
 
 interface HomepageSlotDbRow {
   section: HomepageSection;
@@ -68,7 +73,7 @@ async function loadSlotRows(env: Env): Promise<HomepageSlotDbRow[]> {
 function slotMap(rows: HomepageSlotDbRow[]): Map<string, string | null> {
   const map = new Map<string, string | null>();
   for (const section of ["featured", "popular"] as const) {
-    for (let position = 1; position <= SLOTS_PER_SECTION; position += 1) {
+    for (let position = 1; position <= FEATURED_SLOTS_PER_SECTION; position += 1) {
       map.set(`${section}:${position}`, null);
     }
   }
@@ -99,6 +104,7 @@ async function loadFeaturedAutoPool(env: Env, now: Date): Promise<EventListItem[
 
   const seenIds = new Set<string>();
   const seenSignatures = new Set<string>();
+  const seenGroups = new Set<string>();
   const merged: EventListItem[] = [];
   for (const item of [...todayPool.items, ...aheadPool.items]) {
     if (seenIds.has(item.event.id)) {
@@ -108,14 +114,37 @@ async function loadFeaturedAutoPool(env: Env, now: Date): Promise<EventListItem[
     if (seenSignatures.has(signature)) {
       continue;
     }
+    const group = eventListingGroupKey(item);
+    if (seenGroups.has(group)) {
+      continue;
+    }
     seenIds.add(item.event.id);
     seenSignatures.add(signature);
+    seenGroups.add(group);
     merged.push(item);
   }
 
   return merged
     .filter((item) => isEventEligibleForHomepage(item.event, now))
     .sort(compareEventsByPriorityStart);
+}
+
+function canPlaceFeaturedItem(
+  item: EventListItem,
+  placedIds: Set<string>,
+  placedGroups: Set<string>,
+  sportsCount: number
+): boolean {
+  if (placedIds.has(item.event.id)) {
+    return false;
+  }
+  if (placedGroups.has(eventListingGroupKey(item))) {
+    return false;
+  }
+  if (isSportsEvent(item) && sportsCount >= 1) {
+    return false;
+  }
+  return true;
 }
 
 async function resolveSection(
@@ -127,8 +156,10 @@ async function resolveSection(
 ): Promise<HomepageSlotItem[]> {
   const items: HomepageSlotItem[] = [];
   const pinnedIds: Array<string | null> = [];
+  const placedGroups = new Set<string>();
+  let sportsCount = 0;
 
-  for (let position = 1; position <= SLOTS_PER_SECTION; position += 1) {
+  for (let position = 1; position <= FEATURED_SLOTS_PER_SECTION; position += 1) {
     pinnedIds.push(pins.get(`${section}:${position}`) ?? null);
   }
 
@@ -136,29 +167,45 @@ async function resolveSection(
   const pinnedItems = await listEventsByIds(env, uniquePinned);
   const pinnedById = new Map(pinnedItems.map((item) => [item.event.id, item]));
 
-  for (let position = 1; position <= SLOTS_PER_SECTION; position += 1) {
+  for (let position = 1; position <= FEATURED_SLOTS_PER_SECTION; position += 1) {
     const eventId = pinnedIds[position - 1];
-    if (eventId) {
-      const item = pinnedById.get(eventId);
-      if (item && isEventEligibleForHomepage(item.event)) {
-        items.push({ position, source: "pinned", item });
-        placedIds.add(item.event.id);
-      }
+    if (!eventId) {
+      continue;
+    }
+    const item = pinnedById.get(eventId);
+    if (!item || !isEventEligibleForHomepage(item.event)) {
+      continue;
+    }
+    if (!canPlaceFeaturedItem(item, placedIds, placedGroups, sportsCount)) {
+      continue;
+    }
+    items.push({ position, source: "pinned", item });
+    placedIds.add(item.event.id);
+    placedGroups.add(eventListingGroupKey(item));
+    if (isSportsEvent(item)) {
+      sportsCount += 1;
     }
   }
 
   let autoIndex = 0;
-  while (items.length < SLOTS_PER_SECTION) {
-    while (autoIndex < autoPool.length && placedIds.has(autoPool[autoIndex]!.event.id)) {
+  while (items.length < FEATURED_SLOTS_PER_SECTION) {
+    while (autoIndex < autoPool.length) {
+      const candidate = autoPool[autoIndex]!;
       autoIndex += 1;
-    }
-    const auto = autoPool[autoIndex];
-    if (!auto) {
+      if (!canPlaceFeaturedItem(candidate, placedIds, placedGroups, sportsCount)) {
+        continue;
+      }
+      items.push({ position: items.length + 1, source: "auto", item: candidate });
+      placedIds.add(candidate.event.id);
+      placedGroups.add(eventListingGroupKey(candidate));
+      if (isSportsEvent(candidate)) {
+        sportsCount += 1;
+      }
       break;
     }
-    autoIndex += 1;
-    items.push({ position: items.length + 1, source: "auto", item: auto });
-    placedIds.add(auto.event.id);
+    if (autoIndex >= autoPool.length) {
+      break;
+    }
   }
 
   return items.map((entry, index) => ({ ...entry, position: index + 1 }));
@@ -169,9 +216,11 @@ async function resolveBiggestMonth(env: Env, now: Date): Promise<EventListItem[]
   const pool = await listEventsFromSupabase(env, {
     from: monthWindow.from,
     until: monthWindow.until,
-    limit: 50
+    limit: 80
   });
-  return dedupeEventsByContent(pool.items).slice(0, 10);
+  const byContent = dedupeEventsByContent(pool.items);
+  const byListing = dedupeEventsByListingGroup(byContent);
+  return byListing.sort(compareEventsByPriorityStart).slice(0, BIGGEST_MONTH_LIMIT);
 }
 
 export async function resolveHomepageCuration(env: Env): Promise<HomepageCurationResponse> {
@@ -202,7 +251,7 @@ export async function getHomepageSlotsAdmin(env: Env): Promise<HomepageSlotsResp
   const slots: HomepageSlotRow[] = [];
 
   for (const section of ["featured", "popular"] as const) {
-    for (let position = 1; position <= SLOTS_PER_SECTION; position += 1) {
+    for (let position = 1; position <= FEATURED_SLOTS_PER_SECTION; position += 1) {
       const eventId = pins.get(`${section}:${position}`) ?? null;
       const item = eventId ? byId.get(eventId) : undefined;
       slots.push({

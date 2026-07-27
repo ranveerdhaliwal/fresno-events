@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
+import { DateChip } from "@/components/DateChip";
 import { Text } from "@/components/Text";
 import type { EventRowViewModel } from "@/lib/event-view-model";
 import { cn } from "@/lib/cn";
@@ -28,14 +29,7 @@ export function EventCard({ event }: EventCardProps) {
           ENDED
         </Text>
       ) : null}
-      <div className={styles.date}>
-        <Text variant="eyebrow" tone="onCard" as="span" className={styles.dow}>
-          {event.dayShort}
-        </Text>
-        <Text variant="header2" tone="onCard" as="span" className={styles.dnum}>
-          {event.dayNum}
-        </Text>
-      </div>
+      <DateChip variant="card" dayShort={event.dayShort} dayNum={event.dayNum} />
       <div className={styles.body}>
         <Text variant="header3" tone="onCard" as="span">
           {event.title}

@@ -1,27 +1,9 @@
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  gap: 24px;
-  align-items: start;
-}
-
-.detailCol {
-  position: sticky;
-  top: 14px;
+.listCol {
+  min-width: 0;
 }
 
 .section {
   margin-bottom: 28px;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.rowWrap {
-  display: contents;
 }
 
 .empty {
@@ -34,14 +16,4 @@
 .loading {
   color: var(--text-label);
   font-weight: 600;
-}
-
-@media (max-width: 1080px) {
-  .split {
-    grid-template-columns: 1fr;
-  }
-
-  .detailCol {
-    display: none;
-  }
 }

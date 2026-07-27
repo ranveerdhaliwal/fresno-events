@@ -23,6 +23,7 @@ const toneClass = {
   onCard: styles.toneOnCard ?? "",
   onNav: styles.toneOnNav ?? "",
   accent: styles.toneAccent ?? "",
+  brand: styles.toneBrand ?? "",
   mutedOnPage: styles.toneMutedOnPage ?? "",
   mutedOnCard: styles.toneMutedOnCard ?? "",
   label: styles.toneLabel ?? "",

@@ -44,11 +44,6 @@
   transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
-.tile:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 6px 6px 0 rgba(232, 217, 184, 0.45);
-}
-
 .selected {
   background: var(--coral-active);
   color: #fff;

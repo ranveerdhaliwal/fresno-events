@@ -1,28 +1,8 @@
+/* Base chip styling lives in @/styles/chip.module.css; this module adds AirQualityChip-specific overrides. */
+
 .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--surface-card);
-  border: var(--border-card);
-  padding: 6px 12px;
-  border-radius: 999px;
-  box-shadow: var(--shadow-xs);
-  white-space: nowrap;
   max-width: 100%;
   min-width: 0;
-  text-decoration: none;
-  color: inherit;
-  cursor: pointer;
-}
-
-.chip:hover {
-  border-color: var(--coral);
-}
-
-.icon {
-  font-size: 16px;
-  line-height: 1;
-  flex-shrink: 0;
 }
 
 .labelFull {
@@ -40,9 +20,5 @@
 
   .labelCompact {
     display: inline;
-  }
-
-  .chip {
-    padding: 6px 10px;
   }
 }

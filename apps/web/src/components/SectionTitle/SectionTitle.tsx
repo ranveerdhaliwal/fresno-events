@@ -33,7 +33,7 @@ export function SectionTitle({
   return (
     <Component className={cn(styles.root, styles[size], className)}>
       {script ? (
-        <Text variant="script" tone="accent" scriptStyle="section" as="span" className={styles.script}>
+        <Text variant="script" tone="brand" scriptStyle="section" as="span" className={styles.script}>
           {script}
         </Text>
       ) : null}
