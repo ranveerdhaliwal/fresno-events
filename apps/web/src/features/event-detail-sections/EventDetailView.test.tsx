@@ -76,4 +76,13 @@ describe("EventDetailView", () => {
     expect(screen.getByText("Source")).toBeInTheDocument();
     expect(screen.getByText("ORIGINAL LINK")).toBeInTheDocument();
   });
+
+  it("renders source note without em dash when listing link exists", async () => {
+    const data = mockDetail();
+    data.detail.event.ticketUrl = "https://tickets.example.com/show";
+    await renderWithSiteRouter(<EventDetailView data={data} />);
+
+    expect(screen.getByText(/missed here, and to confirm/)).toBeInTheDocument();
+    expect(screen.queryByText(/missed here —/)).not.toBeInTheDocument();
+  });
 });

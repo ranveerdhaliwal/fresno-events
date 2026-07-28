@@ -109,7 +109,7 @@ export function DayPage() {
         />
 
         <div className={styles.popularRow}>
-          <PopularList title="POPULAR TODAY" events={popular} count={popular.length} />
+          <PopularList title="TOP EVENTS THIS DAY" events={popular} count={popular.length} />
           <AdSlot variant="banner-stacked" />
         </div>
 

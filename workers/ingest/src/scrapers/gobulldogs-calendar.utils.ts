@@ -2,12 +2,16 @@ import type { NormalizedEvent } from "@fresno-events/shared";
 
 import { withDefaultImageUrl } from "@/lib/default-image.utils";
 import { dateOnlyStartTs, instantFromPacificLocal } from "@/lib/pacific-instant.utils";
-import { isGobulldogsFinalEvent } from "@/scrapers/gobulldogs-priority.utils";
+import { isGobulldogsFinalEvent, isGobulldogsFootball } from "@/scrapers/gobulldogs-priority.utils";
 
 const BASE = "https://gobulldogs.com";
 const SOURCE = "api:gobulldogs";
 
 export const BULLDOGS_DEFAULT_IMAGE_URL = "https://gobulldogs.com/images/logos/site/site.png";
+
+/** Season-wide series for Fresno State football home games. */
+export const GOBULLDOGS_FOOTBALL_SERIES_ID = "series:gobulldogs-football:2026";
+export const GOBULLDOGS_FOOTBALL_SERIES_NAME = "Fresno State Football 2026";
 
 export function buildGobulldogsCalendarApiUrl(now: Date, horizonDays = 90): string {
   const end = new Date(now.getTime() + horizonDays * 86_400_000);
@@ -336,6 +340,14 @@ export function gobulldogsGameToNormalizedEvent(
   const venueCity = parseVenueCity(game.location || "Fresno, CA");
   const tags = buildGobulldogsTags(game, title);
   const descriptionText = buildGobulldogsDescription(game);
+  const footballHome =
+    isGobulldogsFootball({
+      source: SOURCE,
+      sourceEventId: `gobulldogs:game:${game.id}`,
+      title,
+      venueName,
+      startTs
+    }) && game.atVs.toLowerCase() !== "at";
 
   const event: NormalizedEvent = {
     source: SOURCE,
@@ -349,7 +361,10 @@ export function gobulldogsGameToNormalizedEvent(
     category: "sports",
     ...(descriptionText ? { descriptionText } : {}),
     ...(tags.length > 0 ? { tags } : {}),
-    ...(game.gameImageUrl ? { imageUrl: game.gameImageUrl } : {})
+    ...(game.gameImageUrl ? { imageUrl: game.gameImageUrl } : {}),
+    ...(footballHome
+      ? { seriesId: GOBULLDOGS_FOOTBALL_SERIES_ID, seriesName: GOBULLDOGS_FOOTBALL_SERIES_NAME }
+      : {})
   };
 
   return withDefaultImageUrl(event, BULLDOGS_DEFAULT_IMAGE_URL);

@@ -6,9 +6,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   BULLDOGS_DEFAULT_IMAGE_URL,
+  GOBULLDOGS_FOOTBALL_SERIES_ID,
   buildGobulldogsCalendarApiUrl,
   buildGobulldogsGameTitle,
   gobulldogsCalendarDaysToEvents,
+  gobulldogsGameToNormalizedEvent,
   parseGobulldogsCalendarDays
 } from "@/scrapers/gobulldogs-calendar.utils";
 
@@ -122,5 +124,50 @@ describe("gobulldogsGameToNormalizedEvent", () => {
 
     expect(football?.title).toBe("Football at USC");
     expect(football?.externalUrl).toBe("https://gobulldogs.com/sports/football/schedule");
+    expect(football?.seriesId).toBeUndefined();
+  });
+
+  it("assigns season series to football home games only", () => {
+    const home = gobulldogsGameToNormalizedEvent(
+      {
+        id: 9001,
+        time: "7:00 PM",
+        atVs: "vs",
+        dateUtc: "2026-09-14T02:00:00.000Z",
+        tbd: false,
+        location: "Fresno, CA",
+        gameCalendarExclude: false,
+        conferenceTitle: null,
+        gamePromotionText: null,
+        gameImageUrl: null,
+        sport: { title: "Football", globalSportShortname: "football" },
+        opponent: { title: "Sacramento State", tournamentTitle: null },
+        facility: { title: "Valley Children's Stadium" }
+      },
+      "2026-09-13"
+    );
+    expect(home?.title).toBe("Football vs Sacramento State");
+    expect(home?.seriesId).toBe(GOBULLDOGS_FOOTBALL_SERIES_ID);
+
+    const away = gobulldogsGameToNormalizedEvent(
+      {
+        id: 9002,
+        time: "5:00 PM",
+        atVs: "at",
+        dateUtc: "2026-09-06T00:00:00.000Z",
+        tbd: false,
+        location: "Los Angeles, CA",
+        gameCalendarExclude: false,
+        conferenceTitle: null,
+        gamePromotionText: null,
+        gameImageUrl: null,
+        sport: { title: "Football", globalSportShortname: "football" },
+        opponent: { title: "USC", tournamentTitle: null },
+        facility: null
+      },
+      "2026-09-05"
+    );
+    expect(away?.title).toBe("Football at USC");
+    expect(away?.seriesId).toBeUndefined();
   });
 });

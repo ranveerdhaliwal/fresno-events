@@ -18,7 +18,7 @@
 .brand {
   font-size: 18px;
   margin: 0 0 4px;
-  -webkit-text-stroke: 1.25px var(--ink);
+  -webkit-text-stroke: var(--text-stroke-on-dark-width) var(--text-stroke-on-dark-color);
   paint-order: stroke fill;
   text-shadow:
     0 0 0 var(--ink),

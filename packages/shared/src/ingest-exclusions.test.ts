@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   formatIngestExclusionNotes,
   getIngestExclusion,
-  isGobulldogsAwayGame
+  isGobulldogsAwayGame,
+  isMilbAwayGame
 } from "./ingest-exclusions.js";
 
 describe("ingest-exclusions", () => {
@@ -53,8 +54,21 @@ describe("ingest-exclusions", () => {
     ).toBeNull();
   });
 
-  it("does not treat non-gobulldogs titles with 'at' as away games", () => {
+  it("rejects Fresno Grizzlies away games", () => {
+    expect(isMilbAwayGame({ source: "api:milb", title: "Fresno Grizzlies at Visalia Rawhide" })).toBe(true);
+    expect(
+      getIngestExclusion({ source: "api:milb", title: "Fresno Grizzlies at Visalia Rawhide" })?.id
+    ).toBe("milb-away");
+  });
+
+  it("keeps Fresno Grizzlies home games", () => {
+    expect(isMilbAwayGame({ source: "api:milb", title: "Fresno Grizzlies vs Ontario Tower Buzzers" })).toBe(false);
+    expect(
+      getIngestExclusion({ source: "api:milb", title: "Fresno Grizzlies vs Ontario Tower Buzzers" })
+    ).toBeNull();
+  });
+
+  it("does not treat non-gobulldogs titles with 'at' as Fresno State away games", () => {
     expect(isGobulldogsAwayGame({ source: "api:milb", title: "Fresno Grizzlies at Visalia Rawhide" })).toBe(false);
-    expect(getIngestExclusion({ source: "api:milb", title: "Fresno Grizzlies at Visalia Rawhide" })).toBeNull();
   });
 });

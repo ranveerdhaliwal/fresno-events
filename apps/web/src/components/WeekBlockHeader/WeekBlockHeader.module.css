@@ -33,7 +33,7 @@
 @media (max-width: 600px) {
   .header {
     position: sticky;
-    top: var(--nav-height-mobile);
+    top: var(--mobile-chrome-height);
     z-index: 10;
     background: var(--surface-page);
     padding-top: 8px;

@@ -40,6 +40,10 @@ export const GRIZZLIES_DEFAULT_IMAGE_URL = "https://www.mlbstatic.com/team-logos
 /** Org-level MiLB tickets portal (statsapi does not expose per-game tickets.com event ids). */
 export const GRIZZLIES_TICKETS_ORG_URL = "https://mlb.tickets.com/?orgId=57456&agency=MILB_MPV";
 
+/** Season-wide series for Fresno home games at Chukchansi (away games are dropped). */
+export const GRIZZLIES_SEASON_SERIES_ID = "series:milb-grizzlies:2026";
+export const GRIZZLIES_SEASON_SERIES_NAME = "Fresno Grizzlies 2026";
+
 const GRIZZLIES_TEAM_ID = 259;
 
 /** Expand airport-style / abbreviated away venues so list rows read clearly. */
@@ -108,9 +112,13 @@ export function toNormalizedEvents(schedule: MilbSchedule): NormalizedEvent[] {
       const home = game.teams.home.team;
       const away = game.teams.away.team;
       const isHome = home.id === GRIZZLIES_TEAM_ID;
-      const opponent = isHome ? away.name : home.name;
-      const title = isHome ? `Fresno Grizzlies vs ${opponent}` : `Fresno Grizzlies at ${opponent}`;
-      const venue = resolveMilbVenue(game, isHome, opponent);
+      // Local calendar: only Chukchansi home games. Away games are out of area.
+      if (!isHome) {
+        continue;
+      }
+      const opponent = away.name;
+      const title = `Fresno Grizzlies vs ${opponent}`;
+      const venue = resolveMilbVenue(game, true, opponent);
 
       events.push({
         source: "api:milb",
@@ -124,7 +132,9 @@ export function toNormalizedEvents(schedule: MilbSchedule): NormalizedEvent[] {
         ticketUrl: GRIZZLIES_TICKETS_ORG_URL,
         imageUrl: GRIZZLIES_DEFAULT_IMAGE_URL,
         showVenueLogoInList: true,
-        listVenueLogoPadding: 10
+        listVenueLogoPadding: 10,
+        seriesId: GRIZZLIES_SEASON_SERIES_ID,
+        seriesName: GRIZZLIES_SEASON_SERIES_NAME
       });
     }
   }

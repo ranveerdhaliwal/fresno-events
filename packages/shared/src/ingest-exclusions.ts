@@ -10,6 +10,7 @@ export interface IngestExclusionInput {
 }
 
 const GOBULLDOGS_SOURCE = "api:gobulldogs";
+const MILB_SOURCE = "api:milb";
 
 /**
  * Sidearm away games use "{Sport} at {Opponent}". Home/neutral invitational rows use
@@ -33,6 +34,23 @@ export function isGobulldogsAwayGame(input: IngestExclusionInput): boolean {
   return /\s+at\s+/i.test(title);
 }
 
+/**
+ * Grizzlies road games ("Fresno Grizzlies at …"). Home stands use "vs".
+ * Prefer dropping at scrape time; this catches stale queue rows.
+ */
+export function isMilbAwayGame(input: IngestExclusionInput): boolean {
+  if (input.source !== MILB_SOURCE) {
+    return false;
+  }
+
+  const title = input.title.trim();
+  if (!title) {
+    return false;
+  }
+
+  return /^fresno grizzlies\s+at\s+/i.test(title);
+}
+
 export interface IngestExclusion {
   id: string;
   label: string;
@@ -52,6 +70,13 @@ export function getIngestExclusion(input: IngestExclusionInput): IngestExclusion
     return {
       id: "gobulldogs-away",
       label: "Fresno State away game (out of area)"
+    };
+  }
+
+  if (isMilbAwayGame(input)) {
+    return {
+      id: "milb-away",
+      label: "Fresno Grizzlies away game (out of area)"
     };
   }
 

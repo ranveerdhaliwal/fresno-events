@@ -6,6 +6,7 @@
   "strategy": "api",
   "listingUrl": "https://www.milb.com/fresno",
   "eventSource": "api:milb",
+  "seriesId": "series:milb-grizzlies:2026",
   "detailMode": "api_embedded",
   "listingDiscovery": "plain"
 }

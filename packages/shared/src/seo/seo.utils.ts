@@ -75,10 +75,11 @@ export function buildEventTitle(event: Pick<Event, "title">, venue: Pick<Venue, 
 
 export function buildEventDescription(
   event: Pick<Event, "title" | "descriptionText" | "startTs">,
-  venue: Pick<Venue, "name">
+  venue: Pick<Venue, "name" | "city">
 ): string {
   const when = formatPacificEventDate(event.startTs);
-  const lead = `${event.title} at ${venue.name} in Fresno on ${when}.`;
+  const city = venue.city?.trim() || "Fresno";
+  const lead = `${event.title} at ${venue.name} in ${city} on ${when}.`;
   const body = event.descriptionText?.trim();
   if (!body) {
     return truncateMetaDescription(lead);
@@ -88,11 +89,12 @@ export function buildEventDescription(
 
 export function buildEventIntroSentence(
   event: Pick<Event, "title" | "startTs" | "category">,
-  venue: Pick<Venue, "name">
+  venue: Pick<Venue, "name" | "city">
 ): string {
   const when = formatPacificEventDate(event.startTs);
   const categoryLabel = formatCategoryLabel(event.category);
-  return `${event.title} is a ${categoryLabel} event at ${venue.name} in Fresno on ${when}.`;
+  const city = venue.city?.trim() || "Fresno";
+  return `${event.title} is a ${categoryLabel} event at ${venue.name} in ${city} on ${when}.`;
 }
 
 export function buildVenueTitle(venue: Pick<Venue, "name">): string {

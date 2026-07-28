@@ -17,7 +17,7 @@
   --text-weight-extrabold: 800;
 
   /* Glyph outline for titles on navy / dark page surfaces */
-  --text-stroke-on-dark-width: 1.25px;
+  --text-stroke-on-dark-width: 2px;
   --text-stroke-on-dark-color: var(--ink);
 
   /* Type scale — desktop defaults; mobile overrides below for a later pass */
@@ -61,6 +61,7 @@
   --page-max: 1280px;
   --nav-height: 68px;
   --nav-height-mobile: 56px;
+  --mobile-chrome-height: calc(var(--nav-height-mobile) + var(--rainbow-stripe-height-mobile));
   --content-max: 1280px;
   --side-col: 380px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);

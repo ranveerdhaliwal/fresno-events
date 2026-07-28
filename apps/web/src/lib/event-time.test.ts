@@ -1,12 +1,16 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { formatShortTime, deriveEventTimeStatus, isLiveNow } from "./event-time";
+import { formatShortTime, formatPopularMeta, deriveEventTimeStatus, isLiveNow } from "./event-time";
 
 describe("event-time", () => {
   it("strips :00 from short time", () => {
     const formatted = formatShortTime("2026-05-22T18:00:00.000-07:00");
     expect(formatted).not.toContain(":00");
+  });
+
+  it("formats popular meta as long month day and time", () => {
+    expect(formatPopularMeta("2026-07-29T17:30:00.000-07:00")).toBe("July 29 - 5:30 PM");
   });
 
   it("detects live window", () => {

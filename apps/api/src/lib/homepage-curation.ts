@@ -27,7 +27,7 @@ import { supabaseRequest } from "@/lib/supabase-client";
 const HOMEPAGE_LIST_FROM_MS = 6 * 60 * 60 * 1000;
 const HOMEPAGE_FEATURED_LOOKAHEAD_DAYS = 7;
 const SCHEDULED_STATUSES = new Set<EventStatus>(["scheduled", "sold_out", "postponed"]);
-/** Featured grid: 2 heroes + 4 small cards. */
+/** Featured grid: 2 heroes + 4 small on desktop; 3 heroes + 4 small on mobile (7 slots). */
 export const FEATURED_SLOTS_PER_SECTION = 7;
 const BIGGEST_MONTH_LIMIT = 10;
 

@@ -1,8 +1,5 @@
 .nav {
   display: none;
-  position: sticky;
-  top: 0;
-  z-index: 20;
   height: var(--nav-height-mobile);
   background: var(--surface-nav);
   color: var(--text-on-nav);

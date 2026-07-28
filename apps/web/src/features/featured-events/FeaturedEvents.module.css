@@ -70,6 +70,14 @@
   align-items: start;
 }
 
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  position: sticky;
+  top: 14px;
+}
+
 .grid {
   display: grid;
   gap: 18px;
@@ -77,8 +85,12 @@
 
 .heroes {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 18px;
+}
+
+.heroExtra {
+  display: none;
 }
 
 .smallRow {
@@ -107,14 +119,6 @@
   z-index: 2;
 }
 
-.side {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  position: sticky;
-  top: 14px;
-}
-
 @media (max-width: 1080px) {
   .layout {
     grid-template-columns: 1fr;
@@ -122,19 +126,16 @@
 
   .side {
     position: static;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px;
+    width: 100%;
+  }
+
+  .smallRow {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 720px) {
-  .heroes,
-  .smallRow {
-    grid-template-columns: 1fr;
-  }
-
-  .side {
+  .heroes {
     grid-template-columns: 1fr;
   }
 }
@@ -157,17 +158,17 @@
     display: flex;
   }
 
-  .side {
-    display: block;
-    margin-top: 4px;
-  }
-
   .grid {
     gap: 12px;
   }
 
   .heroes {
     gap: 12px;
+    grid-template-columns: 1fr;
+  }
+
+  .heroExtra {
+    display: block;
   }
 
   .smallRow {
