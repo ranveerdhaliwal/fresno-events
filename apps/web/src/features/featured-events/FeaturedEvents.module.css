@@ -70,6 +70,14 @@
   align-items: start;
 }
 
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  position: sticky;
+  top: 14px;
+}
+
 .grid {
   display: grid;
   gap: 18px;
@@ -111,14 +119,6 @@
   z-index: 2;
 }
 
-.side {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  position: sticky;
-  top: 14px;
-}
-
 @media (max-width: 1080px) {
   .layout {
     grid-template-columns: 1fr;
@@ -126,9 +126,7 @@
 
   .side {
     position: static;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px;
+    width: 100%;
   }
 
   .smallRow {
@@ -138,10 +136,6 @@
 
 @media (max-width: 720px) {
   .heroes {
-    grid-template-columns: 1fr;
-  }
-
-  .side {
     grid-template-columns: 1fr;
   }
 }
@@ -162,11 +156,6 @@
 
   .tabsMobile {
     display: flex;
-  }
-
-  .side {
-    display: block;
-    margin-top: 4px;
   }
 
   .grid {

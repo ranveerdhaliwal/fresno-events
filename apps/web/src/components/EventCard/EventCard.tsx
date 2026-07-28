@@ -59,15 +59,17 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
         />
       </div>
       <div className={styles.body}>
-        <div className={styles.topRow}>{titleNode}</div>
-        <Text variant="body3" tone="labelOnCard" weight="medium" as="p" className={styles.when}>
-          {whenLine}
-        </Text>
-        <div className={styles.venueRow}>
-          <MapPin className={styles.pin} size={13} strokeWidth={2.25} aria-hidden />
-          <Text variant="body3" tone="labelOnCard" weight="semibold" as="span" className={styles.venue}>
-            {event.venueName}
+        <div className={styles.mainBlock}>
+          <div className={styles.topRow}>{titleNode}</div>
+          <Text variant="body3" tone="labelOnCard" weight="medium" as="p" className={styles.when}>
+            {whenLine}
           </Text>
+          <div className={styles.venueRow}>
+            <MapPin className={styles.pin} size={13} strokeWidth={2.25} aria-hidden />
+            <Text variant="body3" tone="labelOnCard" weight="semibold" as="span" className={styles.venue}>
+              {event.venueName}
+            </Text>
+          </div>
         </div>
         <div className={styles.footerRow}>
           <Text variant="caps" tone="onCard" as="span" className={styles.cat}>
@@ -81,15 +83,7 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
               as="span"
               className={cn(styles.price, event.isFree && styles.free, ticketHint && styles.priceTicketHint)}
             >
-              {ticketHint ? (
-                <>
-                  See Tickets
-                  <br />
-                  for price
-                </>
-              ) : (
-                event.priceLabel
-              )}
+              {event.priceLabel}
             </Text>
           ) : null}
         </div>

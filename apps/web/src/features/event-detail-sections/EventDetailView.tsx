@@ -237,7 +237,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
                     View original listing <ExternalLink size={14} aria-hidden />
                   </a>
                   <Text variant="body2" tone="mutedOnPage" as="p" className={styles.sourceNote}>
-                    Check the original listing for details we may have missed here — and to confirm
+                    Check the original listing for details we may have missed here, and to confirm
                     pricing and whether the event is still on.
                   </Text>
                 </>

@@ -153,41 +153,44 @@
   background: var(--surface-card);
   border: var(--border-card-on-page);
   box-shadow: var(--shadow-card-on-page);
-  padding: 22px 28px;
+  padding: 28px 32px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
+  gap: 28px;
   color: var(--text-primary);
 }
 
 .fact .lab {
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 12px;
+  letter-spacing: 2.5px;
   color: var(--coral-dark);
   text-transform: uppercase;
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .fact .val {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: var(--text-weight-medium);
   display: block;
   color: var(--text-primary);
+  line-height: 1.25;
 }
 
 .fact .whereVal {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: var(--text-weight-regular);
   display: block;
   color: var(--text-primary);
+  line-height: 1.25;
 }
 
 .fact .sub {
-  font-size: 12.5px;
+  font-size: 14px;
   color: color-mix(in srgb, var(--text-secondary-on-card) 85%, transparent);
-  margin-top: 4px;
+  margin-top: 6px;
   display: block;
+  line-height: 1.35;
 }
 
 .coral {

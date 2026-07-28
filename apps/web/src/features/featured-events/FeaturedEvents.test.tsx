@@ -38,4 +38,16 @@ describe("FeaturedEvents", () => {
     expect(screen.getByTestId("popular-list")).toBeInTheDocument();
     expect(screen.getByText("BIGGEST EVENTS THIS MONTH")).toBeInTheDocument();
   });
+
+  it("places biggest-events list in sidebar beside featured grid", async () => {
+    await renderWithSiteRouter(<FeaturedEvents />);
+
+    const layout = document.querySelector('[class*="layout"]');
+    expect(layout).toBeTruthy();
+
+    const aside = layout?.querySelector("aside");
+    expect(aside).toBeTruthy();
+    expect(aside?.querySelector('[data-testid="popular-list"]')).toBeTruthy();
+    expect(layout?.querySelector('[class*="grid"]')).toBeTruthy();
+  });
 });

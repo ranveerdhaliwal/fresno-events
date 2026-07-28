@@ -8,7 +8,7 @@
   padding: 14px 16px;
   text-decoration: none;
   color: var(--text-primary);
-  align-items: start;
+  align-items: stretch;
   text-align: left;
   width: 100%;
   font: inherit;
@@ -47,11 +47,17 @@
   min-height: 104px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+}
+
+.mainBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
 .topRow {
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .title {
@@ -126,7 +132,6 @@
   justify-content: space-between;
   gap: 10px;
   margin-top: auto;
-  padding-top: 4px;
 }
 
 .price {
@@ -144,10 +149,9 @@
 .priceTicketHint {
   font-size: 10px;
   font-weight: var(--text-weight-medium);
-  line-height: 1.1;
+  line-height: 1.2;
   text-align: right;
-  max-width: 4rem;
-  white-space: normal;
+  white-space: nowrap;
 }
 
 .past {
@@ -173,7 +177,6 @@
 
   .body {
     min-height: 84px;
-    gap: 2px;
   }
 
   .title {
@@ -185,7 +188,8 @@
   }
 
   .priceTicketHint {
-    font-size: 10px;
+    font-size: 9px;
+    white-space: normal;
     max-width: 4.25rem;
   }
 }

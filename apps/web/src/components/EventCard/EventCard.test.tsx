@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { renderWithSiteRouter } from "@/tests/router-render";
 import { screen } from "@/tests/render";
 import { getMockEventList } from "@/services/events.mock";
+import { LIST_TICKET_PRICE_LABEL } from "@/lib/event-price.utils";
 import { toEventRowViewModel } from "@/lib/event-view-model";
 
 import { EventCard } from "./EventCard";
@@ -36,6 +37,31 @@ describe("EventCard", () => {
     expect(screen.getByText(event.venueName)).toBeInTheDocument();
     expect(screen.getByText(event.categoryLabel)).toBeInTheDocument();
     expect(screen.queryByText(/·/)).not.toBeInTheDocument();
+  });
+
+  it("renders ticket price hint on one line with footer pinned below meta block", async () => {
+    const base = getMockEventList()[0]!;
+    const { priceMin: _min, priceMax: _max, isFree: _free, ...rest } = base.event;
+    const event = toEventRowViewModel({
+      ...base,
+      event: {
+        ...rest,
+        isFree: false,
+        ticketUrl: "https://tickets.example.com/show"
+      }
+    });
+
+    await renderWithSiteRouter(<EventCard event={event} />);
+
+    const ticketLabel = screen.getByText(LIST_TICKET_PRICE_LABEL);
+    expect(ticketLabel.querySelector("br")).toBeNull();
+
+    const card = screen.getByTestId(`event-card-${event.slug}`);
+    const mainBlock = card.querySelector('[class*="mainBlock"]');
+    const footerRow = card.querySelector('[class*="footerRow"]');
+    expect(mainBlock).toBeTruthy();
+    expect(footerRow).toBeTruthy();
+    expect(mainBlock?.compareDocumentPosition(footerRow!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("labels ended events clearly", async () => {
