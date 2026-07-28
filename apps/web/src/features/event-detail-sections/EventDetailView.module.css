@@ -92,7 +92,7 @@
   line-height: 0.98;
   letter-spacing: 0.04em;
   margin: 0 0 6px;
-  -webkit-text-stroke: 1.5px var(--ink);
+  -webkit-text-stroke: 2.25px var(--ink);
   paint-order: stroke fill;
   text-shadow:
     0 0 0 var(--ink),
@@ -103,7 +103,7 @@
   font-size: 38px;
   color: var(--mustard);
   margin: 0;
-  -webkit-text-stroke: 1.25px var(--ink);
+  -webkit-text-stroke: var(--text-stroke-on-dark-width) var(--text-stroke-on-dark-color);
   paint-order: stroke fill;
   text-shadow:
     0 0 0 var(--ink),

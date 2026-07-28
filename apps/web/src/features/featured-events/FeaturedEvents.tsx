@@ -2,13 +2,16 @@ import { FeatureCard } from "@/components/FeatureCard";
 import { PopularList } from "@/components/PopularList";
 import { SectionTitle } from "@/components/SectionTitle";
 import { AdminEditLink } from "@/features/admin-mode/AdminEditLink";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
+import { partitionFeaturedCards } from "./featured-events.utils";
 import { useHomepageCuration } from "./useHomepageCuration";
 import { FeaturedEventsSkeleton } from "./FeaturedEventsSkeleton";
 import styles from "./FeaturedEvents.module.css";
 
 export function FeaturedEvents() {
   const { viewModel, isLoading } = useHomepageCuration();
+  const isMobile = useIsMobile();
 
   if (isLoading) {
     return <FeaturedEventsSkeleton />;
@@ -16,8 +19,7 @@ export function FeaturedEvents() {
 
   const cards = viewModel?.featuredCards ?? [];
   const biggestMonth = viewModel?.biggestMonth ?? [];
-  const heroes = cards.slice(0, 3);
-  const small = cards.slice(3, 7);
+  const { heroes, small } = partitionFeaturedCards(cards, isMobile);
 
   return (
     <section className={styles.section} data-testid="featured-events">

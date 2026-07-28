@@ -103,6 +103,11 @@
   font-weight: var(--text-weight-bold);
 }
 
+.metaVenue {
+  color: var(--text-label-on-card);
+  font-weight: var(--text-weight-semibold);
+}
+
 .metaWhen {
   display: contents;
 }

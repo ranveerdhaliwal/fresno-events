@@ -56,7 +56,7 @@ export function FeatureCard({ card, variant = "small" }: FeatureCardProps) {
               {card.timeLabel}
             </Text>
           </span>
-          <Text variant="body2" tone="labelOnCard" weight="medium" as="span">
+          <Text variant="body2" tone="labelOnCard" weight="semibold" as="span" className={styles.metaVenue}>
             {card.venueName}
           </Text>
         </div>

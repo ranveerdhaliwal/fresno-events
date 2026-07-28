@@ -113,7 +113,7 @@
   text-transform: uppercase;
   text-align: center;
   box-shadow: var(--shadow-md);
-  -webkit-text-stroke: 1.25px var(--ink);
+  -webkit-text-stroke: var(--text-stroke-on-dark-width) var(--text-stroke-on-dark-color);
   paint-order: stroke fill;
   transition:
     transform 0.12s ease,
