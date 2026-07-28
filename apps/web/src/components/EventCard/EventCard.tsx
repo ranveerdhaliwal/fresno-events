@@ -23,7 +23,7 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
   const showEnded = past || event.flagLabel === "ENDED";
   const imagePadding = heroImagePadding(event.imageUrl);
   const ticketHint = event.priceLabel != null && isListTicketPriceLabel(event.priceLabel);
-  const dateChip = `${event.dayShort} ${event.dayNum}`.trim();
+  const whenLine = `${event.timeLabel} - ${event.dayShort} ${event.dayNum}`.trim();
 
   const titleNode = onSelect ? (
     <Text variant="header3" tone="onCard" weight="regular" as="span" className={styles.title}>
@@ -61,24 +61,7 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
       <div className={styles.body}>
         <div className={styles.topRow}>
           {titleNode}
-          <Text variant="body3" tone="accent" weight="bold" as="span" className={styles.dateChip}>
-            {dateChip}
-          </Text>
-        </div>
-        <Text variant="body3" tone="labelOnCard" weight="medium" as="p" className={styles.time}>
-          {event.timeLabel}
-        </Text>
-        <div className={styles.venueRow}>
-          <MapPin className={styles.pin} size={13} strokeWidth={2.25} aria-hidden />
-          <Text variant="body3" tone="labelOnCard" weight="semibold" as="span" className={styles.venue}>
-            {event.venueName}
-          </Text>
-        </div>
-        <Text variant="caps" tone="mutedOnCard" as="span" className={styles.cat}>
-          {event.categoryLabel}
-        </Text>
-        {event.priceLabel ? (
-          <div className={styles.priceRow}>
+          {event.priceLabel ? (
             <Text
               variant="price"
               tone={event.isFree ? "label" : "accent"}
@@ -96,8 +79,20 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
                 event.priceLabel
               )}
             </Text>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
+        <Text variant="body3" tone="labelOnCard" weight="medium" as="p" className={styles.when}>
+          {whenLine}
+        </Text>
+        <div className={styles.venueRow}>
+          <MapPin className={styles.pin} size={13} strokeWidth={2.25} aria-hidden />
+          <Text variant="body3" tone="labelOnCard" weight="semibold" as="span" className={styles.venue}>
+            {event.venueName}
+          </Text>
+        </div>
+        <Text variant="caps" tone="mutedOnCard" as="span" className={styles.cat}>
+          {event.categoryLabel}
+        </Text>
       </div>
     </>
   );
