@@ -548,7 +548,7 @@ function applyEnrichment(
     title: titleForCategory,
     venueName: event.venueName,
     ...(event.descriptionText ? { descriptionText: event.descriptionText } : {}),
-    category: enrichment.category ?? event.category
+    category: enrichment.category ?? event.category ?? "community"
   });
   if (resolvedCategory !== event.category) {
     next.category = resolvedCategory;

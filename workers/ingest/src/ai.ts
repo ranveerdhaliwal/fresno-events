@@ -109,7 +109,7 @@ function normalizeEnrichment(input: Partial<AiEnrichment>, event: NormalizedEven
     title: titleForCategory,
     venueName: event.venueName,
     ...(event.descriptionText ? { descriptionText: event.descriptionText } : {}),
-    category: aiCategory ?? event.category
+    category: aiCategory ?? event.category ?? "community"
   });
   const tags = Array.isArray(input.tags) ? input.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 8) : [];
   const reasoning = typeof input.reasoning === "string" ? input.reasoning.slice(0, 240) : "";
