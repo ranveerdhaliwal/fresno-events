@@ -51,10 +51,6 @@
 }
 
 .topRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   margin-bottom: 4px;
 }
 
@@ -111,9 +107,7 @@
 }
 
 .cat {
-  align-self: flex-start;
   display: inline-block;
-  margin-top: 4px;
   padding: 2px 9px;
   border: 1.5px solid var(--ink);
   border-radius: 999px;
@@ -126,13 +120,21 @@
   color: var(--text-primary);
 }
 
+.footerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
 .price {
   font-size: 13px;
   color: var(--coral-dark);
   flex-shrink: 0;
   line-height: 1.2;
   text-align: right;
-  margin-left: auto;
 }
 
 .free {
@@ -176,10 +178,6 @@
 
   .title {
     font-size: 14px;
-  }
-
-  .topRow {
-    gap: 8px;
   }
 
   .price {

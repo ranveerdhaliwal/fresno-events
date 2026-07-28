@@ -59,8 +59,20 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
         />
       </div>
       <div className={styles.body}>
-        <div className={styles.topRow}>
-          {titleNode}
+        <div className={styles.topRow}>{titleNode}</div>
+        <Text variant="body3" tone="labelOnCard" weight="medium" as="p" className={styles.when}>
+          {whenLine}
+        </Text>
+        <div className={styles.venueRow}>
+          <MapPin className={styles.pin} size={13} strokeWidth={2.25} aria-hidden />
+          <Text variant="body3" tone="labelOnCard" weight="semibold" as="span" className={styles.venue}>
+            {event.venueName}
+          </Text>
+        </div>
+        <div className={styles.footerRow}>
+          <Text variant="caps" tone="onCard" as="span" className={styles.cat}>
+            {event.categoryLabel}
+          </Text>
           {event.priceLabel ? (
             <Text
               variant="price"
@@ -81,18 +93,6 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
             </Text>
           ) : null}
         </div>
-        <Text variant="body3" tone="labelOnCard" weight="medium" as="p" className={styles.when}>
-          {whenLine}
-        </Text>
-        <div className={styles.venueRow}>
-          <MapPin className={styles.pin} size={13} strokeWidth={2.25} aria-hidden />
-          <Text variant="body3" tone="labelOnCard" weight="semibold" as="span" className={styles.venue}>
-            {event.venueName}
-          </Text>
-        </div>
-        <Text variant="caps" tone="onCard" as="span" className={styles.cat}>
-          {event.categoryLabel}
-        </Text>
       </div>
     </>
   );
