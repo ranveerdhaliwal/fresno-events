@@ -17,7 +17,7 @@ function card(id: string): FeatureCardViewModel {
     paletteKey: "music",
     paletteGradient: "linear-gradient(#000, #111)",
     imageUrl: null,
-    badge: "none",
+    badge: "default",
     priceLabel: "$20",
     isFree: false
   };

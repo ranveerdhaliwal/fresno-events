@@ -59,9 +59,12 @@ describe("EventCard", () => {
     const card = screen.getByTestId(`event-card-${event.slug}`);
     const mainBlock = card.querySelector('[class*="mainBlock"]');
     const footerRow = card.querySelector('[class*="footerRow"]');
-    expect(mainBlock).toBeTruthy();
-    expect(footerRow).toBeTruthy();
-    expect(mainBlock?.compareDocumentPosition(footerRow!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(mainBlock).toBeInstanceOf(Element);
+    expect(footerRow).toBeInstanceOf(Element);
+    if (!(mainBlock instanceof Element) || !(footerRow instanceof Element)) {
+      throw new Error("Expected EventCard mainBlock and footerRow");
+    }
+    expect(mainBlock.compareDocumentPosition(footerRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("labels ended events clearly", async () => {
