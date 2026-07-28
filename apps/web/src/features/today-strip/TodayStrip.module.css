@@ -46,7 +46,7 @@
 }
 
 .sub {
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   margin-left: auto;
 }
 

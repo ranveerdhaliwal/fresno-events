@@ -42,7 +42,17 @@ export function SelectableEventRow({
             : {})}
         {...(adminAction ? { adminAction } : {})}
       />
-      {onSelect ? <EventCard event={event} /> : null}
+      {onSelect || linkRows ? (
+        <EventCard
+          event={event}
+          {...(onSelect
+            ? {
+                onSelect,
+                ...(isSelected !== undefined ? { isSelected } : {})
+              }
+            : {})}
+        />
+      ) : null}
     </div>
   );
 }

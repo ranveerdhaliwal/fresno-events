@@ -1,7 +1,14 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 import type { LinkProps } from "@tanstack/react-router";
 
-export type ButtonVariant = "approve" | "reject" | "secondary" | "secondaryActive" | "ghost" | "cta";
+export type ButtonVariant =
+  | "approve"
+  | "reject"
+  | "secondary"
+  | "secondaryActive"
+  | "ghost"
+  | "cta"
+  | "mustard";
 
 export type ButtonSize = "xs" | "sm" | "md";
 

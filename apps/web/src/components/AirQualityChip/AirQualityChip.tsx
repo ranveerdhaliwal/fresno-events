@@ -34,10 +34,10 @@ export function AirQualityChip() {
       <span className={chipStyles.icon} aria-hidden>
         {icon}
       </span>
-      <Text variant="body3" tone="onCard" as="span" className={styles.labelFull}>
+      <Text variant="body3" tone="onCard" as="span" className={cn(styles.labelFull, chipStyles.chipLabel)}>
         {fullLabel}
       </Text>
-      <Text variant="body3" tone="onCard" as="span" className={styles.labelCompact}>
+      <Text variant="body3" tone="onCard" as="span" className={cn(styles.labelCompact, chipStyles.chipLabel)}>
         {air.aqi} AQI
       </Text>
     </a>

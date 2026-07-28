@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import { RainbowStripe } from "@/components/RainbowStripe";
 import { Text } from "@/components/Text";
+import { CENTRAL_VALLEY_GREETING } from "@/lib/section-script.utils";
 
 import styles from "./SiteFooter.module.css";
 
@@ -14,14 +15,14 @@ export function SiteFooter() {
       <footer className={styles.footer}>
         <div className={styles.inner}>
           <div className={styles.brandBlock}>
-            <Text variant="header2" tone="onPage" as="p" className={styles.brand}>
+            <Text variant="header2" tone="onPage" stroke="onDark" as="p" className={styles.brand}>
               What Up Fresno
             </Text>
-            <Text variant="body2" tone="mutedOnPage" as="p" className={styles.tagline}>
+            <Text variant="body2" tone="onPage" as="p" className={styles.tagline}>
               Fresno &amp; Central Valley events
             </Text>
             <Text variant="script" tone="brand" scriptStyle="footer" as="p" className={styles.script}>
-              greetings from the central valley
+              {CENTRAL_VALLEY_GREETING}
             </Text>
           </div>
 

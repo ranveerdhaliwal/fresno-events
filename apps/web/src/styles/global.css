@@ -22,7 +22,7 @@ body {
   background-position: var(--bg-halftone-position);
   color: var(--text-on-page);
   font-family: var(--font-body);
-  font-size: 14.5px;
+  font-size: var(--text-size-base);
   line-height: 1.5;
 }
 

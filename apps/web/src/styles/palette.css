@@ -5,8 +5,11 @@
   --color-coral: #d85a3c;
   /* Fills that carry white text (selected chips, today tiles, CTAs) — WCAG AA */
   --color-coral-active: #b3401c;
-  /* Text-on-cream accents — darkened for WCAG AA on warm paper */
-  --color-coral-dark: #7a2e12;
+  /*
+   * Text accents on cream cards (prices, ranks, ticket hints).
+   * Matches brand coral — the darker AA-tuned shade read duller on warm paper.
+   */
+  --color-coral-dark: #d85a3c;
   --color-mustard: #f2c14e;
   --color-olive: #6b8e4e;
   /* Text-on-cream “FREE” / olive accents — AA on warm paper */

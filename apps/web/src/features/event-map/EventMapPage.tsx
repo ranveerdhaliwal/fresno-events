@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { ApiResponse, EventListResponse } from "@fresno-events/shared";
 
-import { EventRow } from "@/components/EventRow";
 import { PageChrome } from "@/components/PageChrome";
 import { SectionTitle } from "@/components/SectionTitle";
+import { SelectableEventRow } from "@/components/SelectableEventRow";
 import { Text } from "@/components/Text";
 import { filterOutPastItems } from "@/features/event-browse/active-ended-events.utils";
 import { toEventRowViewModel } from "@/lib/event-view-model";
@@ -104,17 +104,17 @@ export function EventMapPage() {
               <aside className={styles.sidebar}>
                 <div className={styles.sidebarList}>
                   {rows.map((row) => (
-                    <EventRow
+                    <SelectableEventRow
                       key={row.id}
                       event={row}
                       isSelected={selectedId === row.id}
-                      onSelect={() => setSelectedId(row.id)}
+                      onSelect={(id) => setSelectedId(id)}
                     />
                   ))}
                 </div>
               </aside>
               <div className={styles.mapPane}>
-                <EventMap items={filteredItems} />
+                <EventMap items={filteredItems} selectedId={selectedId} />
               </div>
             </div>
           </div>

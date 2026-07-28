@@ -39,27 +39,29 @@ export function FeatureCard({ card, variant = "small" }: FeatureCardProps) {
             {formatFeaturedBadgeLabel(card.badge)}
           </Text>
         ) : null}
-        <Text variant="body3" tone="onCard" as="span" className={styles.pillCat}>
+        <Text variant="caps" tone="onCard" as="span" className={styles.pillCat}>
           {card.categoryLabel}
         </Text>
       </div>
       <div className={styles.body}>
-        <Text variant="header3" tone="onCard" as="h3" className={styles.cardTitle}>
+        <Text variant="header3" tone="onCard" weight="regular" as="h3" className={styles.cardTitle}>
           {card.title}
         </Text>
         <div className={styles.meta}>
-          <Text variant="body3" tone="accent" as="span" className={styles.metaDate}>
-            {card.dateLabel}
-          </Text>
-          <Text variant="body3" tone="labelOnCard" as="span">
-            {card.timeLabel}
-          </Text>
-          <Text variant="body3" tone="labelOnCard" as="span">
+          <span className={styles.metaWhen}>
+            <Text variant="body2" tone="accent" weight="bold" as="span" className={styles.metaDate}>
+              {card.dateLabel}
+            </Text>
+            <Text variant="body2" tone="labelOnCard" weight="medium" as="span">
+              {card.timeLabel}
+            </Text>
+          </span>
+          <Text variant="body2" tone="labelOnCard" weight="medium" as="span">
             {card.venueName}
           </Text>
         </div>
         {variant === "hero" && card.description ? (
-          <Text variant="body2" tone="mutedOnCard" className={styles.desc}>
+          <Text variant="body1" tone="onCard" className={styles.desc}>
             {card.description}
           </Text>
         ) : null}
@@ -68,6 +70,7 @@ export function FeatureCard({ card, variant = "small" }: FeatureCardProps) {
             <Text
               variant="price"
               tone="accent"
+              weight="regular"
               as="span"
               className={cn(
                 card.isFree && styles.free,
@@ -77,9 +80,6 @@ export function FeatureCard({ card, variant = "small" }: FeatureCardProps) {
               {card.priceLabel}
             </Text>
           ) : null}
-          <Text variant="body3" tone="mutedOnCard" as="span" className={styles.source}>
-            via What Up Fresno
-          </Text>
         </div>
       </div>
     </Link>

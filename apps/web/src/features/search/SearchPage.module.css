@@ -50,7 +50,7 @@
   display: block;
   padding: 8px 0;
   color: var(--coral);
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   text-decoration: none;
 }
 
@@ -92,12 +92,10 @@
   color: var(--text-muted);
 }
 
-.hint,
-.error {
+.hint {
   font-size: 14px;
-  color: var(--text-muted);
 }
 
 .error {
-  color: var(--coral);
+  font-size: 14px;
 }

@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  FEATURED_SLOTS_PER_SECTION,
   homepageListFrom,
   isEventEligibleForHomepage,
   isSlotStale
@@ -9,6 +10,10 @@ import {
 
 describe("homepage-curation utils", () => {
   const now = new Date("2026-05-31T20:00:00.000Z");
+
+  it("reserves seven featured grid slots", () => {
+    expect(FEATURED_SLOTS_PER_SECTION).toBe(7);
+  });
 
   it("treats events within grace window as eligible", () => {
     const from = homepageListFrom(now);

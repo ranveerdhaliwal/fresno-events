@@ -2,7 +2,14 @@ import type { ElementType } from "react";
 
 import { cn } from "@/lib/cn";
 
-import type { TextProps, TextScriptStyle, TextTone, TextVariant } from "./Text.types";
+import type {
+  TextProps,
+  TextScriptStyle,
+  TextStroke,
+  TextTone,
+  TextVariant,
+  TextWeight
+} from "./Text.types";
 import styles from "./Text.module.css";
 
 const variantClass = {
@@ -10,6 +17,7 @@ const variantClass = {
   header2: styles.header2 ?? "",
   header3: styles.header3 ?? "",
   eyebrow: styles.eyebrow ?? "",
+  caps: styles.caps ?? "",
   navLabel: styles.navLabel ?? "",
   price: styles.price ?? "",
   body1: styles.body1 ?? "",
@@ -32,6 +40,20 @@ const toneClass = {
   inherit: styles.toneInherit ?? ""
 } satisfies Record<TextTone, string>;
 
+const weightClass = {
+  light: styles.weightLight ?? "",
+  regular: styles.weightRegular ?? "",
+  medium: styles.weightMedium ?? "",
+  semibold: styles.weightSemibold ?? "",
+  bold: styles.weightBold ?? "",
+  extrabold: styles.weightExtrabold ?? ""
+} satisfies Record<TextWeight, string>;
+
+const strokeClass = {
+  none: "",
+  onDark: styles.strokeOnDark ?? ""
+} satisfies Record<TextStroke, string>;
+
 const scriptStyleClass = {
   default: "",
   section: styles.scriptSection ?? "",
@@ -44,6 +66,7 @@ const defaultElement = {
   header2: "h2",
   header3: "h3",
   eyebrow: "p",
+  caps: "span",
   navLabel: "span",
   price: "span",
   body1: "p",
@@ -57,6 +80,7 @@ const defaultTone = {
   header2: "onCard",
   header3: "onCard",
   eyebrow: "label",
+  caps: "labelOnCard",
   navLabel: "onNav",
   price: "accent",
   body1: "onPage",
@@ -68,6 +92,8 @@ const defaultTone = {
 export function Text({
   variant,
   tone,
+  weight,
+  stroke = "none",
   scriptStyle = "default",
   as,
   className,
@@ -82,6 +108,8 @@ export function Text({
       className={cn(
         variantClass[variant],
         toneClass[resolvedTone],
+        weight ? weightClass[weight] : null,
+        strokeClass[stroke],
         variant === "script" && scriptStyleClass[scriptStyle],
         className
       )}

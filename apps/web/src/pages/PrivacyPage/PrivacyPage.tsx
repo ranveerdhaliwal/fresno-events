@@ -11,7 +11,7 @@ export function PrivacyPage() {
   return (
     <PageChrome mobileNav={{ variant: "day", title: "PRIVACY" }}>
       <article className={styles.article}>
-        <Text variant="header1" tone="onPage" as="h1">
+        <Text variant="header1" tone="onPage" stroke="onDark" as="h1">
           Privacy Policy
         </Text>
         <Text variant="body3" tone="label" as="p" className={styles.updated}>

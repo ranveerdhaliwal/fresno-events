@@ -20,5 +20,6 @@ describe("AdSlot", () => {
   it("renders side variant", async () => {
     await renderWithSiteRouter(<AdSlot variant="side" />);
     expect(screen.getByTestId("ad-slot-side")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /LEARN MORE/i })).toBeInTheDocument();
   });
 });

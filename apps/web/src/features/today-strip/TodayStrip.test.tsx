@@ -14,6 +14,7 @@ describe("TodayStrip", () => {
     await renderWithSiteRouter(<TodayStrip />);
     expect(screen.getByTestId("lineup-section")).toBeInTheDocument();
     expect(screen.getByText("LINEUP")).toBeInTheDocument();
+    expect(screen.getByText("The")).toBeInTheDocument();
     expect(screen.queryByText("THIS MONTH")).not.toBeInTheDocument();
   });
 });

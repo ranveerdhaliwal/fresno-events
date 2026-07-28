@@ -27,7 +27,7 @@ export function WeatherChip() {
       <span className={chipStyles.icon} aria-hidden>
         {weather.icon}
       </span>
-      <Text variant="body3" tone="onCard" as="span">
+      <Text variant="body3" tone="onCard" as="span" className={chipStyles.chipLabel}>
         {weather.tempF}°F · {weather.condition}
       </Text>
     </a>

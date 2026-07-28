@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { heroImageFit, heroImagePadding, isTeamLogoHeroUrl } from "./hero-image.utils";
+import { heroImageFit, heroImagePadding, isLogoLikeHeroUrl, isTeamLogoHeroUrl } from "./hero-image.utils";
 
 describe("hero-image.utils", () => {
   it("detects MLB team spot and logo URLs", () => {
@@ -8,6 +8,12 @@ describe("hero-image.utils", () => {
     expect(isTeamLogoHeroUrl("https://www.mlbstatic.com/team-logos/259.svg")).toBe(true);
     expect(isTeamLogoHeroUrl("https://images.unsplash.com/photo-1")).toBe(false);
     expect(isTeamLogoHeroUrl(null)).toBe(false);
+  });
+
+  it("treats CMT square promo art as logo-like", () => {
+    expect(isLogoLikeHeroUrl("https://tickets.cmtworks.com/uplimage/Cinderella_200x200.png")).toBe(true);
+    expect(heroImageFit("https://tickets.cmtworks.com/uplimage/Cinderella_200x200.png")).toBe("contain");
+    expect(heroImagePadding("https://tickets.cmtworks.com/uplimage/Cinderella_200x200.png")).toBe(10);
   });
 
   it("uses contain fit for team logos", () => {

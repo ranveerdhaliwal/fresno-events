@@ -142,7 +142,7 @@ export function UpcomingEvents() {
   return (
     <div className={styles.wrap} data-testid="upcoming-events">
       <div className={styles.toolbar}>
-        <SectionTitle as="h2" script="upcoming" size="sm">
+        <SectionTitle as="h2" script="upcoming" size="sm" scriptJoin="tight">
           EVENTS
         </SectionTitle>
       </div>

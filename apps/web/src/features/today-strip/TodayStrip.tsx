@@ -29,10 +29,10 @@ export function TodayStrip() {
       <div className={styles.head}>
         <h2 className={styles.headTitle}>
           <Link to="/day/$date" params={{ date: todayIso }} className={styles.headLink}>
-            <Text variant="script" tone="brand" scriptStyle="section" as="span">
-              the
+            <Text variant="script" tone="brand" scriptStyle="section" stroke="onDark" as="span">
+              The
             </Text>{" "}
-            <Text variant="header1" tone="onPage" as="span" className={styles.headDisplay}>
+            <Text variant="header1" tone="onPage" stroke="onDark" as="span" className={styles.headDisplay}>
               LINEUP
             </Text>{" "}
             <span className={styles.arrow}>→</span>

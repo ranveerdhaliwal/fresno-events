@@ -115,6 +115,32 @@ describe("dedupeFeaturedItems", () => {
     expect(result.map((slot) => slot.item.event.id)).toEqual(["evt-comedy", "evt-away"]);
   });
 
+  it("collapses multi-night shows with different seriesIds", () => {
+    const night1 = makeItem({
+      id: "evt-cind-1",
+      title: "CMT Presents Cinderella",
+      venueName: "Fresno Memorial Auditorium",
+      startTs: "2026-07-31T19:30:00.000-07:00",
+      seriesId: "series:cinderella:1"
+    });
+    const night2 = makeItem({
+      id: "evt-cind-2",
+      title: "CMT Presents Cinderella",
+      venueName: "Fresno Memorial Auditorium",
+      startTs: "2026-08-01T19:30:00.000-07:00",
+      seriesId: "series:cinderella:2"
+    });
+    const slots = [
+      { source: "auto" as const, item: night1 },
+      { source: "auto" as const, item: night2 },
+      { source: "auto" as const, item: comedy }
+    ];
+    expect(dedupeFeaturedItems(slots).map((slot) => slot.item.event.id)).toEqual([
+      "evt-cind-1",
+      "evt-comedy"
+    ]);
+  });
+
   it("returns the same list when there are no duplicates", () => {
     const slots = [
       { source: "auto" as const, item: ringlingA },

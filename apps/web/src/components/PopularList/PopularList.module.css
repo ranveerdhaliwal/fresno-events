@@ -26,7 +26,7 @@
   color: var(--surface-card);
   border-radius: 999px;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: var(--text-weight-bold);
   padding: 1px 8px;
 }
 
@@ -42,9 +42,9 @@
 
 .list li a {
   display: grid;
-  grid-template-columns: 20px 1fr;
-  gap: 8px;
-  padding: 10px 12px 10px 10px;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  padding: 10px 14px;
   border-top: 1px dashed var(--border-subtle);
   text-decoration: none;
   color: inherit;
@@ -62,27 +62,23 @@
 .rank {
   font-size: 16px;
   line-height: 1.2;
+  align-self: start;
+  margin-top: 1px;
 }
 
 .eventTitle {
   display: block;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   line-height: 1.2;
 }
 
 .meta {
   display: block;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .adminEdit {
   position: absolute;
   top: 8px;
   right: 8px;
-}
-
-@media (max-width: 600px) {
-  .card {
-    display: none;
-  }
 }

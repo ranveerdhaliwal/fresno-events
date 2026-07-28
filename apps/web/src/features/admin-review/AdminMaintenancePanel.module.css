@@ -47,7 +47,7 @@
 
 .introTitle {
   margin: 0 0 4px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .code {
@@ -95,7 +95,7 @@
 
 .opTitle {
   margin: 0 0 4px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .opDescription {
@@ -130,7 +130,7 @@
 }
 
 .resultTitle {
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .resultHint {
@@ -171,7 +171,7 @@
 
 .statValue {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: var(--text-weight-bold);
   line-height: 1.1;
 }
 

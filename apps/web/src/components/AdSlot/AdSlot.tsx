@@ -1,5 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
 
+import { Button } from "@/components/Button/Button";
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import { Text } from "@/components/Text";
 import { cn } from "@/lib/cn";
@@ -41,9 +42,9 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
         <Text variant="body2" tone="mutedOnCard" as="p">
           Your ad could reach Fresno event-goers every week.
         </Text>
-        <Text variant="eyebrow" tone="onCard" as="span" className={styles.ctaLink}>
+        <Button type="button" variant="mustard" size="xs" className={styles.ctaButton}>
           LEARN MORE
-        </Text>
+        </Button>
       </div>
     );
   }
@@ -60,9 +61,9 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
         <Text variant="body2" tone="mutedOnCard" as="p" className={styles.sideCopy}>
           Your business here — reach event-goers weekly.
         </Text>
-        <Text variant="eyebrow" tone="onCard" as="span" className={styles.ctaLink}>
+        <Button type="button" variant="mustard" size="xs" className={styles.ctaButton}>
           LEARN MORE
-        </Text>
+        </Button>
       </div>
     );
   }
@@ -76,16 +77,16 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
         AD
       </Text>
       <div className={styles.body}>
-        <Text variant="header3" tone="onCard" as="h4">
+        <Text variant="header3" tone="inverse" as="h4" className={styles.bannerHeadline}>
           Reach Fresno locals
         </Text>
-        <Text variant="body2" tone="mutedOnCard" as="p">
+        <Text variant="body2" tone="mutedOnPage" as="p">
           Promote your business on What Up Fresno.
         </Text>
       </div>
-      <Text variant="eyebrow" tone="inverse" as="span" className={styles.cta}>
+      <Button type="button" variant="mustard" size="xs">
         GET STARTED
-      </Text>
+      </Button>
     </div>
   );
 }

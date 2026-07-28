@@ -10,7 +10,7 @@
 
 .crumb a {
   color: var(--coral);
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   text-decoration: none;
 }
 

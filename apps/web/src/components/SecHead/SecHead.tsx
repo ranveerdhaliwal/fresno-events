@@ -1,4 +1,5 @@
 import { Text } from "@/components/Text";
+import { capitalizeScriptPhrase } from "@/lib/section-script.utils";
 import { cn } from "@/lib/cn";
 
 import styles from "./SecHead.module.css";
@@ -26,6 +27,8 @@ export function SecHead({
   variant = "default",
   groupSelectAll
 }: SecHeadProps) {
+  const scriptLabel = script ? capitalizeScriptPhrase(script) : null;
+
   return (
     <div className={cn(styles.head, variant === "live" && styles.live)} data-testid="sec-head">
       <div className={styles.lead}>
@@ -40,11 +43,12 @@ export function SecHead({
             </label>
           ) : null}
           {variant === "live" ? <span className={styles.liveDot} aria-hidden /> : null}
-          {script ? (
-            <Text variant="script" tone="onNav" scriptStyle="nav" as="span" className={styles.script}>
-              {script}
+          {scriptLabel ? (
+            <Text variant="script" tone="brand" scriptStyle="nav" as="span" className={styles.script}>
+              {scriptLabel}
             </Text>
           ) : null}
+          {scriptLabel ? <span className={styles.join}> - </span> : null}
           {title}
         </Text>
       </div>

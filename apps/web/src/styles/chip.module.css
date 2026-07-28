@@ -19,8 +19,12 @@
   border-color: var(--coral);
 }
 
+.chipLabel {
+  font-weight: var(--text-weight-semibold);
+}
+
 .icon {
-  font-size: 16px;
+  font-size: var(--text-size-body1);
   line-height: 1;
   flex-shrink: 0;
 }

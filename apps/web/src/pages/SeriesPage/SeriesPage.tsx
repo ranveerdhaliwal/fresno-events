@@ -1,7 +1,7 @@
 import { useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
-import { EventRow } from "@/components/EventRow";
+import { SelectableEventRow } from "@/components/SelectableEventRow";
 import { EventRowSkeleton } from "@/components/EventRowSkeleton";
 import { PageChrome } from "@/components/PageChrome";
 import { Skeleton } from "@/components/Skeleton";
@@ -28,7 +28,7 @@ export function SeriesPage() {
   return (
     <PageChrome mobileNav={{ variant: "day", title: "SERIES" }}>
       <div className={styles.wrap}>
-        <Text variant="header1" tone="onPage" as="h1">
+        <Text variant="header1" tone="onPage" stroke="onDark" as="h1">
           {title}
         </Text>
         <Text variant="body2" tone="mutedOnPage" as="p" className={styles.sub}>
@@ -45,7 +45,12 @@ export function SeriesPage() {
         ) : (
           <div className={styles.list}>
             {rows.map((row) => (
-              <EventRow key={row.id} event={row} slug={row.slug} adminAction={<AdminEditLink eventId={row.id} />} />
+              <SelectableEventRow
+                key={row.id}
+                event={row}
+                linkRows
+                adminAction={<AdminEditLink eventId={row.id} />}
+              />
             ))}
           </div>
         )}

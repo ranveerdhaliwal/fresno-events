@@ -23,14 +23,14 @@ function defaultMapPinIcon() {
   });
 }
 
-export function VenueMiniMap({ lat, lng, height = 200 }: VenueMiniMapProps) {
+export function VenueMiniMap({ lat, lng, height = 280 }: VenueMiniMapProps) {
   const icon = useMemo(() => defaultMapPinIcon(), []);
 
   return (
     <div className={styles.map} style={{ height }}>
       <MapContainer
         center={[lat, lng]}
-        zoom={16}
+        zoom={14}
         style={{ height: "100%", width: "100%" }}
         zoomControl={false}
         dragging

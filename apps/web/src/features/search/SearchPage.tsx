@@ -103,7 +103,7 @@ export function SearchPage() {
   return (
     <PageChrome mobileNav={{ variant: "day", title: "SEARCH" }}>
       <main className={styles.page}>
-        <SectionTitle script="search" size="lg" className={styles.title ?? ""}>
+        <SectionTitle script="search" size="lg" scriptJoin="tight" className={styles.title ?? ""}>
           EVENTS
         </SectionTitle>
         <form onSubmit={handleSubmit}>
@@ -137,12 +137,12 @@ export function SearchPage() {
             selected={selected}
             onSelect={handleSelect}
             listHeader={
-              <Text variant="header2" tone="onPage" as="h2" className={styles.listHeading}>
+              <Text variant="header2" tone="onPage" stroke="onDark" as="h2" className={styles.listHeading}>
                 {isSearching ? `Results (${rows.length})` : `This week (${rows.length})`}
               </Text>
             }
             empty={
-              <Text variant="body2" tone="label" className={styles.hint}>
+              <Text variant="body2" tone="onPage" className={styles.hint}>
                 {isSearching ? "No events matched your search." : "No events this week yet."}
               </Text>
             }

@@ -40,7 +40,7 @@
 
 .meta {
   color: var(--text-label);
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 /* Same scroll model as home Upcoming: list grows with the page; right pane sticks. */
@@ -58,7 +58,7 @@
 .sidebarList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .mapPane {
@@ -146,7 +146,7 @@
   color: #fff !important;
   font-family: var(--font-display);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: var(--text-weight-bold);
   box-shadow: 2px 2px 0 rgba(20, 24, 29, 0.35);
   line-height: 1;
 }

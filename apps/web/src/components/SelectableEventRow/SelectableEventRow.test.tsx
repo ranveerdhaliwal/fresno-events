@@ -37,12 +37,12 @@ describe("SelectableEventRow", () => {
     expect(onSelect).toHaveBeenCalledWith(row.id, row.slug);
   });
 
-  it("renders the row as a link with no companion card when onSelect is omitted", async () => {
+  it("renders a companion EventCard when linkRows is set without onSelect", async () => {
     const row = firstRow();
 
     await renderWithSiteRouter(<SelectableEventRow event={row} linkRows />);
 
     expect(screen.getByTestId(`event-row-${row.slug}`)).toBeInTheDocument();
-    expect(screen.queryByTestId(`event-card-${row.slug}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId(`event-card-${row.slug}`)).toBeInTheDocument();
   });
 });

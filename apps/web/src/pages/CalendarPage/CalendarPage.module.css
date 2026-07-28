@@ -20,7 +20,7 @@
 
 .loading,
 .empty {
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   color: var(--text-label);
 }
 

@@ -1,19 +1,21 @@
 .card {
   background: var(--surface-card);
-  border: var(--border-card);
-  box-shadow: var(--shadow-sm);
+  border: var(--border-card-on-page);
+  box-shadow: var(--shadow-card-on-page);
   padding: 16px;
+  color: var(--text-primary);
 }
 
 .card h3 {
   font-size: 12px;
-  letter-spacing: 2px;
-  margin: 0 0 10px;
+  letter-spacing: 2.5px;
+  color: var(--text-label-on-card);
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: var(--border-card);
 }
 
 .script {
-  color: var(--coral);
-  font-size: 22px;
   margin: 0 0 8px;
   white-space: nowrap;
   overflow: hidden;
@@ -30,23 +32,4 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 2px solid var(--border-default);
-  background: var(--mustard);
-  color: var(--text-primary);
-  font-size: 11px;
-  letter-spacing: 1px;
-  padding: 8px 12px;
-  text-decoration: none;
-  cursor: pointer;
-  box-shadow: 2px 2px 0 var(--coral);
-}
-
-.btn:hover {
-  transform: translate(-1px, -1px);
 }

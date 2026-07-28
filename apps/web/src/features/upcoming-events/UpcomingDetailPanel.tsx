@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 
 import { Button } from "@/components/Button/Button";
+import { EventTag } from "@/components/EventTag";
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import { Text } from "@/components/Text";
 import type { EventRowViewModel } from "@/lib/event-view-model";
@@ -17,8 +18,8 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
     return (
       <div className={styles.panel} data-testid="upcoming-detail-empty">
         <div className={styles.empty}>
-          <Text variant="script" tone="accent" scriptStyle="section" className={styles.emptyScript}>
-            pick one!
+          <Text variant="script" tone="brand" scriptStyle="section" className={styles.emptyScript}>
+            Pick one!
           </Text>
           <Text variant="eyebrow" tone="onCard" as="h3">
             SELECT AN EVENT
@@ -60,14 +61,12 @@ export function UpcomingDetailPanel({ event }: UpcomingDetailPanelProps) {
         {event.tags.length > 0 ? (
           <div className={styles.tags}>
             {event.tags.map((tag) => (
-              <Text key={tag} variant="eyebrow" tone="onCard" as="span" className={styles.tag}>
-                {tag}
-              </Text>
+              <EventTag key={tag}>{tag}</EventTag>
             ))}
           </div>
         ) : null}
 
-        <Text variant="header2" tone="onCard" as="h3" className={styles.title}>
+        <Text variant="header2" tone="onCard" weight="regular" as="h3" className={styles.title}>
           <Link to="/event/$slug" params={{ slug: event.slug }}>
             {event.title}
           </Link>

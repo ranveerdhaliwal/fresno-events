@@ -67,7 +67,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   line-height: 1.35;
   display: grid;
   gap: 4px;
@@ -102,17 +102,17 @@
 }
 
 .occCount {
-  font-weight: 800;
+  font-weight: var(--text-weight-extrabold);
 }
 
 .empty {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .more {
   margin-top: auto;
   padding-top: 6px;
-  font-weight: 700;
+  font-weight: var(--text-weight-bold);
   letter-spacing: 0.5px;
 }

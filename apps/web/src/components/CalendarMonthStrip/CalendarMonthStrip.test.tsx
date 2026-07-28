@@ -10,7 +10,7 @@ describe("CalendarMonthStrip", () => {
     await renderWithSiteRouter(<CalendarMonthStrip selectedYear={2026} selectedMonth={6} />);
 
     expect(screen.getByTestId("calendar-month-strip")).toBeInTheDocument();
-    expect(screen.getByText("pick a")).toBeInTheDocument();
+    expect(screen.getByText("Pick A")).toBeInTheDocument();
     expect(screen.getByText("MONTH")).toBeInTheDocument();
   });
 });

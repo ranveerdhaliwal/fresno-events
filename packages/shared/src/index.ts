@@ -85,6 +85,9 @@ export {
   diversifyHomepageFeatured,
   eventContentSignature,
   eventListingGroupKey,
+  eventListingGroupKeys,
+  listingGroupAlreadySeen,
+  markListingGroupsSeen,
   isSportsEvent,
   type EventContentSignatureInput,
   type EventListingGroupInput
@@ -126,6 +129,11 @@ export {
   stripBracketedLinkPlaceholders
 } from "./description-text.utils.js";
 export { sanitizeEventTags } from "./event-tags.utils.js";
+export {
+  inferEventCategory,
+  resolveEventCategory,
+  type InferEventCategoryInput
+} from "./infer-event-category.js";
 export {
   buildBreadcrumbJsonLd,
   buildCalendarDescription,

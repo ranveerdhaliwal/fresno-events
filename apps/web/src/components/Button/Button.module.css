@@ -44,7 +44,7 @@
   border: 1.5px solid var(--ink);
   background: var(--mustard);
   color: var(--ink);
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .approve:hover:not(:disabled) {
@@ -55,7 +55,7 @@
   border: 1.5px solid color-mix(in srgb, var(--coral) 70%, var(--ink));
   background: color-mix(in srgb, var(--coral) 12%, var(--surface-card));
   color: var(--coral-dark);
-  font-weight: 500;
+  font-weight: var(--text-weight-medium);
 }
 
 .reject:hover:not(:disabled) {
@@ -78,7 +78,7 @@
   background: var(--surface-card);
   color: var(--text-primary);
   box-shadow: var(--shadow-xs);
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .secondaryActive:hover:not(:disabled) {
@@ -113,6 +113,8 @@
   text-transform: uppercase;
   text-align: center;
   box-shadow: var(--shadow-md);
+  -webkit-text-stroke: 1.25px var(--ink);
+  paint-order: stroke fill;
   transition:
     transform 0.12s ease,
     box-shadow 0.12s ease,
@@ -123,4 +125,26 @@
   transform: translate(-1px, -1px);
   box-shadow: var(--shadow-coral-hover);
   background: color-mix(in srgb, var(--coral) 92%, var(--ink));
+}
+
+.mustard {
+  border-radius: 0;
+  border: 2px solid var(--border-default);
+  background: var(--mustard);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  box-shadow: var(--shadow-xs);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.12s ease;
+}
+
+.mustard:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
+  background: color-mix(in srgb, var(--mustard) 88%, white);
 }

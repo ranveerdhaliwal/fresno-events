@@ -107,7 +107,7 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
                 </SectionTitle>
                 {data.weeks.map((week) => (
                   <section key={week.label} className={styles.weekBlock}>
-                    <Text variant="header3" tone="onPage" as="h3">
+                    <Text variant="header3" tone="onPage" stroke="onDark" as="h3">
                       {week.label}
                     </Text>
                     {week.preview.length === 0 ? (

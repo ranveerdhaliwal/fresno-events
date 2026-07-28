@@ -1,6 +1,7 @@
 import {
   eventCategories,
   formatEventDisplayPriorityRubric,
+  resolveEventCategory,
   type EventCategory,
   type NormalizedEvent
 } from "@fresno-events/shared";
@@ -65,7 +66,11 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
     "P3 = notable venue shows (Tower Theatre, Saroyan/Selland, Warnors, Big Fresno Fair concerts, Fresno Grizzlies games).",
     "P4 = bigger-than-usual local listing (club shows at Fulton 55 / Strummer's / Rainbow Ballroom, community runs/walks, zoo special events).",
     "P5 = routine recurring community listing (farmers markets, karaoke, trivia, open mic, bingo, wine walks, fitness-in-the-park, story time, scavenger hunts, meetups, workshops/classes/camps, away minor-league games).",
-    "Never assign suggested_priority 0 unless the listing is clearly sponsored/ad content."
+    "Never assign suggested_priority 0 unless the listing is clearly sponsored/ad content.",
+    "Category calibration: touring/concert acts and named musical artists at performing-arts venues",
+    "(Tower Theatre, Warnors, Saroyan/Selland, Save Mart Center, clubs) are category music — not community.",
+    "Use community only for markets, meetups, workshops, trivia, karaoke, fitness, and similar routine listings.",
+    "Use theater for plays/musicals/ballet/opera; comedy for stand-up; sports for games and races."
   ].join(" ");
 
   const user = [
@@ -88,18 +93,25 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
     return null;
   }
 
-  return normalizeEnrichment(result);
+  return normalizeEnrichment(result, event);
 }
 
-function normalizeEnrichment(input: Partial<AiEnrichment>): AiEnrichment {
+function normalizeEnrichment(input: Partial<AiEnrichment>, event: NormalizedEvent): AiEnrichment {
   const isJunk = Boolean(input.is_junk);
   const confidence = clampEnrichmentConfidence(input.confidence);
-  const category =
+  const aiCategory =
     typeof input.category === "string" && eventCategories.includes(input.category as EventCategory)
       ? (input.category as EventCategory)
       : null;
-  const tags = Array.isArray(input.tags) ? input.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 8) : [];
   const cleaned = typeof input.cleaned_title === "string" && input.cleaned_title.trim().length > 0 ? input.cleaned_title.trim() : null;
+  const titleForCategory = cleaned ?? event.title;
+  const category = resolveEventCategory({
+    title: titleForCategory,
+    venueName: event.venueName,
+    ...(event.descriptionText ? { descriptionText: event.descriptionText } : {}),
+    category: aiCategory ?? event.category
+  });
+  const tags = Array.isArray(input.tags) ? input.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 8) : [];
   const reasoning = typeof input.reasoning === "string" ? input.reasoning.slice(0, 240) : "";
   const suggested_priority = clampSuggestedPriority(input.suggested_priority, isJunk);
 

@@ -29,7 +29,7 @@
   margin: 0;
   text-align: center;
   color: var(--text-secondary-on-card);
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   background: var(--surface-card);
   border: var(--border-card-on-page);
 }
@@ -50,7 +50,7 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
 .rowWrap {
@@ -67,8 +67,6 @@
   }
 }
 
-@media (max-width: 600px) {
-  .rowWrap :global([data-testid^="event-row-"]) {
-    display: none;
-  }
+.rowWrap :global([data-testid^="event-row-"]) {
+  display: none;
 }
