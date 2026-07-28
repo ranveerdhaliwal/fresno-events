@@ -90,7 +90,7 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
             {event.venueName}
           </Text>
         </div>
-        <Text variant="caps" tone="mutedOnCard" as="span" className={styles.cat}>
+        <Text variant="caps" tone="onCard" as="span" className={styles.cat}>
           {event.categoryLabel}
         </Text>
       </div>
