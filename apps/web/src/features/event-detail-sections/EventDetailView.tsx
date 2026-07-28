@@ -19,7 +19,7 @@ import { deriveTagline, eventIsFree, formatDetailPrice, toEventRowViewModel } fr
 import { heroImageFit, heroImagePadding } from "@/lib/hero-image.utils";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
 import { resolvePublicEventTags } from "@/lib/public-event-tags.utils";
-import { buildEventIntroSentence, buildGoogleMapsSearchUrl, formatCategoryLabel } from "@fresno-events/shared";
+import { buildEventIntroSentence, buildGoogleMapsSearchUrl, formatCategoryLabel, stripVenueCountrySuffix } from "@fresno-events/shared";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { formatCountdownLabel, formatEventDate, formatShortTime, toIsoDateLocal } from "@/lib/event-time";
 import { paletteKeyForCategory } from "@/lib/image-palette";
@@ -53,8 +53,9 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
   const ticketUrl = event.ticketUrl?.trim() || null;
   const sourceUrl = event.externalUrl?.trim() || null;
   const originalUrl = sourceUrl ?? ticketUrl;
+  const venueDisplayName = stripVenueCountrySuffix(venue.name);
   const shareUrl = typeof globalThis.location !== "undefined" ? globalThis.location.href : "";
-  const heroAlt = heroImage?.altText?.trim() || `${event.title} at ${venue.name}`;
+  const heroAlt = heroImage?.altText?.trim() || `${event.title} at ${venueDisplayName}`;
   const seoIntro = buildEventIntroSentence(event, venue);
 
   return (
@@ -114,7 +115,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
                     rel="noreferrer"
                     variant="cta"
                     size="sm"
-                    className={styles.ticketBtn}
+                    className={styles.heroBtn}
                   >
                     TICKETS <ExternalLink size={12} aria-hidden />
                   </Button>
@@ -124,9 +125,9 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
                     href={sourceUrl}
                     target="_blank"
                     rel="noreferrer"
-                    variant="secondary"
+                    variant="cta"
                     size="sm"
-                    className={styles.sourceBtn}
+                    className={styles.heroBtn}
                   >
                     SOURCE <ExternalLink size={12} aria-hidden />
                   </Button>
@@ -158,10 +159,10 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
           <Text variant="body1" tone="onCard" weight="regular" as="span" className={styles.whereVal}>
             {venue.slug ? (
               <Link to="/venue/$slug" params={{ slug: venue.slug }} className={styles.venueLink}>
-                {venue.name}
+                {venueDisplayName}
               </Link>
             ) : (
-              venue.name
+              venueDisplayName
             )}
           </Text>
           <Text variant="body3" tone="mutedOnCard" as="span" className={styles.sub}>
@@ -242,7 +243,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               />
             ) : null}
             <Text variant="body2" tone="onPage" as="p" className={styles.addressLine}>
-              {formatVenueAddressLine(venue) || venue.name}
+              {formatVenueAddressLine(venue) || venueDisplayName}
             </Text>
             {mapsUrl ? (
               <a href={mapsUrl} target="_blank" rel="noreferrer" className={styles.mapLink}>
@@ -326,12 +327,12 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               {venue.slug ? (
                 <Link to="/venue/$slug" params={{ slug: venue.slug }} className={styles.orgName}>
                   <Text variant="header3" tone="onCard" as="span">
-                    {venue.name}
+                    {venueDisplayName}
                   </Text>
                 </Link>
               ) : (
                 <Text variant="header3" tone="onCard" as="p" className={styles.orgName}>
-                  {venue.name}
+                  {venueDisplayName}
                 </Text>
               )}
               <Text variant="body3" tone="mutedOnCard" as="p" className={styles.orgMeta}>

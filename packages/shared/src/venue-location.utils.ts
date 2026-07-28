@@ -23,15 +23,21 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+const COUNTRY_TAIL_RE = /,?\s*(?:USA|U\.S\.A\.|United States(?: of America)?)\s*$/i;
 const MAILING_TAIL_RE = /,\s*([^,]+),\s*([A-Za-z]{2})(?:\s+(\d{5}(?:-\d{4})?))?\s*$/i;
 const STATE_ZIP_TAIL_RE = /,\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)\s*$/i;
+
+/** Drop trailing USA / United States from mailing lines (redundant for local listings). */
+export function stripVenueCountrySuffix(value: string): string {
+  return value.replace(COUNTRY_TAIL_RE, "").replace(/\s+/g, " ").trim();
+}
 
 /**
  * Parse trailing `, City, ST ZIP` segments (iteratively) from a mailing-style line.
  * Handles duplicated suffixes like `123 Main, Fresno, CA 93726, Fresno, CA 93726`.
  */
 export function parseMailingAddress(fullAddress: string): VenueLocationParts | null {
-  let street = fullAddress.trim();
+  let street = stripVenueCountrySuffix(fullAddress);
   if (!street) {
     return null;
   }

@@ -12,4 +12,13 @@ describe("formatVenueAddressLine", () => {
     expect(line).not.toMatch(/Fresno,\s*Fresno/);
     expect(line).toContain("2650");
   });
+
+  it("drops trailing USA from display lines", () => {
+    expect(
+      formatVenueAddressLine({
+        address: "2600 Fresno St, Fresno, CA 93721, USA",
+        city: "Fresno"
+      })
+    ).not.toMatch(/USA/i);
+  });
 });
