@@ -18,6 +18,9 @@ See also [VENUE_INGEST.md](VENUE_INGEST.md) for venue module layout.
 - Auto-assigned when `seriesName` matches a recurrence pattern (`Recurring weekly on Tuesday`, etc.)
 - Anchor: normalized title + venue (handles title drift and duplicate CMS slugs)
 - Explicit ids from `venue.config.json` (e.g. Big Fresno Fair) are preserved as-is
+- **Sports seasons (explicit):**
+  - Grizzlies home games → `series:milb-grizzlies:2026` (away games dropped at scrape + exclusion)
+  - Fresno State football home games → `series:gobulldogs-football:2026` (other sports stay ungrouped; away games excluded)
 
 ## Verify
 

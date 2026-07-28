@@ -46,4 +46,10 @@ describe("event-view-model", () => {
     expect(popular[0]?.rank).toBe(1);
     expect(popular.length).toBeLessThanOrEqual(5);
   });
+
+  it("formats popular meta as month day and time", () => {
+    const popular = toPopularViewModels(getMockEventList(), 1);
+    expect(popular[0]?.meta).toMatch(/^[A-Za-z]+ \d+ - /);
+    expect(popular[0]?.meta).not.toMatch(/Fresno|Clovis|·/);
+  });
 });

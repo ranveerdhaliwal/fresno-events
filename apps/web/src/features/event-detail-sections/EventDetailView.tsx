@@ -99,7 +99,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
                   {event.seriesName}
                 </Text>
               ) : null}
-              <Text variant="script" tone="brand" scriptStyle="section" as="p" className={styles.tagline}>
+              <Text variant="body1" tone="brand" weight="semibold" as="p" className={styles.tagline}>
                 {tagline}
               </Text>
             </div>

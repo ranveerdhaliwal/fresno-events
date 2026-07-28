@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildEventDescription,
+  buildEventIntroSentence,
   buildEventJsonLd,
   buildEventTitle,
   buildHomeTitle,
@@ -33,11 +34,24 @@ describe("seo.utils", () => {
         descriptionText: "Live horns and cocktails.",
         startTs: "2026-08-01T19:00:00-07:00"
       },
-      { name: "Tower Theatre" }
+      { name: "Tower Theatre", city: "Fresno" }
     );
     expect(description).toContain("Jazz Night");
     expect(description).toContain("Tower Theatre");
     expect(description).toContain("Fresno");
+  });
+
+  it("uses venue city in event intro and meta copy", () => {
+    const intro = buildEventIntroSentence(
+      {
+        title: "Fresno Grizzlies vs. Ontario Tower Buzzers",
+        startTs: "2026-08-01T01:35:00.000Z",
+        category: "sports"
+      },
+      { name: "ONT Field (Ontario, CA)", city: "Ontario" }
+    );
+    expect(intro).toContain("in Ontario on");
+    expect(intro).not.toContain("in Fresno");
   });
 
   it("resolves og image from hero URL or default", () => {

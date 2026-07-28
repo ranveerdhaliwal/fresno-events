@@ -100,9 +100,13 @@
 }
 
 .tagline {
-  font-size: 38px;
+  font-family: var(--font-body);
+  font-size: 22px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
   color: var(--mustard);
   margin: 0;
+  max-width: 36rem;
   -webkit-text-stroke: var(--text-stroke-on-dark-width) var(--text-stroke-on-dark-color);
   paint-order: stroke fill;
   text-shadow:

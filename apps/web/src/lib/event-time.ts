@@ -42,6 +42,19 @@ export function formatMonthDay(value: string | Date): string {
   }).format(typeof value === "string" ? new Date(value) : value);
 }
 
+export function formatMonthDayLong(value: string | Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    timeZone: TIME_ZONE
+  }).format(typeof value === "string" ? new Date(value) : value);
+}
+
+/** Popular-list meta: "July 29 - 5:30 PM" (date instead of city). */
+export function formatPopularMeta(startTs: string): string {
+  return `${formatMonthDayLong(startTs)} - ${formatShortTime(startTs)}`;
+}
+
 export function toIsoDateLocal(value: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",

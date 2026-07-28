@@ -38,10 +38,10 @@ Lane is derived from `strategy` in code (`venue-lanes.utils.ts`); no extra confi
 | `strummers` | `html_parse` (Squarespace eventlist on `/shows`) | `scrape:www.strummersclub.com` |
 | `rainbow-ballroom` | `scroll_listing_then_detail` | scrape host |
 | `big-fresno-fair` | `scroll_listing_then_detail` | scrape host |
-| `gobulldogs` | `api` (Sidearm `/api/v2/Calendar/from/.../to/...`) | `api:gobulldogs` |
+| `milb-grizzlies` | `api` (home games only; `series:milb-grizzlies:2026`) | `api:milb` |
+| `gobulldogs` | `api` (away excluded; football home → `series:gobulldogs-football:2026`) | `api:gobulldogs` |
 | `visit-fresno-county` | `api` | `api:visitfresnocounty` |
 | `downtown-fresno` | `api` | `api:downtownfresno` |
-| `milb-grizzlies` | `api` | `api:milb` |
 
 ## Commands
 

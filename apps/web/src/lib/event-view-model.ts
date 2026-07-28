@@ -7,6 +7,7 @@ import {
   formatEventDate,
   formatMonthDay,
   formatMonthLong,
+  formatPopularMeta,
   formatShortTime,
   isTonight,
   isWeekend,
@@ -188,7 +189,7 @@ export function toPopularViewModels(items: EventListItem[], limit = 5): PopularE
     id: item.event.id,
     slug: item.event.slug,
     title: item.event.title,
-    meta: `${item.venue.neighborhood ?? item.venue.city} · ${formatShortTime(item.event.startTs)}`,
+    meta: formatPopularMeta(item.event.startTs),
     priceLabel: formatPrice(item.event)
   }));
 }
