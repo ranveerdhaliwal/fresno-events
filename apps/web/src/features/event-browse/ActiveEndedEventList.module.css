@@ -12,7 +12,7 @@
 
 .endedLabel {
   margin: 0 0 8px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }

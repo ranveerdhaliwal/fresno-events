@@ -91,7 +91,7 @@ export function buildEventIntroSentence(
   venue: Pick<Venue, "name">
 ): string {
   const when = formatPacificEventDate(event.startTs);
-  const categoryLabel = event.category.replace(/_/g, " ");
+  const categoryLabel = formatCategoryLabel(event.category);
   return `${event.title} is a ${categoryLabel} event at ${venue.name} in Fresno on ${when}.`;
 }
 
@@ -383,5 +383,20 @@ function formatPacificDayTitle(isoDate: string): string {
 }
 
 export function formatCategoryLabel(category: EventCategory): string {
-  return category.replace(/_/g, " ");
+  const labels: Record<EventCategory, string> = {
+    music: "Live music",
+    comedy: "Comedy",
+    food_drink: "Food & drink",
+    art: "Arts",
+    theater: "Theater",
+    sports: "Sports",
+    outdoor: "Outdoor",
+    family: "Family",
+    festival: "Festival",
+    community: "Community",
+    nightlife: "Nightlife",
+    wellness: "Wellness",
+    education: "Education"
+  };
+  return labels[category] ?? category.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }

@@ -2,7 +2,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { EventRow } from "@/components/EventRow";
+import { SelectableEventRow } from "@/components/SelectableEventRow";
 import { EventRowSkeleton } from "@/components/EventRowSkeleton";
 import { PageChrome } from "@/components/PageChrome";
 import { Skeleton } from "@/components/Skeleton";
@@ -56,7 +56,7 @@ export function VenuePage() {
         ) : null}
         {data ? (
           <>
-            <Text variant="header1" tone="onPage" as="h1">
+            <Text variant="header1" tone="onPage" stroke="onDark" as="h1">
               {data.venue.name}
             </Text>
             <Text variant="body2" tone="mutedOnPage" as="p" className={styles.address}>
@@ -70,7 +70,7 @@ export function VenuePage() {
                 Website
               </a>
             ) : null}
-            <Text variant="header2" tone="onPage" as="h2" className={styles.sectionTitle}>
+            <Text variant="header2" tone="onPage" stroke="onDark" as="h2" className={styles.sectionTitle}>
               Upcoming events
             </Text>
             <div className={styles.list}>
@@ -80,7 +80,12 @@ export function VenuePage() {
                 </Text>
               ) : null}
               {rows.map((row) => (
-                <EventRow key={row.id} event={row} slug={row.slug} adminAction={<AdminEditLink eventId={row.id} />} />
+                <SelectableEventRow
+                  key={row.id}
+                  event={row}
+                  linkRows
+                  adminAction={<AdminEditLink eventId={row.id} />}
+                />
               ))}
             </div>
             <Link to="/" className={styles.back}>

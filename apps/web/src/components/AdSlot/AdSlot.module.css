@@ -31,29 +31,16 @@
   flex: 1;
 }
 
-.body h4 {
+.bannerHeadline {
   font-size: 18px;
   margin: 4px 0 2px;
+  color: var(--mustard);
 }
 
 .body p {
   margin: 0;
   font-size: 13px;
   color: color-mix(in srgb, var(--text-on-page) 75%, transparent);
-}
-
-.cta {
-  background: var(--coral-active);
-  color: #fff;
-  border: 2px solid var(--border-default);
-  padding: 10px 18px;
-  font-size: 11px;
-  letter-spacing: 2px;
-  box-shadow: var(--shadow-sm);
-}
-
-.cta :global(span) {
-  color: #fff;
 }
 
 .card {
@@ -83,16 +70,10 @@
   color: var(--text-secondary-on-card);
 }
 
-.ctaLink {
+.ctaButton {
   margin-top: 6px;
-  background: var(--mustard);
-  color: var(--text-primary);
-  border: 2px solid var(--border-default);
-  padding: 7px 14px;
-  font-size: 10px;
-  letter-spacing: 2px;
-  box-shadow: var(--shadow-xs);
   align-self: flex-start;
+  width: auto;
 }
 
 .side {

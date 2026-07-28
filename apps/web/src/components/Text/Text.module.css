@@ -1,8 +1,14 @@
-/* Typography variants — use Text instead of ad-hoc font-family / font-size */
+/* Typography variants — use Text instead of ad-hoc font-family / font-size.
+ *
+ * Weight scale (CSS vars live in tokens.css for global availability):
+ *   light 300 · regular 400 · medium 500 · semibold 600 · bold 700 · extrabold 800
+ * Prefer <Text weight="medium" /> over raw font-weight in feature CSS.
+ */
 
 .header1 {
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: var(--text-size-header1);
+  font-weight: var(--text-weight-regular);
   letter-spacing: 0.04em;
   line-height: 1.2;
   margin: 0;
@@ -10,8 +16,8 @@
 
 .header2 {
   font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 600;
+  font-size: var(--text-size-header2);
+  font-weight: var(--text-weight-semibold);
   letter-spacing: 0.035em;
   line-height: 1.25;
   margin: 0;
@@ -19,7 +25,8 @@
 
 .header3 {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: var(--text-size-header3);
+  font-weight: var(--text-weight-regular);
   letter-spacing: 0.03em;
   line-height: 1.3;
   margin: 0;
@@ -27,16 +34,34 @@
 
 .eyebrow {
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: var(--text-size-eyebrow);
+  font-weight: var(--text-weight-regular);
   letter-spacing: 0.27em;
   line-height: 1.3;
   text-transform: uppercase;
   margin: 0;
 }
 
+/*
+ * Small all-caps labels (categories). Body font + modest tracking stays sharper
+ * than Alfa Slab at ~11px with wide letter-spacing.
+ */
+.caps {
+  font-family: var(--font-body);
+  font-size: var(--text-size-caps);
+  font-weight: var(--text-weight-bold);
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  margin: 0;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+}
+
 .navLabel {
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: var(--text-size-nav-label);
+  font-weight: var(--text-weight-regular);
   letter-spacing: 2px;
   line-height: 1.2;
   text-transform: uppercase;
@@ -45,28 +70,32 @@
 
 .price {
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: var(--text-size-price);
+  font-weight: var(--text-weight-regular);
   line-height: 1.1;
   margin: 0;
 }
 
 .body1 {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: var(--text-size-body1);
+  font-weight: var(--text-weight-regular);
   line-height: 1.55;
   margin: 0;
 }
 
 .body2 {
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--text-size-body2);
+  font-weight: var(--text-weight-regular);
   line-height: 1.5;
   margin: 0;
 }
 
 .body3 {
   font-family: var(--font-body);
-  font-size: 11px;
+  font-size: var(--text-size-body3);
+  font-weight: var(--text-weight-regular);
   line-height: 1.45;
   margin: 0;
 }
@@ -74,6 +103,7 @@
 .script {
   font-family: var(--font-script);
   font-size: 1.15em;
+  font-weight: var(--text-weight-regular);
   line-height: 1.2;
   margin: 0;
 }
@@ -85,15 +115,52 @@
 }
 
 .scriptNav {
-  font-size: 18px;
+  font-size: var(--text-size-script-nav);
   transform: rotate(-3deg);
   display: inline-block;
   text-transform: none;
 }
 
 .scriptFooter {
-  font-size: 15px;
+  font-size: var(--text-size-script-footer);
   display: block;
+}
+
+/* Explicit weight overrides via <Text weight="…" /> */
+.weightLight {
+  font-weight: var(--text-weight-light);
+}
+
+.weightRegular {
+  font-weight: var(--text-weight-regular);
+}
+
+.weightMedium {
+  font-weight: var(--text-weight-medium);
+}
+
+.weightSemibold {
+  font-weight: var(--text-weight-semibold);
+}
+
+.weightBold {
+  font-weight: var(--text-weight-bold);
+}
+
+.weightExtrabold {
+  font-weight: var(--text-weight-extrabold);
+}
+
+/*
+ * Glyph outline for cream / coral titles sitting on navy page atmosphere.
+ * Use <Text stroke="onDark" /> — not a CSS box border around the word.
+ */
+.strokeOnDark {
+  -webkit-text-stroke: var(--text-stroke-on-dark-width) var(--text-stroke-on-dark-color);
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 0 var(--ink),
+    2px 2px 0 color-mix(in srgb, var(--ink) 45%, transparent);
 }
 
 .toneOnPage {
@@ -109,7 +176,7 @@
 }
 
 .toneAccent {
-  /* Cream-card accents — darkened for WCAG AA on warm paper */
+  /* Cream-card accents — brand coral (see --color-coral-dark) */
   color: var(--coral-dark);
 }
 

@@ -41,7 +41,7 @@
   border: var(--border-card);
   padding: 6px 12px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .home {

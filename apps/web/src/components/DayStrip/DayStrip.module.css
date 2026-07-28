@@ -74,7 +74,7 @@
   color: color-mix(in srgb, currentColor 75%, transparent);
   margin-top: 3px;
   display: block;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .today .dcount {

@@ -37,6 +37,7 @@ Prerequisite: `pnpm ingest:dev` on `:8788`.
 7. Query `pending_review` — flag dupes, bad venues, missing coords on marquee shows
 8. `GET /review/candidates/pre-approve-audit` — must be 0 blocking issues
 9. `pnpm review:bulk-approve` when queue looks good
+10. `pnpm review:bulk-approve-changes` when `needs_changes` > 0
 
 Or one shot for promote + post-promote + maintenance shell: `pnpm ingest:scheduled-local` (steps 1–6; agent review still manual).
 
@@ -51,7 +52,7 @@ Or one shot for promote + post-promote + maintenance shell: `pnpm ingest:schedul
 | Global detail backfill + enrich + reject-exclusions + address backfill | **`ingest:post-promote`** (or `scheduled-local`) |
 | Occurrence relink + orphan cleanup | **`ingest:scheduled-local`** maintenance block, or manual steps 5–6 |
 
-After post-promote + relink: run **agent review** (§ below), then `pnpm review:bulk-approve` and `bulk-approve-changes-all` if needed.
+After post-promote + relink: run **agent review** (§ below), then `pnpm review:bulk-approve` and `pnpm review:bulk-approve-changes` if `needs_changes` > 0.
 
 See [docs/INGEST_LOCAL_OPS.md](docs/INGEST_LOCAL_OPS.md) and [docs/INGEST_TESTING.md](docs/INGEST_TESTING.md).
 

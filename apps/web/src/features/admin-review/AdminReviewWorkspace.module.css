@@ -238,7 +238,7 @@
 .detailTitle {
   margin: 4px 0 0;
   font-size: 20px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   line-height: 1.25;
   color: var(--text-primary);
 }
@@ -413,7 +413,7 @@
 }
 
 .diffPanelLabel {
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   color: var(--text-primary);
 }
 
@@ -424,7 +424,7 @@
 
 .diffPanelAfter {
   color: var(--ink);
-  font-weight: 500;
+  font-weight: var(--text-weight-medium);
 }
 
 .proposedFieldGroupChanged {
@@ -460,7 +460,7 @@
 
 .rawJson summary {
   cursor: pointer;
-  font-weight: 500;
+  font-weight: var(--text-weight-medium);
   color: var(--text-primary);
 }
 

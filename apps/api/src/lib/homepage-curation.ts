@@ -4,7 +4,8 @@ import {
   dedupeEventsByContent,
   dedupeEventsByListingGroup,
   eventContentSignature,
-  eventListingGroupKey,
+  listingGroupAlreadySeen,
+  markListingGroupsSeen,
   isSportsEvent,
   pacificEndOfDay,
   pacificStartOfDay,
@@ -27,7 +28,7 @@ const HOMEPAGE_LIST_FROM_MS = 6 * 60 * 60 * 1000;
 const HOMEPAGE_FEATURED_LOOKAHEAD_DAYS = 7;
 const SCHEDULED_STATUSES = new Set<EventStatus>(["scheduled", "sold_out", "postponed"]);
 /** Featured grid: 2 heroes + 4 small cards. */
-export const FEATURED_SLOTS_PER_SECTION = 6;
+export const FEATURED_SLOTS_PER_SECTION = 7;
 const BIGGEST_MONTH_LIMIT = 10;
 
 interface HomepageSlotDbRow {
@@ -114,13 +115,12 @@ async function loadFeaturedAutoPool(env: Env, now: Date): Promise<EventListItem[
     if (seenSignatures.has(signature)) {
       continue;
     }
-    const group = eventListingGroupKey(item);
-    if (seenGroups.has(group)) {
+    if (listingGroupAlreadySeen(item, seenGroups)) {
       continue;
     }
     seenIds.add(item.event.id);
     seenSignatures.add(signature);
-    seenGroups.add(group);
+    markListingGroupsSeen(item, seenGroups);
     merged.push(item);
   }
 
@@ -138,7 +138,7 @@ function canPlaceFeaturedItem(
   if (placedIds.has(item.event.id)) {
     return false;
   }
-  if (placedGroups.has(eventListingGroupKey(item))) {
+  if (listingGroupAlreadySeen(item, placedGroups)) {
     return false;
   }
   if (isSportsEvent(item) && sportsCount >= 1) {
@@ -181,7 +181,7 @@ async function resolveSection(
     }
     items.push({ position, source: "pinned", item });
     placedIds.add(item.event.id);
-    placedGroups.add(eventListingGroupKey(item));
+    markListingGroupsSeen(item, placedGroups);
     if (isSportsEvent(item)) {
       sportsCount += 1;
     }
@@ -197,7 +197,7 @@ async function resolveSection(
       }
       items.push({ position: items.length + 1, source: "auto", item: candidate });
       placedIds.add(candidate.event.id);
-      placedGroups.add(eventListingGroupKey(candidate));
+      markListingGroupsSeen(candidate, placedGroups);
       if (isSportsEvent(candidate)) {
         sportsCount += 1;
       }

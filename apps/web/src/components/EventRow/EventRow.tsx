@@ -99,14 +99,14 @@ export function EventRow({
           {event.title}
         </Text>
         <div className={styles.rowMeta}>
-          <Text variant="body3" tone="mutedOnCard" as="span">
+          <Text variant="body2" tone="mutedOnCard" as="span">
             {event.timeLabel}
           </Text>
-          <Text variant="body3" tone="mutedOnCard" as="span">
+          <Text variant="body2" tone="mutedOnCard" as="span">
             {event.venueName}
           </Text>
         </div>
-        <Text variant="eyebrow" tone="labelOnCard" as="span" className={styles.rowCat}>
+        <Text variant="caps" tone="labelOnCard" as="span" className={styles.rowCat}>
           {event.categoryLabel}
         </Text>
       </div>

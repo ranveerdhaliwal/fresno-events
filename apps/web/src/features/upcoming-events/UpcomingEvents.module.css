@@ -5,7 +5,7 @@
 .loading {
   padding: 24px 0;
   color: var(--text-label);
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .listCol {
@@ -20,7 +20,7 @@
   display: inline-block;
   margin-top: 10px;
   color: var(--coral);
-  font-weight: 700;
+  font-weight: var(--text-weight-bold);
   text-decoration: none;
 }
 
@@ -35,7 +35,7 @@
 .sub {
   font-size: 12px;
   color: var(--text-label);
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   margin-left: auto;
 }
 
@@ -57,7 +57,7 @@
 
 .endedLabel {
   margin: 0 0 8px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }

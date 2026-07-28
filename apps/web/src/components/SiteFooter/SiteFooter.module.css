@@ -18,12 +18,17 @@
 .brand {
   font-size: 18px;
   margin: 0 0 4px;
+  -webkit-text-stroke: 1.25px var(--ink);
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 0 var(--ink),
+    2px 2px 0 color-mix(in srgb, var(--ink) 45%, transparent);
 }
 
 .tagline {
   margin: 0;
   font-size: 13px;
-  color: color-mix(in srgb, var(--text-on-page) 75%, transparent);
+  color: color-mix(in srgb, var(--text-on-page) 92%, transparent);
 }
 
 .script {

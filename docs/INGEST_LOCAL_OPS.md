@@ -83,7 +83,7 @@ Or in **`/admin` → Queue maintenance → Published orphan cleanup** → **Prev
 
 Run step 5 after every full promote (re-promote alone does not refresh stale `occurrence_id` on existing rows). Run step 6 after relink and **before** bulk approve when sources were approved in different orders — otherwise pre-approve audit may flag `published_content_duplicate`. See [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md).
 
-**Then:** review queue (see **Cursor review** below) → `pnpm review:bulk-approve` or `/admin`.
+**Then:** review queue (see **Cursor review** below) → `pnpm review:bulk-approve` → `pnpm review:bulk-approve-changes` if `needs_changes` > 0 (or use `/admin`).
 
 ### One command (`pnpm ingest:scheduled-local`)
 
@@ -184,7 +184,14 @@ curl -fsS "http://127.0.0.1:8790/review/candidates/pre-approve-audit" \
 pnpm review:bulk-approve
 ```
 
-**8. Priority sanity check** (cloud-dev requires `--allow-remote`)
+**8. Approve re-scrape updates** (when `needs_changes` > 0)
+
+```bash
+pnpm review:bulk-approve-changes --dry-run
+pnpm review:bulk-approve-changes
+```
+
+**9. Priority sanity check** (cloud-dev requires `--allow-remote`)
 
 ```bash
 pnpm priority:rerank -- --allow-remote          # dry-run
@@ -208,11 +215,11 @@ pnpm priority:rerank -- --allow-remote --apply  # fix Strummers P2→P4, arena P
 
 **After `pnpm ingest:scheduled-local` — read the review manifest first:**
 
-> Open `/tmp/fresno-ingest-scheduled/run-<stamp>-cursor-review.txt` and the matching `.log`. For each `>>>` step, confirm preflight/validation ok, relink `errors=0`, orphan `wouldDelete` matches expectations (and is under the max), no `ingest_runs` stuck `running`. Then follow the **Agent runbook** above. If maintenance and queue look good, run `pnpm review:bulk-approve`.
+> Open `/tmp/fresno-ingest-scheduled/run-<stamp>-cursor-review.txt` and the matching `.log`. For each `>>>` step, confirm preflight/validation ok, post-promote completed (including reject-exclusions), relink `errors=0`, orphan `wouldDelete` matches expectations (and is under the max), no `ingest_runs` stuck `running`. Then follow the **Agent runbook** above. If maintenance and queue look good, run `pnpm review:bulk-approve` and `pnpm review:bulk-approve-changes` if needed.
 
 **Manual pipeline — example prompt:**
 
-> Run the Agent runbook in INGEST_LOCAL_OPS.md: queue snapshot, reject-exclusions, relink if needed, spot-check dupes, pre-approve-audit, then bulk-approve if clean.
+> Run the Agent runbook in INGEST_LOCAL_OPS.md: queue snapshot, reject-exclusions, relink if needed, spot-check dupes, pre-approve-audit, then bulk-approve (and bulk-approve-changes if needed).
 
 The agent can run the same SQL/API steps as this doc; you stay in one thread instead of clicking through 180+ rows in `/admin`.
 
@@ -291,9 +298,11 @@ Load: `launchctl load ~/Library/LaunchAgents/com.whatupfresno.ingest.plist`
 | `pnpm ingest:preflight-all` | Dry-run all venues |
 | `pnpm ingest:relink` | After full promote — recompute occurrence keys and cross-source links (step 7; `--dry-run` first) |
 | `pnpm review:orphan-cleanup` | Published orphan cleanup — `--dry-run` first; wired into `ingest:scheduled-local` |
+| `pnpm review:reject-exclusions` | Auto-reject away games / Shen Yun — also inside `ingest:post-promote` |
 | `pnpm eventbrite:detail --limit=10` | Eventbrite URL rows still missing detail |
 | `pnpm priority:rerank -- --apply` | Recompute display priority on candidates/events |
 | `pnpm review:bulk-approve` | After Cursor or `/admin` vetting — approve all remaining pending |
+| `pnpm review:bulk-approve-changes` | Approve all `needs_changes` after re-scrape updates |
 
 ### Single venue
 

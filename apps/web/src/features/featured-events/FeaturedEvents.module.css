@@ -5,7 +5,7 @@
 
 .loading {
   padding: 48px 32px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   color: var(--text-label);
 }
 
@@ -77,12 +77,27 @@
 
 .heroes {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 18px;
+}
+
+.smallRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  align-items: stretch;
 }
 
 .cardWrap {
   position: relative;
+  display: flex;
+  height: 100%;
+}
+
+.cardWrap > a {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 
 .adminEdit {
@@ -90,12 +105,6 @@
   top: 8px;
   right: 8px;
   z-index: 2;
-}
-
-.smallRow {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 18px;
 }
 
 .side {
@@ -132,7 +141,12 @@
 
 @media (max-width: 600px) {
   .section {
-    padding: 20px 16px;
+    padding: 16px 12px;
+  }
+
+  .header {
+    margin-bottom: 12px;
+    gap: 10px;
   }
 
   .tabsDesktop {
@@ -144,10 +158,20 @@
   }
 
   .side {
-    display: none;
+    display: block;
+    margin-top: 4px;
+  }
+
+  .grid {
+    gap: 12px;
+  }
+
+  .heroes {
+    gap: 12px;
   }
 
   .smallRow {
     grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 }

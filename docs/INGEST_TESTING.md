@@ -21,6 +21,7 @@ Cloud dev Studio: [event_candidates table](https://supabase.com/dashboard/projec
 | `pnpm ingest:relink` | Occurrence relink maintenance (after full promote or matching-rule changes) |
 | `POST /review/ops/published-orphan-cleanup` | Remove duplicate published events (API; `/admin` → Queue maintenance; `pnpm review:orphan-cleanup`) |
 | `pnpm review:bulk-approve` | Approve all `pending_review` locally |
+| `pnpm review:bulk-approve-changes` | Approve all `needs_changes` (re-scrape updates) |
 
 **Preflight vs promote:** separate commands. Preflight = dry-run (no `event_candidates`; venue runs write `venue_ingest_runs` debug).
 
@@ -40,8 +41,9 @@ Cloud dev Studio: [event_candidates table](https://supabase.com/dashboard/projec
 7. Orphan cleanup — preview then apply (`pnpm review:orphan-cleanup` or `/admin` → Queue maintenance)
 8. **Agent review** — see [INGEST_LOCAL_OPS.md](INGEST_LOCAL_OPS.md) § Agent runbook (dupes, bad venues, pre-approve-audit)
 9. `pnpm review:bulk-approve` when audit is clean
+10. `pnpm review:bulk-approve-changes` if `needs_changes` count > 0 (re-scrape updates tab)
 
-**One command:** `pnpm ingest:scheduled-local` runs steps 2–7 (agent review still step 8).
+**One command:** `pnpm ingest:scheduled-local` runs steps 2–7 (agent review still steps 8–10).
 
 ## Checklist (single source / preflight)
 

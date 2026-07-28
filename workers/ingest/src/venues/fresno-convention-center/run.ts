@@ -20,7 +20,7 @@ function finalizeConventionEvent(event: NormalizedEvent): NormalizedEvent {
   const withVenue = applyConventionVenueLocation(event);
   return {
     ...withVenue,
-    category: inferConventionCategory(withVenue.title)
+    category: inferConventionCategory(withVenue.title, withVenue.venueName)
   };
 }
 

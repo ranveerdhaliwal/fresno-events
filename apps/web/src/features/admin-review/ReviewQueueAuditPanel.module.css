@@ -22,7 +22,7 @@
 }
 
 .panelTitle {
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .panelActions {
@@ -99,7 +99,7 @@
 }
 
 .issueCode {
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .issueId {
@@ -109,7 +109,7 @@
 .issueTitle {
   margin: 0 0 4px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }
 
 .issueMessage {

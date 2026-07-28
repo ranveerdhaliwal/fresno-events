@@ -3,7 +3,7 @@ name: What Up Fresno
 description: Warm Valley postcard aesthetic for local event discovery — playful, scannable, community-first.
 colors:
   coral: "#d85a3c"
-  coral-dark: "#b3401c"
+  coral-dark: "#d85a3c"
   mustard: "#f2c14e"
   olive: "#6b8e4e"
   ink: "#14181d"
@@ -18,6 +18,14 @@ colors:
   status-warning: "#b45309"
   status-danger: "#b42318"
 typography:
+  # Weight scale — CSS vars --text-weight-* (tokens.css) + Text weight prop
+  weights:
+    light: 300
+    regular: 400
+    medium: 500
+    semibold: 600
+    bold: 700
+    extrabold: 800
   display:
     fontFamily: '"Alfa Slab One", serif'
     fontSize: "28px"
@@ -38,15 +46,21 @@ typography:
     letterSpacing: "normal"
   body:
     fontFamily: '"Work Sans", system-ui, sans-serif'
-    fontSize: "14.5px"
+    fontSize: "16px"
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: "normal"
   body-compact:
     fontFamily: '"Work Sans", system-ui, sans-serif'
-    fontSize: "13px"
+    fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.4
+    letterSpacing: "normal"
+  body-small:
+    fontFamily: '"Work Sans", system-ui, sans-serif'
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: 1.45
     letterSpacing: "normal"
   label:
     fontFamily: '"Alfa Slab One", serif'
@@ -54,11 +68,138 @@ typography:
     fontWeight: 400
     lineHeight: 1.3
     letterSpacing: "0.27em"
+  caps:
+    fontFamily: '"Work Sans", system-ui, sans-serif'
+    fontSize: "11px"
+    fontWeight: 700
+    lineHeight: 1.3
+    letterSpacing: "0.06em"
   script:
     fontFamily: '"Yellowtail", cursive'
     fontSize: "1.15em"
     fontWeight: 400
     lineHeight: 1.2
+    letterSpacing: "normal"
+  script-nav:
+    fontFamily: '"Yellowtail", cursive'
+    fontSize: "18px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  script-footer:
+    fontFamily: '"Yellowtail", cursive'
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  section-title-lg:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "28px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "0.5px"
+  section-title-md:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "26px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "1px"
+  section-title-sm:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "22px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "0.5px"
+  # Component-scale steps used by list/detail/search CSS modules (via Text tokens or local overrides)
+  micro:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "9.5px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  micro-tight:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "10px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  label-btn:
+    fontFamily: '"Work Sans", system-ui, sans-serif'
+    fontSize: "11.5px"
+    fontWeight: 600
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  meta:
+    fontFamily: '"Work Sans", system-ui, sans-serif'
+    fontSize: "12.5px"
+    fontWeight: 400
+    lineHeight: 1.4
+    letterSpacing: "normal"
+  meta-loose:
+    fontFamily: '"Work Sans", system-ui, sans-serif'
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.4
+    letterSpacing: "normal"
+  meta-strong:
+    fontFamily: '"Work Sans", system-ui, sans-serif'
+    fontSize: "13.5px"
+    fontWeight: 400
+    lineHeight: 1.4
+    letterSpacing: "normal"
+  title-sm:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "16.5px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  title-md:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "19px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  card-title:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "24px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  share-script:
+    fontFamily: '"Yellowtail", cursive'
+    fontSize: "22px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  empty-script:
+    fontFamily: '"Yellowtail", cursive'
+    fontSize: "32px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  hero-tagline:
+    fontFamily: '"Yellowtail", cursive'
+    fontSize: "38px"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  hero-title-mobile:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "40px"
+    fontWeight: 400
+    lineHeight: 1
+    letterSpacing: "normal"
+  hero-title:
+    fontFamily: '"Alfa Slab One", serif'
+    fontSize: "56px"
+    fontWeight: 400
+    lineHeight: 0.98
+    letterSpacing: "normal"
+  rem-small:
+    fontFamily: '"Work Sans", system-ui, sans-serif'
+    fontSize: "0.75rem"
+    fontWeight: 400
+    lineHeight: 1.3
     letterSpacing: "normal"
   nav-title:
     fontFamily: '"Alfa Slab One", serif'
@@ -121,7 +262,7 @@ A Central Valley palette: sun-warmed corals and mustards on paper, teal for meta
 ### Primary
 
 - **Fresno Coral** (`#d85a3c` / `--coral`): Prices, live badges, accent emphasis, rainbow stripe segment. Use for action and energy, not large fills.
-- **Coral Dark** (`#b3401c` / `--coral-dark`): Reject/destructive text, darker coral states.
+- **Coral Dark** (`#d85a3c` / `--coral-dark`): Same vivid brand coral as `--coral` for cream-card accents (prices, ranks). Kept as a separate token so we can diverge later without hunting call sites.
 
 ### Secondary
 
@@ -152,7 +293,7 @@ A Central Valley palette: sun-warmed corals and mustards on paper, teal for meta
 
 **Display Font:** Alfa Slab One (serif) — logos, nav links, section headers, date numerals, prices.
 
-**Body Font:** Work Sans (system-ui fallback) — descriptions, form fields, meta lines. Base size 14.5px, line-height 1.5.
+**Body Font:** Work Sans (system-ui fallback) — descriptions, form fields, meta lines. Base size 16px (`--text-size-base` / `body1`), line-height 1.5.
 
 **Script Font:** Yellowtail (cursive) — accent only via `Text` variant `script`.
 
@@ -163,7 +304,7 @@ A Central Valley palette: sun-warmed corals and mustards on paper, teal for meta
 - **Display** (Alfa Slab, 28px / `header1`, line-height 1.2): Page titles, major section heads.
 - **Headline** (Alfa Slab, 20px semibold / `header2`, line-height 1.25): Subsection titles.
 - **Title** (Alfa Slab, 16px / `header3`, line-height 1.3): Card titles, compact headers.
-- **Body** (Work Sans, 14–14.5px / `body1`–`body3`, line-height 1.45–1.55): Descriptions; cap at 65–75ch on prose blocks.
+- **Body** (Work Sans, 12–16px / `body1`–`body3`, line-height 1.45–1.55): Descriptions; cap at 65–75ch on prose blocks. `body1` is the 16px default.
 - **Label** (Alfa Slab, 11px uppercase, letter-spacing 0.27em / `eyebrow`): Section kickers, category tags, date abbreviations.
 - **Script** (Yellowtail, 1.15em / `script`): Sparingly for delight.
 

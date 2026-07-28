@@ -31,9 +31,11 @@ describe("FeaturedEvents", () => {
     mockState.isLoading = false;
   });
 
-  it("renders featured section", async () => {
+  it("renders featured section with biggest-events list", async () => {
     await renderWithSiteRouter(<FeaturedEvents />);
     expect(screen.getByTestId("featured-events")).toBeInTheDocument();
     expect(screen.getByText("HAPPENING")).toBeInTheDocument();
+    expect(screen.getByTestId("popular-list")).toBeInTheDocument();
+    expect(screen.getByText("BIGGEST EVENTS THIS MONTH")).toBeInTheDocument();
   });
 });

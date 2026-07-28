@@ -5,6 +5,39 @@
   --font-script: "Yellowtail", cursive;
   --font-body: "Work Sans", system-ui, sans-serif;
 
+  /*
+   * Font weights — owned by Text (`Text.module.css` classes / `weight` prop).
+   * Use these vars for one-off CSS; prefer <Text weight="…" /> for copy.
+   */
+  --text-weight-light: 300;
+  --text-weight-regular: 400;
+  --text-weight-medium: 500;
+  --text-weight-semibold: 600;
+  --text-weight-bold: 700;
+  --text-weight-extrabold: 800;
+
+  /* Glyph outline for titles on navy / dark page surfaces */
+  --text-stroke-on-dark-width: 1.25px;
+  --text-stroke-on-dark-color: var(--ink);
+
+  /* Type scale — desktop defaults; mobile overrides below for a later pass */
+  --text-size-header1: 28px;
+  --text-size-header2: 20px;
+  --text-size-header3: 16px;
+  --text-size-eyebrow: 11px;
+  --text-size-nav-label: 13px;
+  --text-size-price: 13px;
+  --text-size-body1: 16px;
+  --text-size-body2: 14px;
+  --text-size-body3: 12px;
+  --text-size-caps: 11px;
+  --text-size-script-nav: 18px;
+  --text-size-script-footer: 15px;
+  --text-size-section-title-lg: 28px;
+  --text-size-section-title-md: 26px;
+  --text-size-section-title-sm: 22px;
+  --text-size-base: 16px;
+
   /* Shadows keep postcard offsets; strength varies by theme via --shadow-opacity */
   --shadow-xs: 2px 2px 0
     color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
@@ -50,4 +83,17 @@
     var(--text-label) 20px 30px
   );
   --rainbow-stripe-height-mobile: 5px;
+}
+
+/* Mobile type scale hooks — keep in sync with desktop until the mobile pass. */
+@media (max-width: 640px) {
+  :root {
+    --text-size-header1: 28px;
+    --text-size-header2: 20px;
+    --text-size-header3: 16px;
+    --text-size-body1: 16px;
+    --text-size-body2: 14px;
+    --text-size-body3: 12px;
+    --text-size-base: 16px;
+  }
 }

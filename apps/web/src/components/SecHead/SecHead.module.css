@@ -23,7 +23,13 @@
 }
 
 .script {
-  margin-right: 6px;
+  margin-right: 0;
+}
+
+.join {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font-display);
 }
 
 .groupSelectAll {

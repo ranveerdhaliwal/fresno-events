@@ -12,6 +12,27 @@
   box-shadow: var(--shadow-xs);
 }
 
+/* EventCard: one-line “FRI 31” under the thumb — no fill, flush with card edge. */
+.inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-top: 1.5px solid var(--border-default);
+  background: transparent;
+  padding: 4px 2px;
+  box-shadow: none;
+  min-height: 0;
+  border-radius: 0;
+}
+
+.inlineText {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 /* EventRow: larger dow+num+month box. */
 .row {
   background: var(--surface-card);
@@ -43,7 +64,7 @@
 }
 
 .month {
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   letter-spacing: 0;
   line-height: 1.25;
   margin-top: 4px;

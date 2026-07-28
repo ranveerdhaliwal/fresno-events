@@ -29,4 +29,16 @@ describe("Text", () => {
     const node = screen.getByTestId("brand-script");
     expect(node.className).toContain(styles.toneBrand);
   });
+
+  it("applies weight and onDark stroke props", () => {
+    renderWithProviders(
+      <Text variant="header1" tone="onPage" weight="medium" stroke="onDark" data-testid="stroked-title">
+        Events
+      </Text>
+    );
+
+    const node = screen.getByTestId("stroked-title");
+    expect(node.className).toContain(styles.weightMedium);
+    expect(node.className).toContain(styles.strokeOnDark);
+  });
 });

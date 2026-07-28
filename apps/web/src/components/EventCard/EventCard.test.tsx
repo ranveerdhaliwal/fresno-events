@@ -19,6 +19,14 @@ describe("EventCard", () => {
     expect(screen.getByText(event.title).tagName).toBe("SPAN");
   });
 
+  it("renders a thumbnail beside the title", async () => {
+    const event = toEventRowViewModel(getMockEventList()[0]!);
+
+    await renderWithSiteRouter(<EventCard event={event} />);
+
+    expect(screen.getByTestId(`event-card-thumb-${event.slug}`)).toBeInTheDocument();
+  });
+
   it("labels ended events clearly", async () => {
     const base = getMockEventList()[0]!;
     const event = toEventRowViewModel(

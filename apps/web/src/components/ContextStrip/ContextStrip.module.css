@@ -6,7 +6,7 @@
   justify-content: flex-end;
   align-items: center;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   color: var(--text-on-page);
 }
 

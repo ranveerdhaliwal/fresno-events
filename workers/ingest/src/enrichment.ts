@@ -1,5 +1,10 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
-import { formatIngestExclusionNotes, getIngestExclusion, sanitizeEventTags } from "@fresno-events/shared";
+import {
+  formatIngestExclusionNotes,
+  getIngestExclusion,
+  resolveEventCategory,
+  sanitizeEventTags
+} from "@fresno-events/shared";
 
 import { enrichCandidate, getAiBackend } from "@/ai";
 import {
@@ -538,8 +543,15 @@ function applyEnrichment(
   let mutated = false;
   const next: NormalizedEvent = { ...event };
 
-  if (enrichment.category && enrichment.category !== event.category) {
-    next.category = enrichment.category;
+  const titleForCategory = enrichment.cleaned_title ?? event.title;
+  const resolvedCategory = resolveEventCategory({
+    title: titleForCategory,
+    venueName: event.venueName,
+    ...(event.descriptionText ? { descriptionText: event.descriptionText } : {}),
+    category: enrichment.category ?? event.category ?? "community"
+  });
+  if (resolvedCategory !== event.category) {
+    next.category = resolvedCategory;
     mutated = true;
   }
   if (enrichment.cleaned_title && enrichment.cleaned_title !== event.title) {

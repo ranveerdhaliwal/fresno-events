@@ -32,4 +32,10 @@ describe("buttonClasses", () => {
     expect(className).toContain(styles.cta);
     expect(className).toContain(styles.md);
   });
+
+  it("includes mustard variant class", () => {
+    const className = buttonClasses("mustard", "xs");
+    expect(className).toContain(styles.mustard);
+    expect(className).toContain(styles.xs);
+  });
 });

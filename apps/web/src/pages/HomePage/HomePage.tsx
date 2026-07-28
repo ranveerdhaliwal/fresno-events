@@ -15,7 +15,7 @@ export function HomePage() {
   return (
     <PageChrome mobileNav={{ variant: "home" }}>
       <div className={styles.home} data-testid="home-page">
-        <Text variant="header1" tone="onPage" className={styles.pageTitle}>
+        <Text variant="header1" tone="onPage" stroke="onDark" className={styles.pageTitle}>
           Events in Fresno &amp; the Central Valley
         </Text>
         <FeaturedEvents />

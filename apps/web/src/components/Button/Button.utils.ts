@@ -9,7 +9,8 @@ const variantClass = {
   secondary: styles.secondary ?? "",
   secondaryActive: styles.secondaryActive ?? "",
   ghost: styles.ghost ?? "",
-  cta: styles.cta ?? ""
+  cta: styles.cta ?? "",
+  mustard: styles.mustard ?? ""
 } satisfies Record<ButtonVariant, string>;
 
 const sizeClass = {

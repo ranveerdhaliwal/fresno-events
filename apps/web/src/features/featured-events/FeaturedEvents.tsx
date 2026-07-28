@@ -16,8 +16,8 @@ export function FeaturedEvents() {
 
   const cards = viewModel?.featuredCards ?? [];
   const biggestMonth = viewModel?.biggestMonth ?? [];
-  const heroes = cards.slice(0, 2);
-  const small = cards.slice(2, 6);
+  const heroes = cards.slice(0, 3);
+  const small = cards.slice(3, 7);
 
   return (
     <section className={styles.section} data-testid="featured-events">

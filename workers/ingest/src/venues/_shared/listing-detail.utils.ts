@@ -1,4 +1,10 @@
-import { eventCategories, type EventCategory, type NormalizedEvent, type ScrapeError } from "@fresno-events/shared";
+import {
+  eventCategories,
+  resolveEventCategory,
+  type EventCategory,
+  type NormalizedEvent,
+  type ScrapeError
+} from "@fresno-events/shared";
 
 import type { AiDiscoveryItem } from "@/ai";
 import { sleep } from "@/lib/sleep";
@@ -64,7 +70,7 @@ export function mergeListingWithDetail(
     return listing;
   }
 
-  const category: EventCategory =
+  const rawCategory: EventCategory =
     detail.category && ALLOWED_CATEGORIES.has(detail.category as EventCategory)
       ? (detail.category as EventCategory)
       : (listing.category ?? "community");
@@ -73,11 +79,20 @@ export function mergeListingWithDetail(
   const imageUrl = detail.imageUrl?.trim() || listing.imageUrl?.trim();
 
   const mergedTitle = isPlaceholderDetailTitle(detail.title) ? listing.title : detail.title.trim();
+  const venueName = detail.venueName.trim();
+  const descriptionText = detail.descriptionText?.trim() || listing.descriptionText;
+
+  const category = resolveEventCategory({
+    title: mergedTitle,
+    venueName,
+    ...(descriptionText ? { descriptionText } : {}),
+    category: rawCategory
+  });
 
   return {
     ...listing,
     title: mergedTitle,
-    venueName: detail.venueName.trim(),
+    venueName,
     startTs: start.toISOString(),
     category,
     ...(detail.descriptionText?.trim()

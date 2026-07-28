@@ -20,9 +20,9 @@ describe("DateChip", () => {
     expect(screen.getByText("Jul")).toBeInTheDocument();
   });
 
-  it("omits the month for the card variant even when provided", () => {
-    renderWithProviders(<DateChip variant="card" dayShort="Fri" dayNum="18" monthShort="Jul" />);
+  it("renders a single-line inline variant", () => {
+    renderWithProviders(<DateChip variant="inline" dayShort="FRI" dayNum="31" />);
 
-    expect(screen.queryByText("Jul")).not.toBeInTheDocument();
+    expect(screen.getByTestId("date-chip-inline")).toHaveTextContent("FRI 31");
   });
 });

@@ -1,7 +1,9 @@
 import { Link2 } from "lucide-react";
 import { useState } from "react";
 
+import { Button } from "@/components/Button/Button";
 import { Text } from "@/components/Text";
+import { CENTRAL_VALLEY_GREETING } from "@/lib/section-script.utils";
 
 import { buildEventShareUrls, copyTextToClipboard } from "./EventShareCard.utils";
 import styles from "./EventShareCard.module.css";
@@ -27,29 +29,29 @@ export function EventShareCard({ title, url }: EventShareCardProps) {
 
   return (
     <div className={styles.card} data-testid="event-share-card">
-      <Text variant="eyebrow" tone="onCard" as="h3">
+      <Text variant="eyebrow" tone="labelOnCard" as="h3">
         SHARE
       </Text>
       <Text variant="script" tone="accent" scriptStyle="footer" as="p" className={styles.script}>
-        greetings from the central valley
+        {CENTRAL_VALLEY_GREETING}
       </Text>
       <Text variant="body2" tone="mutedOnCard" as="p" className={styles.hint}>
         Share this event with friends across Fresno.
       </Text>
       <div className={styles.buttons}>
-        <button type="button" className={styles.btn} onClick={() => void copyLink()}>
+        <Button type="button" variant="mustard" size="xs" onClick={() => void copyLink()}>
           <Link2 size={14} aria-hidden />
           {copied ? "Copied!" : "Copy link"}
-        </button>
-        <a className={styles.btn} href={shareUrls.twitter} target="_blank" rel="noreferrer">
+        </Button>
+        <Button href={shareUrls.twitter} target="_blank" rel="noreferrer" variant="mustard" size="xs">
           X
-        </a>
-        <a className={styles.btn} href={shareUrls.facebook} target="_blank" rel="noreferrer">
+        </Button>
+        <Button href={shareUrls.facebook} target="_blank" rel="noreferrer" variant="mustard" size="xs">
           Facebook
-        </a>
-        <a className={styles.btn} href={shareUrls.sms}>
+        </Button>
+        <Button href={shareUrls.sms} variant="mustard" size="xs">
           Text
-        </a>
+        </Button>
       </div>
     </div>
   );

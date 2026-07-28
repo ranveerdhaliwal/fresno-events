@@ -71,9 +71,10 @@ Cron maintains freshness; it does not seed an empty database.
 1. Ensure cloud-dev secrets are set on the ingest worker (`wrangler secret put … --env dev`).
 2. Run a full manual promote:
    ```bash
-   pnpm ingest:promote --source=ticketmaster
-   pnpm ingest:promote --source=venunite
-   pnpm ingest:promote-all   # all venue modules
+   pnpm ingest:promote --source=ticketmaster --no-enrich
+   pnpm ingest:promote --source=venunite --no-enrich
+   pnpm ingest:promote-all --no-enrich
+   pnpm ingest:post-promote   # detail-backfill, enrich, reject-exclusions, addresses
    ```
 3. Approve candidates in `/admin` as needed.
 

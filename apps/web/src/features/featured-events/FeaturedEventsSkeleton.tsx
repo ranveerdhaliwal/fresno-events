@@ -19,6 +19,7 @@ export function FeaturedEventsSkeleton() {
           <div className={styles.heroes}>
             <FeatureCardSkeleton variant="hero" />
             <FeatureCardSkeleton variant="hero" />
+            <FeatureCardSkeleton variant="hero" />
           </div>
           <div className={styles.smallRow}>
             <FeatureCardSkeleton variant="small" />

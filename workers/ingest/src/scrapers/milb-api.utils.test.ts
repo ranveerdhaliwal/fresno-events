@@ -32,4 +32,28 @@ describe("milb-api.utils", () => {
     expect(events[0]?.listVenueLogoPadding).toBe(10);
     expect(events[0]?.ticketUrl).toBe(GRIZZLIES_TICKETS_ORG_URL);
   });
+
+  it("expands abbreviated away venues like ONT Field", () => {
+    const events = toNormalizedEvents({
+      dates: [
+        {
+          games: [
+            {
+              gamePk: 1,
+              gameDate: "2026-07-30T01:35:00Z",
+              officialDate: "2026-07-29",
+              venue: { name: "ONT Field" },
+              teams: {
+                away: { team: { id: 259, name: "Fresno Grizzlies", teamName: "Grizzlies" } },
+                home: { team: { id: 1, name: "Ontario Tower Buzzers", teamName: "Tower Buzzers" } }
+              }
+            }
+          ]
+        }
+      ]
+    });
+    expect(events[0]?.venueName).toBe("ONT Field (Ontario, CA)");
+    expect(events[0]?.venueCity).toBe("Ontario");
+    expect(events[0]?.title).toContain("at Ontario Tower Buzzers");
+  });
 });

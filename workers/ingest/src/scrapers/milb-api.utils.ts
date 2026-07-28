@@ -42,6 +42,30 @@ export const GRIZZLIES_TICKETS_ORG_URL = "https://mlb.tickets.com/?orgId=57456&a
 
 const GRIZZLIES_TEAM_ID = 259;
 
+/** Expand airport-style / abbreviated away venues so list rows read clearly. */
+const AWAY_VENUE_DISPLAY: Record<string, { venueName: string; venueCity: string }> = {
+  "ont field": { venueName: "ONT Field (Ontario, CA)", venueCity: "Ontario" }
+};
+
+function resolveMilbVenue(
+  game: z.infer<typeof GameSchema>,
+  isHome: boolean,
+  opponentName: string
+): { venueName: string; venueCity: string } {
+  const raw = game.venue?.name?.trim() ?? "";
+  if (isHome) {
+    return { venueName: raw || "Chukchansi Park", venueCity: "Fresno" };
+  }
+  const mapped = AWAY_VENUE_DISPLAY[raw.toLowerCase()];
+  if (mapped) {
+    return mapped;
+  }
+  if (raw) {
+    return { venueName: raw, venueCity: "Fresno" };
+  }
+  return { venueName: opponentName, venueCity: "Fresno" };
+}
+
 function teamSlug(team: { teamName?: string | undefined; name: string }): string {
   const raw = team.teamName?.trim() || team.name.split(/\s+/).pop() || team.name;
   return raw
@@ -86,13 +110,14 @@ export function toNormalizedEvents(schedule: MilbSchedule): NormalizedEvent[] {
       const isHome = home.id === GRIZZLIES_TEAM_ID;
       const opponent = isHome ? away.name : home.name;
       const title = isHome ? `Fresno Grizzlies vs ${opponent}` : `Fresno Grizzlies at ${opponent}`;
+      const venue = resolveMilbVenue(game, isHome, opponent);
 
       events.push({
         source: "api:milb",
         sourceEventId: String(game.gamePk),
         title,
-        venueName: game.venue?.name ?? (isHome ? "Chukchansi Park" : opponent),
-        venueCity: "Fresno",
+        venueName: venue.venueName,
+        venueCity: venue.venueCity,
         startTs: new Date(game.gameDate).toISOString(),
         category: "sports",
         externalUrl: buildMilbGamedayUrl(game),

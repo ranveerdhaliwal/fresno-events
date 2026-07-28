@@ -11,6 +11,7 @@ describe("inferConventionCategory", () => {
     expect(inferConventionCategory("Bluey's Big Play")).toBe("family");
     expect(inferConventionCategory("Miss California 2026")).toBe("family");
     expect(inferConventionCategory("Grupo Duelo - GRAVEDAD TOUR 2026")).toBe("music");
+    expect(inferConventionCategory("ZZ Top", "Saroyan Theatre")).toBe("music");
     expect(inferConventionCategory("Random Community Fair")).toBe("community");
   });
 });

@@ -9,11 +9,11 @@
 .empty {
   font-size: 13px;
   color: var(--text-label);
-  font-weight: 500;
+  font-weight: var(--text-weight-medium);
   padding: 8px 0 16px;
 }
 
 .loading {
   color: var(--text-label);
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
 }

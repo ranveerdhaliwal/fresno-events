@@ -7,24 +7,37 @@
 }
 
 .script {
-  margin-right: -0.15em;
+  margin-right: 0;
+}
+
+.scriptTight {
+  margin-right: 0.2em;
+}
+
+.join {
+  font-family: var(--font-display);
+  font-size: var(--text-size-section-title-md);
+  line-height: 1;
 }
 
 .title {
   text-transform: uppercase;
 }
 
-.lg .title {
-  font-size: 28px;
+.lg .title,
+.lg .join {
+  font-size: var(--text-size-section-title-lg);
   letter-spacing: 0.5px;
 }
 
-.md .title {
-  font-size: 26px;
+.md .title,
+.md .join {
+  font-size: var(--text-size-section-title-md);
   letter-spacing: 1px;
 }
 
-.sm .title {
-  font-size: 22px;
+.sm .title,
+.sm .join {
+  font-size: var(--text-size-section-title-sm);
   letter-spacing: 0.5px;
 }

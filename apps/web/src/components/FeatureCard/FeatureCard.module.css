@@ -9,6 +9,7 @@
   text-decoration: none;
   color: var(--text-primary);
   -webkit-tap-highlight-color: transparent;
+  height: 100%;
 }
 
 .card:focus-visible {
@@ -58,7 +59,7 @@
   border-radius: 999px;
   padding: 3px 12px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: var(--text-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -77,14 +78,21 @@
 
 .cardTitle {
   font-size: 18px;
-  letter-spacing: 0.035em;
-  line-height: 1.15;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+
+.card:not(.hero) .cardTitle {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  min-height: calc(1.15em * 3);
 }
 
 .meta {
   display: flex;
   gap: 10px;
-  font-weight: 600;
   flex-wrap: wrap;
   align-items: baseline;
 }
@@ -92,10 +100,48 @@
 .metaDate {
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  font-weight: var(--text-weight-bold);
+}
+
+.metaWhen {
+  display: contents;
 }
 
 .desc {
   line-height: 1.45;
+}
+
+/* Desktop: lock title/desc heights so date, venue, and blurb share a scan line across the row. */
+@media (min-width: 601px) {
+  .hero .cardTitle {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    min-height: calc(1.2em * 3);
+    line-height: 1.2;
+  }
+
+  .hero .meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .hero .metaWhen {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: baseline;
+  }
+
+  .hero .desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+    min-height: calc(1.45em * 4);
+  }
 }
 
 .priceRow {
@@ -116,12 +162,71 @@
 }
 
 .priceTicketHint {
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.25;
-  max-width: 5rem;
+  font-size: 12px;
+  font-weight: var(--text-weight-medium);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .source {
   font-size: 11px;
+}
+
+@media (max-width: 600px) {
+  .hero .image {
+    height: 140px;
+  }
+
+  .image {
+    height: 100px;
+  }
+
+  .badge {
+    top: 8px;
+    left: 8px;
+    padding: 3px 8px;
+    font-size: 9px;
+  }
+
+  .pillCat {
+    bottom: 8px;
+    left: 8px;
+    padding: 2px 8px;
+    font-size: 10px;
+  }
+
+  .body {
+    padding: 10px 12px 12px;
+    gap: 4px;
+  }
+
+  .hero .cardTitle {
+    font-size: 18px;
+  }
+
+  .cardTitle {
+    font-size: 14px;
+    letter-spacing: 0.04em;
+  }
+
+  .card:not(.hero) .cardTitle {
+    -webkit-line-clamp: 2;
+    min-height: calc(1.2em * 2);
+  }
+
+  .meta {
+    gap: 6px;
+  }
+
+  .desc {
+    display: none;
+  }
+
+  .priceRow {
+    padding-top: 8px;
+  }
+
+  .price {
+    font-size: 12px;
+  }
 }

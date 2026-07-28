@@ -148,7 +148,7 @@ function parseParagraphBlock(
     venueName,
     venueCity: venueLocation.venueCity ?? "Fresno",
     startTs,
-    category: inferConventionCategory(title),
+    category: inferConventionCategory(title, venueName),
     externalUrl: detailUrl ?? config.listingUrl,
     ...venueLocation,
     ...(listingImageUrl ? { imageUrl: listingImageUrl } : {})

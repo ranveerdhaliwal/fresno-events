@@ -59,7 +59,7 @@
 
 .year {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: var(--text-weight-bold);
   letter-spacing: 1px;
   opacity: 0.85;
 }
