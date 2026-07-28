@@ -14,9 +14,20 @@
   display: block;
 }
 
+.mobileChrome {
+  display: none;
+}
+
 @media (max-width: 600px) {
   .desktopChrome {
     display: none;
+  }
+
+  .mobileChrome {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 20;
   }
 }
 

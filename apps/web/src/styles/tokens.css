@@ -61,6 +61,7 @@
   --page-max: 1280px;
   --nav-height: 68px;
   --nav-height-mobile: 56px;
+  --mobile-chrome-height: calc(var(--nav-height-mobile) + var(--rainbow-stripe-height-mobile));
   --content-max: 1280px;
   --side-col: 380px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);

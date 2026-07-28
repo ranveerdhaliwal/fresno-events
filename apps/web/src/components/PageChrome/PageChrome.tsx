@@ -22,8 +22,12 @@ export function PageChrome({ children, mobileNav }: PageChromeProps) {
           <TopNav />
           <RainbowStripe variant="desktop" />
         </div>
-        {mobileNav ? <MobileNav {...mobileNav} /> : null}
-        <RainbowStripe variant="mobile" />
+        {mobileNav ? (
+          <div className={styles.mobileChrome}>
+            <MobileNav {...mobileNav} />
+            <RainbowStripe variant="mobile" />
+          </div>
+        ) : null}
         <main className={styles.main}>{children}</main>
         <SiteFooter />
       </div>
