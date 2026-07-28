@@ -27,6 +27,17 @@ describe("EventCard", () => {
     expect(screen.getByTestId(`event-card-thumb-${event.slug}`)).toBeInTheDocument();
   });
 
+  it("renders date, venue pin, and category on separate lines", async () => {
+    const event = toEventRowViewModel(getMockEventList()[0]!);
+
+    await renderWithSiteRouter(<EventCard event={event} />);
+
+    expect(screen.getByText(`${event.dayShort} ${event.dayNum}`.trim())).toBeInTheDocument();
+    expect(screen.getByText(event.venueName)).toBeInTheDocument();
+    expect(screen.getByText(event.categoryLabel)).toBeInTheDocument();
+    expect(screen.queryByText(/·/)).not.toBeInTheDocument();
+  });
+
   it("labels ended events clearly", async () => {
     const base = getMockEventList()[0]!;
     const event = toEventRowViewModel(

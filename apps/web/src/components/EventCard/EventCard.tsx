@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { MapPin } from "lucide-react";
 
 import { PlaceholderImage } from "@/components/PlaceholderImage";
 import { Text } from "@/components/Text";
@@ -22,6 +23,24 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
   const showEnded = past || event.flagLabel === "ENDED";
   const imagePadding = heroImagePadding(event.imageUrl);
   const ticketHint = event.priceLabel != null && isListTicketPriceLabel(event.priceLabel);
+  const dateChip = `${event.dayShort} ${event.dayNum}`.trim();
+
+  const titleNode = onSelect ? (
+    <Text variant="header3" tone="onCard" weight="regular" as="span" className={styles.title}>
+      <Link
+        to="/event/$slug"
+        params={{ slug: event.slug }}
+        className={styles.titleLink}
+        onClick={(eventClick) => eventClick.stopPropagation()}
+      >
+        {event.title}
+      </Link>
+    </Text>
+  ) : (
+    <Text variant="header3" tone="onCard" weight="regular" as="span" className={styles.title}>
+      {event.title}
+    </Text>
+  );
 
   const body = (
     <>
@@ -40,24 +59,26 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
         />
       </div>
       <div className={styles.body}>
-        <div className={styles.headerRow}>
-          {onSelect ? (
-            <Text variant="header3" tone="onCard" weight="regular" as="span" className={styles.title}>
-              <Link
-                to="/event/$slug"
-                params={{ slug: event.slug }}
-                className={styles.titleLink}
-                onClick={(eventClick) => eventClick.stopPropagation()}
-              >
-                {event.title}
-              </Link>
-            </Text>
-          ) : (
-            <Text variant="header3" tone="onCard" weight="regular" as="span" className={styles.title}>
-              {event.title}
-            </Text>
-          )}
-          {event.priceLabel ? (
+        <div className={styles.topRow}>
+          {titleNode}
+          <Text variant="body3" tone="accent" weight="bold" as="span" className={styles.dateChip}>
+            {dateChip}
+          </Text>
+        </div>
+        <Text variant="body3" tone="labelOnCard" weight="medium" as="p" className={styles.time}>
+          {event.timeLabel}
+        </Text>
+        <div className={styles.venueRow}>
+          <MapPin className={styles.pin} size={13} strokeWidth={2.25} aria-hidden />
+          <Text variant="body3" tone="labelOnCard" weight="semibold" as="span" className={styles.venue}>
+            {event.venueName}
+          </Text>
+        </div>
+        <Text variant="caps" tone="mutedOnCard" as="span" className={styles.cat}>
+          {event.categoryLabel}
+        </Text>
+        {event.priceLabel ? (
+          <div className={styles.priceRow}>
             <Text
               variant="price"
               tone={event.isFree ? "label" : "accent"}
@@ -75,14 +96,8 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
                 event.priceLabel
               )}
             </Text>
-          ) : null}
-        </div>
-        <Text variant="body3" tone="mutedOnCard" as="p" className={styles.meta}>
-          {event.dayShort} {event.dayNum} · {event.timeLabel} · {event.venueName}
-        </Text>
-        <Text variant="body2" tone="labelOnCard" weight="medium" as="span" className={styles.cat}>
-          {event.categoryLabel}
-        </Text>
+          </div>
+        ) : null}
       </div>
     </>
   );

@@ -18,7 +18,7 @@
 }
 
 .hero .image {
-  height: 230px;
+  height: 200px;
 }
 
 .image {
@@ -116,14 +116,13 @@
   line-height: 1.45;
 }
 
-/* Desktop: lock title/desc heights so date, venue, and blurb share a scan line across the row. */
+/* Desktop heroes: clamp without reserved min-heights so 2-up cards stay compact. */
 @media (min-width: 601px) {
   .hero .cardTitle {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
     overflow: hidden;
-    min-height: calc(1.2em * 3);
     line-height: 1.2;
   }
 
@@ -143,9 +142,8 @@
   .hero .desc {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 4;
+    -webkit-line-clamp: 3;
     overflow: hidden;
-    min-height: calc(1.45em * 4);
   }
 }
 
