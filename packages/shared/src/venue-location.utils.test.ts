@@ -10,6 +10,18 @@ import {
 } from "./venue-location.utils.js";
 
 describe("venue-location.utils", () => {
+  it("strips trailing USA from mailing addresses before parsing", () => {
+    expect(parseMailingAddress("2600 Fresno St, Fresno, CA 93721, USA")).toEqual({
+      street: "2600 Fresno St",
+      city: "Fresno",
+      state: "CA",
+      zip: "93721"
+    });
+    expect(normalizeVenueStreetAddress("2600 Fresno St, Fresno, CA 93721, USA", "Fresno")).toBe(
+      "2600 Fresno St"
+    );
+  });
+
   it("parses street from a full mailing address", () => {
     expect(
       parseStreetFromFullAddress("5090 East Clinton Way, Fresno, CA 93727", {

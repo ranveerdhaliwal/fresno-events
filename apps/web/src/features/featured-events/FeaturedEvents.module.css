@@ -85,7 +85,7 @@
 
 .heroes {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
 }
 
@@ -95,7 +95,7 @@
 
 .smallRow {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
   align-items: stretch;
 }
@@ -104,6 +104,7 @@
   position: relative;
   display: flex;
   height: 100%;
+  min-width: 0;
 }
 
 .cardWrap > a {
@@ -130,7 +131,7 @@
   }
 
   .smallRow {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -142,7 +143,7 @@
 
 @media (max-width: 600px) {
   .section {
-    padding: 16px 12px;
+    padding: 16px 16px;
   }
 
   .header {
@@ -172,7 +173,7 @@
   }
 
   .smallRow {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 }

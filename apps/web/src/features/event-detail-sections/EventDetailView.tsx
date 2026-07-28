@@ -19,10 +19,10 @@ import { deriveTagline, eventIsFree, formatDetailPrice, toEventRowViewModel } fr
 import { heroImageFit, heroImagePadding } from "@/lib/hero-image.utils";
 import { formatVenueAddressLine } from "@/lib/venue-display.utils";
 import { resolvePublicEventTags } from "@/lib/public-event-tags.utils";
-import { buildEventIntroSentence, buildGoogleMapsSearchUrl, formatCategoryLabel } from "@fresno-events/shared";
+import { buildEventIntroSentence, buildGoogleMapsSearchUrl, formatCategoryLabel, stripVenueCountrySuffix } from "@fresno-events/shared";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { formatCountdownLabel, formatEventDate, formatShortTime, toIsoDateLocal } from "@/lib/event-time";
-import { paletteKeyForCategory, gradientForPalette } from "@/lib/image-palette";
+import { paletteKeyForCategory } from "@/lib/image-palette";
 import type { EventDetailResult } from "@/services/events.types";
 
 import styles from "./EventDetailView.module.css";
@@ -50,9 +50,12 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
   const hasCoords = venue.lat != null && venue.lng != null;
   const priceLabel = formatDetailPrice(event) || "TBA";
   const categoryLabel = formatCategoryLabel(event.category);
-  const originalUrl = event.externalUrl ?? event.ticketUrl ?? null;
+  const ticketUrl = event.ticketUrl?.trim() || null;
+  const sourceUrl = event.externalUrl?.trim() || null;
+  const originalUrl = sourceUrl ?? ticketUrl;
+  const venueDisplayName = stripVenueCountrySuffix(venue.name);
   const shareUrl = typeof globalThis.location !== "undefined" ? globalThis.location.href : "";
-  const heroAlt = heroImage?.altText?.trim() || `${event.title} at ${venue.name}`;
+  const heroAlt = heroImage?.altText?.trim() || `${event.title} at ${venueDisplayName}`;
   const seoIntro = buildEventIntroSentence(event, venue);
 
   return (
@@ -103,11 +106,32 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
                 {tagline}
               </Text>
             </div>
-            {event.ticketUrl ? (
+            {ticketUrl || sourceUrl ? (
               <div className={styles.heroActions}>
-                <Button href={event.ticketUrl} target="_blank" rel="noreferrer" variant="cta" className={styles.ticketBtn}>
-                  TICKETS <ExternalLink size={14} aria-hidden />
-                </Button>
+                {ticketUrl ? (
+                  <Button
+                    href={ticketUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    variant="cta"
+                    size="sm"
+                    className={styles.heroBtn}
+                  >
+                    TICKETS <ExternalLink size={12} aria-hidden />
+                  </Button>
+                ) : null}
+                {sourceUrl ? (
+                  <Button
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    variant="cta"
+                    size="sm"
+                    className={styles.heroBtn}
+                  >
+                    SOURCE <ExternalLink size={12} aria-hidden />
+                  </Button>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -135,10 +159,10 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
           <Text variant="body1" tone="onCard" weight="regular" as="span" className={styles.whereVal}>
             {venue.slug ? (
               <Link to="/venue/$slug" params={{ slug: venue.slug }} className={styles.venueLink}>
-                {venue.name}
+                {venueDisplayName}
               </Link>
             ) : (
-              venue.name
+              venueDisplayName
             )}
           </Text>
           <Text variant="body3" tone="mutedOnCard" as="span" className={styles.sub}>
@@ -219,7 +243,7 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               />
             ) : null}
             <Text variant="body2" tone="onPage" as="p" className={styles.addressLine}>
-              {formatVenueAddressLine(venue) || venue.name}
+              {formatVenueAddressLine(venue) || venueDisplayName}
             </Text>
             {mapsUrl ? (
               <a href={mapsUrl} target="_blank" rel="noreferrer" className={styles.mapLink}>
@@ -300,26 +324,23 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
               VENUE
             </Text>
             <div className={styles.organizer}>
-              <div className={styles.avatar} style={{ background: gradientForPalette(paletteKey) }} />
-              <div>
-                {venue.slug ? (
-                  <Link to="/venue/$slug" params={{ slug: venue.slug }} className={styles.orgName}>
-                    <Text variant="header3" tone="onCard" as="span">
-                      {venue.name}
-                    </Text>
-                  </Link>
-                ) : (
-                  <Text variant="header3" tone="onCard" as="p" className={styles.orgName}>
-                    {venue.name}
+              {venue.slug ? (
+                <Link to="/venue/$slug" params={{ slug: venue.slug }} className={styles.orgName}>
+                  <Text variant="header3" tone="onCard" as="span">
+                    {venueDisplayName}
                   </Text>
-                )}
-                <Text variant="body3" tone="mutedOnCard" as="p" className={styles.orgMeta}>
-                  {venue.neighborhood ?? venue.city}
+                </Link>
+              ) : (
+                <Text variant="header3" tone="onCard" as="p" className={styles.orgName}>
+                  {venueDisplayName}
                 </Text>
-                <Text variant="body3" tone="mutedOnCard" as="p" className={styles.orgAddress}>
-                  {formatVenueAddressLine(venue)}
-                </Text>
-              </div>
+              )}
+              <Text variant="body3" tone="mutedOnCard" as="p" className={styles.orgMeta}>
+                {venue.neighborhood ?? venue.city}
+              </Text>
+              <Text variant="body3" tone="mutedOnCard" as="p" className={styles.orgAddress}>
+                {formatVenueAddressLine(venue)}
+              </Text>
             </div>
           </div>
           {publicTags.length > 0 ? (

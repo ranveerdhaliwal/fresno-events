@@ -33,7 +33,7 @@ describe("EventCard", () => {
 
     await renderWithSiteRouter(<EventCard event={event} />);
 
-    expect(screen.getByText(`${event.timeLabel} - ${event.dayShort} ${event.dayNum}`.trim())).toBeInTheDocument();
+    expect(screen.getByText(`${event.timeLabel} - ${event.dateLabel}`)).toBeInTheDocument();
     expect(screen.getByText(event.venueName)).toBeInTheDocument();
     expect(screen.getByText(event.categoryLabel)).toBeInTheDocument();
     expect(screen.queryByText(/·/)).not.toBeInTheDocument();

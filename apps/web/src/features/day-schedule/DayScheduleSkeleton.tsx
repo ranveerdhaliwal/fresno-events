@@ -7,7 +7,7 @@ import styles from "./DaySchedule.module.css";
 const PERIODS = [
   { id: "morning", title: "MORNING", script: "early" },
   { id: "afternoon", title: "AFTERNOON", script: "midday" },
-  { id: "evening", title: "EVENING & NIGHT", script: "after dark" }
+  { id: "evening", title: "EVENING & NIGHT", script: "later" }
 ] as const;
 
 export function DayScheduleSkeleton() {

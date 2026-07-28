@@ -52,12 +52,12 @@
 .mainBlock {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
 .topRow {
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .title {
@@ -96,6 +96,7 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
+  margin-top: 2px;
 }
 
 .pin {
@@ -177,6 +178,24 @@
 
   .body {
     min-height: 84px;
+  }
+
+  .mainBlock {
+    gap: 4px;
+  }
+
+  .topRow {
+    margin-bottom: 2px;
+  }
+
+  .venueRow {
+    margin-top: 1px;
+    margin-bottom: 2px;
+  }
+
+  .footerRow {
+    margin-top: auto;
+    padding-top: 4px;
   }
 
   .title {

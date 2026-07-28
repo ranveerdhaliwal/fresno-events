@@ -2,7 +2,7 @@ import type { AdminEventListHit } from "@fresno-events/shared";
 import { clampEventPriority } from "@fresno-events/shared";
 
 import type { EventRowViewModel, RowPriority } from "@/lib/event-view-model";
-import { formatEventDate, formatMonthLong, formatShortTime } from "@/lib/event-time";
+import { formatMonthLong, formatShortTime, formatWeekdayMonthDay } from "@/lib/event-time";
 import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
 
 export interface PublishedPriorityGroup {
@@ -81,7 +81,7 @@ export function toPublishedEventRowViewModel(hit: AdminEventListHit): EventRowVi
     venueName: hit.venueName,
     neighborhood: "Fresno",
     timeLabel: formatShortTime(hit.startTs),
-    dateLabel: formatEventDate(hit.startTs),
+    dateLabel: formatWeekdayMonthDay(hit.startTs),
     dayShort,
     dayNum,
     monthShort: formatMonthLong(hit.startTs),

@@ -15,7 +15,7 @@ import styles from "./DaySchedule.module.css";
 const PERIODS: { id: Exclude<DayPeriod, "live">; title: string; script?: string }[] = [
   { id: "morning", title: "MORNING", script: "early" },
   { id: "afternoon", title: "AFTERNOON", script: "midday" },
-  { id: "evening", title: "EVENING & NIGHT", script: "after dark" }
+  { id: "evening", title: "EVENING & NIGHT", script: "later" }
 ];
 
 function schedulePeriod(startTs: string, endTs: string | undefined, now: Date): Exclude<DayPeriod, "live"> {

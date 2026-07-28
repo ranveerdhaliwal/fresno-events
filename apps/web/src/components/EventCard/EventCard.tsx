@@ -23,7 +23,9 @@ export function EventCard({ event, onSelect, isSelected = false }: EventCardProp
   const showEnded = past || event.flagLabel === "ENDED";
   const imagePadding = heroImagePadding(event.imageUrl);
   const ticketHint = event.priceLabel != null && isListTicketPriceLabel(event.priceLabel);
-  const whenLine = `${event.timeLabel} - ${event.dayShort} ${event.dayNum}`.trim();
+  const whenLine = event.timeLabel
+    ? `${event.timeLabel} - ${event.dateLabel}`
+    : event.dateLabel;
 
   const titleNode = onSelect ? (
     <Text variant="header3" tone="onCard" weight="regular" as="span" className={styles.title}>

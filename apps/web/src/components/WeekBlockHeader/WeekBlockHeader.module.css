@@ -38,4 +38,8 @@
     background: var(--surface-page);
     padding-top: 8px;
   }
+
+  .dates {
+    font-size: 11px;
+  }
 }

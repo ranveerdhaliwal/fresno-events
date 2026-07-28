@@ -27,6 +27,16 @@ export function formatEventDate(value: string | Date): string {
   }).format(typeof value === "string" ? new Date(value) : value);
 }
 
+/** List card when-line date: "Friday, Aug 2". */
+export function formatWeekdayMonthDay(value: string | Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    timeZone: TIME_ZONE
+  }).format(typeof value === "string" ? new Date(value) : value);
+}
+
 export function formatMonthLong(value: string | Date): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "long",

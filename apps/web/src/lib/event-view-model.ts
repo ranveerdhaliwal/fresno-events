@@ -4,11 +4,11 @@ import { clampEventPriority, daysFromIsoThroughSunday } from "@fresno-events/sha
 import { eventIsFree, formatListPrice } from "@/lib/event-price.utils";
 import {
   deriveEventTimeStatus,
-  formatEventDate,
   formatMonthDay,
   formatMonthLong,
   formatPopularMeta,
   formatShortTime,
+  formatWeekdayMonthDay,
   isTonight,
   isWeekend,
   toIsoDateLocal
@@ -127,7 +127,7 @@ export function toEventRowViewModel(item: EventListItem, now = new Date()): Even
     venueName: venue.name,
     neighborhood: venue.neighborhood ?? venue.city,
     timeLabel: formatShortTime(event.startTs),
-    dateLabel: formatEventDate(event.startTs),
+    dateLabel: formatWeekdayMonthDay(event.startTs),
     dayShort: new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Los_Angeles" })
       .format(start)
       .toUpperCase()

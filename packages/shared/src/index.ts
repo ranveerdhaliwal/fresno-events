@@ -175,6 +175,7 @@ export {
   parseMailingAddress,
   parseStreetFromFullAddress,
   resolveVenueLocationFields,
+  stripVenueCountrySuffix,
   type MapsLinkInput,
   type ResolvedVenueLocation,
   type VenueLocationParts
