@@ -99,3 +99,9 @@
 .error {
   font-size: 14px;
 }
+
+@media (max-width: 600px) {
+  .page {
+    padding: 16px 16px 40px;
+  }
+}

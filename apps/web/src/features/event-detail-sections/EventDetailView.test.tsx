@@ -77,6 +77,18 @@ describe("EventDetailView", () => {
     expect(screen.getByText("ORIGINAL LINK")).toBeInTheDocument();
   });
 
+  it("renders compact tickets and source actions in the hero", async () => {
+    const data = mockDetail();
+    data.detail.event.ticketUrl = "https://tickets.example.com/show";
+    data.detail.event.externalUrl = "https://source.example.com/listing";
+    await renderWithSiteRouter(<EventDetailView data={data} />);
+
+    const tickets = screen.getByRole("link", { name: /TICKETS/i });
+    const source = screen.getByRole("link", { name: /^SOURCE/i });
+    expect(tickets).toHaveAttribute("href", "https://tickets.example.com/show");
+    expect(source).toHaveAttribute("href", "https://source.example.com/listing");
+  });
+
   it("renders source note without em dash when listing link exists", async () => {
     const data = mockDetail();
     data.detail.event.ticketUrl = "https://tickets.example.com/show";

@@ -2,7 +2,7 @@ import type { EventbriteDetailStatus, EventCandidate } from "@fresno-events/shar
 import { clampEventPriority } from "@fresno-events/shared";
 
 import type { EventRowViewModel, RowPriority } from "@/lib/event-view-model";
-import { formatEventDate, formatMonthLong, formatShortTime } from "@/lib/event-time";
+import { formatMonthLong, formatShortTime, formatWeekdayMonthDay } from "@/lib/event-time";
 import { gradientForPalette, paletteKeyForCategory } from "@/lib/image-palette";
 import { resolveMediaUrl } from "@/lib/media-url";
 
@@ -101,7 +101,7 @@ export function toCandidateEventRowViewModel(
     venueName: candidate.venueName,
     neighborhood: normalized.venueCity ?? "Fresno",
     timeLabel: candidate.normalizedEvent.timeUnknown ? "" : formatShortTime(candidate.startTs),
-    dateLabel: formatEventDate(candidate.startTs),
+    dateLabel: formatWeekdayMonthDay(candidate.startTs),
     dayShort,
     dayNum,
     monthShort: formatMonthLong(candidate.startTs),

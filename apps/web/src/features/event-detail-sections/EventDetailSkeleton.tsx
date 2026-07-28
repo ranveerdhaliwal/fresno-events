@@ -68,7 +68,6 @@ export function EventDetailSkeleton() {
           <div className={styles.sideCard}>
             <Skeleton height={14} width={80} className={skeletonStyles.headGap} />
             <div className={styles.organizer}>
-              <Skeleton circle height={48} />
               <div className={skeletonStyles.orgLines}>
                 <Skeleton height={16} width="70%" />
                 <Skeleton height={12} width="45%" />
