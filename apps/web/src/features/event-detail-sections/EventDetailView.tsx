@@ -69,9 +69,15 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
         <span className={styles.sep}>/</span>
         <span className={styles.current}>{event.title}</span>
         {!isMobile ? (
-          <Link to="/day/$date" params={{ date: dayIso }} className={styles.back}>
-            ← BACK TO DAY
-          </Link>
+          <Button
+            to="/day/$date"
+            params={{ date: dayIso }}
+            variant="mustard"
+            size="sm"
+            className={styles.back}
+          >
+            ← All events on {formatEventDate(event.startTs)}
+          </Button>
         ) : null}
       </div>
 
@@ -358,6 +364,10 @@ export function EventDetailView({ data }: { data: EventDetailResult }) {
           <EventShareCard title={event.title} url={shareUrl} />
           <AdSlot variant="side" />
         </aside>
+      </div>
+
+      <div className={styles.footerAd}>
+        <AdSlot variant="banner-footer" />
       </div>
     </article>
   );

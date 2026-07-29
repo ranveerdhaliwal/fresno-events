@@ -1,10 +1,10 @@
 .section {
-  padding: 28px 32px;
+  padding: 28px var(--page-gutter);
   border-bottom: var(--divider-rule);
 }
 
 .loading {
-  padding: 48px 32px;
+  padding: 48px var(--page-gutter);
   font-weight: var(--text-weight-semibold);
   color: var(--text-label);
 }
@@ -143,7 +143,7 @@
 
 @media (max-width: 600px) {
   .section {
-    padding: 16px 16px;
+    padding: 16px var(--page-gutter);
   }
 
   .header {

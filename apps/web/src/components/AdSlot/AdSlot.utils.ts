@@ -3,6 +3,7 @@ import type { AdSlotVariant } from "./AdSlot";
 const SLOT_ENV_BY_VARIANT: Record<AdSlotVariant, keyof ImportMetaEnv> = {
   "banner-wide": "VITE_ADSENSE_SLOT_BANNER_WIDE",
   "banner-stacked": "VITE_ADSENSE_SLOT_BANNER_STACKED",
+  "banner-footer": "VITE_ADSENSE_SLOT_BANNER_FOOTER",
   card: "VITE_ADSENSE_SLOT_CARD",
   side: "VITE_ADSENSE_SLOT_SIDE"
 };

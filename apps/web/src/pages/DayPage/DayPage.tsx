@@ -119,6 +119,8 @@ export function DayPage() {
           isoDate={viewDate}
           onNavigateEvent={(slug) => void navigate({ to: "/event/$slug", params: { slug } })}
         />
+
+        <AdSlot variant="banner-footer" />
       </div>
     </PageChrome>
   );

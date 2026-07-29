@@ -13,6 +13,10 @@ const TITLE_NOISE_PREFIXES = [
   /^cancelled:\s*/i
 ];
 
+/** Drop a leading calendar year used as title noise ("2026 NSA …" → "NSA …"). */
+export function stripLeadingCalendarYear(title: string): string {
+  return title.replace(/^(?:19|20)\d{2}\s+/, "").trim();
+}
 /** Slug → canonical slug for cross-source venue matching. */
 const VENUE_ALIASES: Record<string, string> = {
   "chukchansi-park": "save-mart-center",

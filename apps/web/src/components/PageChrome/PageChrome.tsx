@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-import { HomeAtmosphere } from "@/components/HomeAtmosphere";
 import { MobileNav, type MobileNavProps } from "@/components/MobileNav";
 import { RainbowStripe } from "@/components/RainbowStripe";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -16,7 +15,6 @@ export interface PageChromeProps {
 export function PageChrome({ children, mobileNav }: PageChromeProps) {
   return (
     <div className={styles.page}>
-      <HomeAtmosphere />
       <div className={styles.chrome}>
         <div className={styles.desktopChrome}>
           <TopNav />

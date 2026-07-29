@@ -1,5 +1,5 @@
 .section {
-  padding: 28px 32px 30px;
+  padding: 28px var(--page-gutter) 30px;
   border-bottom: var(--divider-rule);
   position: relative;
 }
@@ -65,7 +65,7 @@
 
 @media (max-width: 600px) {
   .section {
-    padding: 20px 16px 24px;
+    padding: 20px var(--page-gutter) 24px;
   }
 
   .head {

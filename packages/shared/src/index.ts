@@ -15,6 +15,7 @@ export {
   normalizeTitle,
   normalizeVenue,
   canonicalOccurrenceTitle,
+  stripLeadingCalendarYear,
   isUtcNoonAllDaySentinel,
   pacificDateFromStartTs,
   normalizeListingUrl,

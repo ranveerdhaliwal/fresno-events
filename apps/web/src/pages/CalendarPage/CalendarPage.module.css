@@ -1,5 +1,5 @@
 .wrap {
-  padding: 24px 32px 48px;
+  padding: 24px var(--page-gutter) 48px;
 }
 
 .head {
@@ -89,7 +89,7 @@
 
 @media (max-width: 520px) {
   .wrap {
-    padding: 16px 16px 40px;
+    padding: 16px var(--page-gutter) 40px;
   }
 
   .grid,

@@ -67,7 +67,7 @@
 }
 
 .description {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   font-weight: var(--text-weight-medium);
   display: -webkit-box;
   -webkit-line-clamp: 6;

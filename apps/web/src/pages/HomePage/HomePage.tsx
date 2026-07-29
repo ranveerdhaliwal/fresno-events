@@ -23,6 +23,7 @@ export function HomePage() {
         <TodayStrip />
         <section className={styles.upcomingSection}>
           <UpcomingEvents />
+          <AdSlot variant="banner-footer" />
         </section>
       </div>
     </PageChrome>

@@ -1,27 +1,31 @@
-import { Link } from "@tanstack/react-router";
-
-import { Text } from "@/components/Text";
+import { Button } from "@/components/Button/Button";
+import { formatEventDate } from "@/lib/event-time";
 
 import styles from "./SeeAllDayCta.module.css";
 
 export interface SeeAllDayCtaProps {
   date: string;
   count: number;
+  /** @deprecated Both breakpoints use the same mustard button. */
   variant?: "desktop" | "mobile";
 }
 
-export function SeeAllDayCta({ date, count, variant = "desktop" }: SeeAllDayCtaProps) {
-  const label = `SEE ALL ${count} EVENTS ON ${date.toUpperCase()} →`;
+export function SeeAllDayCta({ date, count }: SeeAllDayCtaProps) {
+  const dayLabel = formatEventDate(new Date(`${date}T12:00:00-07:00`));
+  const label = `See all ${count} events on ${dayLabel} →`;
+
   return (
-    <Link
-      to="/day/$date"
-      params={{ date }}
-      className={variant === "mobile" ? styles.mobile : styles.desktop}
-      data-testid="see-all-day-cta"
-    >
-      <Text variant="eyebrow" tone="inherit" as="span">
+    <div className={styles.wrap}>
+      <Button
+        to="/day/$date"
+        params={{ date }}
+        variant="mustard"
+        size="md"
+        className={styles.btn}
+        data-testid="see-all-day-cta"
+      >
         {label}
-      </Text>
-    </Link>
+      </Button>
+    </div>
   );
 }
