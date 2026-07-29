@@ -27,7 +27,12 @@ export function pushAdSenseSlot(): void {
   try {
     window.adsbygoogle = window.adsbygoogle ?? [];
     window.adsbygoogle.push({});
-  } catch {
-    // Ad blockers or strict CSP may throw; fail silently.
+  } catch (error) {
+    // Ad blockers and strict CSP throw here, as does a zero-width slot
+    // ("No slot size for availableWidth=0"). Never break the page over an ad,
+    // but surface the reason in dev so the cause is debuggable.
+    if (import.meta.env.DEV) {
+      console.warn("[adsense] push failed:", error);
+    }
   }
 }

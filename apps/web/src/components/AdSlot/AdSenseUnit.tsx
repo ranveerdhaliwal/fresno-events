@@ -38,7 +38,7 @@ export function AdSenseUnit({ clientId, slotId, variant }: AdSenseUnitProps) {
     <div className={styles.live} data-variant={variant} data-testid={`ad-slot-live-${variant}`}>
       <ins
         className="adsbygoogle"
-        style={{ display: "block" }}
+        style={{ display: "block", width: "100%" }}
         data-ad-client={clientId}
         data-ad-slot={slotId}
         data-ad-format="auto"

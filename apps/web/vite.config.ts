@@ -27,7 +27,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
-        navigateFallback: "/"
+        // Must be a precached URL. "/" is not in the manifest (index.html is),
+        // which makes workbox throw non-precached-url on every navigation.
+        navigateFallback: "/index.html"
       }
     })
   ],
