@@ -52,7 +52,6 @@ export function FeaturedEvents() {
           <PopularList
             title="BIGGEST EVENTS THIS MONTH"
             events={biggestMonth}
-            count={biggestMonth.length}
             renderAdminEdit={(eventId) => <AdminEditLink eventId={eventId} />}
           />
         </aside>

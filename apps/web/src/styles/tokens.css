@@ -51,12 +51,21 @@
     color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
   --shadow-coral-lg: 5px 5px 0 color-mix(in srgb, var(--coral) 92%, transparent);
   --shadow-coral-hover: 7px 7px 0 color-mix(in srgb, var(--coral) 92%, transparent);
+  --shadow-mustard: 4px 4px 0 color-mix(in srgb, var(--mustard) 45%, var(--ink));
+  --shadow-mustard-hover: 7px 7px 0 color-mix(in srgb, var(--mustard) 88%, var(--ink));
 
   --border-thin: 3px solid var(--border-default);
   --border-card: 3px solid var(--border-default);
   --border-thick: 3.5px solid var(--border-default);
   --border-hero: 4px solid var(--coral);
   --divider-rule: 3.5px solid var(--divider-on-page);
+
+  /* Page edge gutter — every top-level page container uses this so desktop,
+     tablet, and mobile stay in step. Overrides live at the bottom of this file. */
+  --page-gutter: 32px;
+  /* Gap between the last page element and the site footer. SiteFooter adds its
+     own margin-top, so page containers should not add bottom padding as well. */
+  --page-footer-gap: 32px;
 
   --page-max: 1280px;
   --nav-height: 68px;
@@ -84,6 +93,20 @@
     var(--text-label) 20px 30px
   );
   --rainbow-stripe-height-mobile: 5px;
+}
+
+/* Tablet: pull the page edges in one step before the mobile jump. */
+@media (max-width: 1080px) {
+  :root {
+    --page-gutter: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --page-gutter: 16px;
+    --page-footer-gap: 24px;
+  }
 }
 
 /* Mobile type scale hooks — keep in sync with desktop until the mobile pass. */

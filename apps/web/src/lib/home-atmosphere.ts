@@ -3,7 +3,8 @@
  * Flip `HOME_ATMOSPHERE` to `"none"` to disable without deleting assets/code.
  *
  * Image pack: public-domain Sierra / Valley landscapes under `/public/atmosphere/`
- * (see `SOURCES.json`). One is chosen at random per page load; mobile gets `*-sm.jpg`.
+ * (see `SOURCES.json`). One is chosen at random on first paint; route changes crossfade
+ * to another image. Mobile gets `*-sm.jpg`.
  */
 export type HomeAtmosphereId = "none" | "veiled-sierra";
 
@@ -71,6 +72,19 @@ export function pickAtmosphereVariant(
   }
   const index = Math.floor(random() * pack.length);
   return pack[index] ?? pack[0]!;
+}
+
+/** Prefer a different landscape than `excludeId` when navigating between pages. */
+export function pickAtmosphereVariantExcluding(
+  excludeId: string | null | undefined,
+  pack: readonly AtmosphereImageVariant[] = HOME_ATMOSPHERE_PACK,
+  random: () => number = Math.random
+): AtmosphereImageVariant {
+  if (!excludeId || pack.length <= 1) {
+    return pickAtmosphereVariant(pack, random);
+  }
+  const filtered = pack.filter((entry) => entry.id !== excludeId);
+  return pickAtmosphereVariant(filtered.length > 0 ? filtered : pack, random);
 }
 
 /** Resolve desktop vs mobile URL for a chosen variant. */

@@ -2,6 +2,7 @@ import {
   eventCategories,
   formatEventDisplayPriorityRubric,
   resolveEventCategory,
+  stripLeadingCalendarYear,
   type EventCategory,
   type NormalizedEvent
 } from "@fresno-events/shared";
@@ -59,6 +60,8 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
     "suggested_priority (integer 0..5).",
     "cleaned_title: when the source title appends venue/admission policy noise (age gates, 'under 18 must be accompanied',",
     "'21+', 'all ages', 'ID required', similar trailing parentheticals or disclaimers), return a cleaned show name without that noise.",
+    "Also strip a leading calendar year when it is just season noise (e.g. '2026 NSA Southwest Nationals' → 'NSA Southwest Nationals',",
+    "'2026 Summer Band Concerts…' → 'Summer Band Concerts…'). Keep years that are part of a proper name (e.g. 'Class of 2026').",
     "Keep artistic/tour parentheticals that are part of the act name (e.g. Acoustic, Live, tour nicknames).",
     "If the title is already clean, set cleaned_title to null.",
     `Display priority rubric (lower = more prominent in feed): ${priorityRubric}.`,
@@ -107,7 +110,18 @@ function normalizeEnrichment(input: Partial<AiEnrichment>, event: NormalizedEven
     typeof input.category === "string" && eventCategories.includes(input.category as EventCategory)
       ? (input.category as EventCategory)
       : null;
-  const cleaned = typeof input.cleaned_title === "string" && input.cleaned_title.trim().length > 0 ? input.cleaned_title.trim() : null;
+  const aiCleaned =
+    typeof input.cleaned_title === "string" && input.cleaned_title.trim().length > 0
+      ? input.cleaned_title.trim()
+      : null;
+  const strippedSource = stripLeadingCalendarYear(event.title);
+  const strippedAi = aiCleaned ? stripLeadingCalendarYear(aiCleaned) : null;
+  const cleaned =
+    strippedAi && strippedAi !== event.title.trim()
+      ? strippedAi
+      : strippedSource !== event.title.trim()
+        ? strippedSource
+        : null;
   const titleForCategory = cleaned ?? event.title;
   const category = resolveEventCategory({
     title: titleForCategory,

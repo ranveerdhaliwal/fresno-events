@@ -1,5 +1,5 @@
 .wrap {
-  padding: 24px 32px 48px;
+  padding: 24px var(--page-gutter) 48px;
 }
 
 .wrap h1 {

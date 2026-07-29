@@ -19,6 +19,14 @@
   align-items: flex-start;
 }
 
+/* Banner between page content and the footer. The host page container supplies
+   the horizontal gutter so the ad lines up with content; SiteFooter's margin-top
+   supplies the gap below, so this only adds space above. */
+.footer {
+  margin: var(--page-footer-gap) 0 0;
+  min-height: 100px;
+}
+
 .tag {
   background: var(--surface-nav);
   color: var(--mustard);
@@ -106,17 +114,18 @@
   justify-content: center;
 }
 
-.wide.live,
-.banner.live {
+/* Live units render only .live (no variant class), so spacing keys off data-variant. */
+.live[data-variant="banner-wide"] {
   margin: 22px 32px;
 }
 
-@media (max-width: 600px) {
-  .wide {
-    margin: 16px;
-  }
+.live[data-variant="banner-footer"] {
+  margin: var(--page-footer-gap) 0 0;
+}
 
-  .wide.live {
+@media (max-width: 600px) {
+  .wide,
+  .live[data-variant="banner-wide"] {
     margin: 16px;
   }
 }

@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_ADSENSE_CLIENT_ID?: string;
   readonly VITE_ADSENSE_SLOT_BANNER_WIDE?: string;
   readonly VITE_ADSENSE_SLOT_BANNER_STACKED?: string;
+  readonly VITE_ADSENSE_SLOT_BANNER_FOOTER?: string;
   readonly VITE_ADSENSE_SLOT_CARD?: string;
   readonly VITE_ADSENSE_SLOT_SIDE?: string;
 }

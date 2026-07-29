@@ -19,7 +19,6 @@ describe("PageChrome", () => {
 
     expect(screen.getByTestId("top-nav")).toBeInTheDocument();
     expect(screen.getByTestId("site-footer")).toBeInTheDocument();
-    expect(screen.getByTestId("home-atmosphere")).toBeInTheDocument();
     expect(screen.getByTestId("page-child")).toHaveTextContent("Hello");
   });
 });

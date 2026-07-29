@@ -1,7 +1,8 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/Button/Button";
 import { FilterChip } from "@/components/FilterChip";
 import { SectionTitle } from "@/components/SectionTitle";
 import { SelectableEventRow } from "@/components/SelectableEventRow";
@@ -14,7 +15,7 @@ import {
 import { useBrowseEventSelect } from "@/hooks/useIsMobile";
 import { calendarSearchCurrent } from "@/lib/calendar-search.utils";
 import { toEventRowViewModel } from "@/lib/event-view-model";
-import { formatEventDate, toIsoDateLocal } from "@/lib/event-time";
+import { formatEventDate, formatMonthLong, toIsoDateLocal } from "@/lib/event-time";
 import patternStyles from "@/styles/patterns.module.css";
 import type { EventSectionBucket } from "@fresno-events/shared";
 
@@ -52,6 +53,7 @@ function SectionBlock({
   dateLabel?: string;
 }) {
   const rows = bucket.preview.map((item) => toEventRowViewModel(item));
+  const monthLabel = formatMonthLong(new Date());
 
   return (
     <section className={styles.sectionBlock}>
@@ -72,9 +74,17 @@ function SectionBlock({
         </div>
       )}
       {bucket.hidden > 0 ? (
-        <Link to="/calendar" search={calendarSearchCurrent()} className={styles.viewAll}>
-          {bucket.hidden} more events · View all →
-        </Link>
+        <div className={styles.viewAll}>
+          <Button
+            to="/calendar"
+            search={calendarSearchCurrent()}
+            variant="mustard"
+            size="md"
+            className={styles.viewAllBtn}
+          >
+            View Events all in {monthLabel} →
+          </Button>
+        </div>
       ) : null}
     </section>
   );

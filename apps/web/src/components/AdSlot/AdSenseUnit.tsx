@@ -2,12 +2,13 @@ import { useEffect, useRef } from "react";
 
 import { loadAdSenseScript, pushAdSenseSlot } from "@/lib/google-adsense/google-adsense.utils";
 
+import type { AdSlotVariant } from "./AdSlot";
 import styles from "./AdSlot.module.css";
 
 export interface AdSenseUnitProps {
   clientId: string;
   slotId: string;
-  variant: "banner-wide" | "banner-stacked" | "card" | "side";
+  variant: AdSlotVariant;
 }
 
 export function AdSenseUnit({ clientId, slotId, variant }: AdSenseUnitProps) {
@@ -34,7 +35,7 @@ export function AdSenseUnit({ clientId, slotId, variant }: AdSenseUnitProps) {
   }, [clientId, slotId]);
 
   return (
-    <div className={styles.live} data-testid={`ad-slot-live-${variant}`}>
+    <div className={styles.live} data-variant={variant} data-testid={`ad-slot-live-${variant}`}>
       <ins
         className="adsbygoogle"
         style={{ display: "block" }}

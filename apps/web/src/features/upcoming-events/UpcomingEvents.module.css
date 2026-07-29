@@ -17,11 +17,16 @@
 }
 
 .viewAll {
-  display: inline-block;
-  margin-top: 10px;
-  color: var(--coral);
-  font-weight: var(--text-weight-bold);
-  text-decoration: none;
+  margin-top: 14px;
+}
+
+.viewAllBtn {
+  width: 100%;
+  min-height: 48px;
+  padding: 14px 18px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  justify-content: center;
 }
 
 .toolbar {

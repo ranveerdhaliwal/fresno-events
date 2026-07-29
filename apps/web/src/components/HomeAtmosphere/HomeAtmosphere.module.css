@@ -6,6 +6,12 @@
   overflow: hidden;
 }
 
+.photos {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
 .photo {
   position: absolute;
   inset: 0;
@@ -16,9 +22,20 @@
   filter: saturate(0.85) contrast(1.05);
 }
 
+.photoOverlay {
+  opacity: 0;
+  transition: opacity 800ms ease;
+  will-change: opacity;
+}
+
+.photoVisible {
+  opacity: 1;
+}
+
 .veil {
   position: absolute;
   inset: 0;
+  z-index: 1;
   /* Stronger navy page tint so the photo reads cooler/bluer. */
   background: linear-gradient(
     180deg,
@@ -32,6 +49,7 @@
 .halftone {
   position: absolute;
   inset: 0;
+  z-index: 2;
   background-image: var(--bg-halftone);
   background-size: var(--bg-halftone-size);
   background-position: var(--bg-halftone-position);
@@ -41,5 +59,9 @@
 @media (prefers-reduced-motion: reduce) {
   .photo {
     transform: none;
+  }
+
+  .photoOverlay {
+    transition: none;
   }
 }

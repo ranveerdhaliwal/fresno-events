@@ -145,6 +145,18 @@ pnpm --filter @fresno-events/web build
 
 Set the same `VITE_*` variables in **Cloudflare Pages → Settings → Environment variables → Production** (plus `VITE_ADSENSE_SLOT_*` when ad units are created). Deploy `apps/web/dist` and attach `whatupfresno.com`.
 
+Each AdSense ad unit maps to one `AdSlot` variant. Without its slot variable a variant renders the house placeholder instead of a live ad:
+
+| Env variable | `AdSlot` variant | Placement |
+| --- | --- | --- |
+| `VITE_ADSENSE_SLOT_BANNER_WIDE` | `banner-wide` | Home, below featured events |
+| `VITE_ADSENSE_SLOT_BANNER_STACKED` | `banner-stacked` | Day view, beside top events |
+| `VITE_ADSENSE_SLOT_BANNER_FOOTER` | `banner-footer` | Home, day view, and event detail — above the footer |
+| `VITE_ADSENSE_SLOT_CARD` | `card` | Featured events grid |
+| `VITE_ADSENSE_SLOT_SIDE` | `side` | Event detail sidebar |
+
+Vite inlines these at build time, so changing them in Cloudflare requires a new deployment (Deployments → Retry deployment) before they take effect.
+
 Local dev keeps GA/ads off unless you copy those vars into `apps/web/.env.local` and restart the dev server.
 
 ## Event Review Flow

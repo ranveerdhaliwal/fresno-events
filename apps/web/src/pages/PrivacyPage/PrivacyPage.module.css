@@ -1,5 +1,5 @@
 .article {
-  padding: 24px 32px 8px;
+  padding: 24px var(--page-gutter) 8px;
   max-width: 720px;
 }
 
@@ -37,6 +37,6 @@
 
 @media (max-width: 600px) {
   .article {
-    padding: 16px 16px 8px;
+    padding: 16px var(--page-gutter) 8px;
   }
 }

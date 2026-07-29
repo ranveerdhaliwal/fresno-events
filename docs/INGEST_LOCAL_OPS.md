@@ -166,6 +166,18 @@ SELECT id, source, normalized_event->>'title', normalized_event->>'venueName'
 FROM event_candidates
 WHERE status = 'pending_review'
   AND (normalized_event->>'venueName' ~ '^[0-9]{3}-' OR normalized_event->>'venueName' IN ('Clovis', 'Fresno'));
+
+-- Series siblings with leading-year title drift ("2026 Foo" vs "Foo")
+SELECT series_id,
+       array_agg(DISTINCT title ORDER BY title) AS titles,
+       count(*)::int AS n
+FROM events
+WHERE series_id IS NOT NULL
+GROUP BY series_id
+HAVING count(DISTINCT title) > 1
+   AND bool_or(title ~ '^(19|20)[0-9]{2} ');
+-- If any rows: prefer the title without the year; UPDATE events SET title = regexp_replace(title, '^(19|20)[0-9]{2}\s+', '')
+-- WHERE series_id = '…' AND title ~ '^(19|20)[0-9]{2}\s+'; (enrichment also strips this going forward).
 ```
 
 **Reject duplicates:** keep higher-priority source (Ticketmaster / venue scrape over Visit Fresno / VenuNite). Use `/admin` or `POST /review/candidates/bulk-reject`.

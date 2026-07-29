@@ -9,6 +9,7 @@ import {
   isMobileAtmosphereViewport,
   pickAtmosphereImage,
   pickAtmosphereVariant,
+  pickAtmosphereVariantExcluding,
   resolveAtmosphereUrl
 } from "./home-atmosphere";
 
@@ -29,6 +30,13 @@ describe("home-atmosphere", () => {
 
     const last = pickAtmosphereVariant(HOME_ATMOSPHERE_PACK, () => 0.999);
     expect(last).toEqual(HOME_ATMOSPHERE_PACK[13]);
+  });
+
+  it("can exclude the current variant when picking the next page backdrop", () => {
+    const current = HOME_ATMOSPHERE_PACK[0]!;
+    const next = pickAtmosphereVariantExcluding(current.id, HOME_ATMOSPHERE_PACK, () => 0);
+    expect(next.id).not.toBe(current.id);
+    expect(next).toEqual(HOME_ATMOSPHERE_PACK[1]);
   });
 
   it("resolves mobile vs desktop URLs for the same variant", () => {

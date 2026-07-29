@@ -2,8 +2,13 @@
   padding-bottom: var(--safe-bottom);
 }
 
+/* .article is full-bleed, so the footer ad needs the page gutter of its own. */
+.footerAd {
+  padding: 0 var(--page-gutter);
+}
+
 .crumbs {
-  padding: 18px 32px 6px;
+  padding: 18px var(--page-gutter) 6px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -27,18 +32,14 @@
 
 .back {
   margin-left: auto;
-  background: var(--surface-card);
-  border: 2px solid var(--border-default);
-  padding: 5px 14px;
-  font-size: 10px;
-  letter-spacing: 2px;
-  box-shadow: var(--shadow-xs);
-  text-decoration: none;
-  color: var(--text-primary);
+  width: auto;
+  flex-shrink: 0;
+  text-transform: none;
+  letter-spacing: 0.04em;
 }
 
 .heroWrap {
-  padding: 8px 32px 0;
+  padding: 8px var(--page-gutter) 0;
 }
 
 .hero {
@@ -63,7 +64,7 @@
   display: flex;
   align-items: flex-end;
   gap: 24px;
-  padding: 0 32px 28px;
+  padding: 0 var(--page-gutter) 28px;
 }
 
 .heroText {
@@ -209,7 +210,7 @@
 }
 
 .content {
-  padding: 0 32px;
+  padding: 0 var(--page-gutter);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 32px;
@@ -498,14 +499,6 @@ a.orgName:hover {
 }
 
 @media (max-width: 600px) {
-  .crumbs,
-  .heroWrap,
-  .quickFacts,
-  .content {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
   .hero {
     height: 340px;
   }

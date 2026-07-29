@@ -10,7 +10,7 @@ import { getAdSenseSlotId, isAdSenseLive, shouldShowLiveAds } from "./AdSlot.uti
 
 import styles from "./AdSlot.module.css";
 
-export type AdSlotVariant = "banner-wide" | "banner-stacked" | "card" | "side";
+export type AdSlotVariant = "banner-wide" | "banner-stacked" | "banner-footer" | "card" | "side";
 
 export interface AdSlotProps {
   variant?: AdSlotVariant;
@@ -70,7 +70,12 @@ export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
 
   return (
     <div
-      className={cn(styles.banner, variant === "banner-wide" && styles.wide, variant === "banner-stacked" && styles.stacked)}
+      className={cn(
+        styles.banner,
+        variant === "banner-wide" && styles.wide,
+        variant === "banner-stacked" && styles.stacked,
+        variant === "banner-footer" && styles.footer
+      )}
       data-testid="ad-slot"
     >
       <Text variant="eyebrow" tone="inverse" as="span" className={styles.tag}>

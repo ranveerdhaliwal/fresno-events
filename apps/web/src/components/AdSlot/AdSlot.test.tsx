@@ -12,6 +12,11 @@ describe("AdSlot", () => {
     expect(screen.getByText("Reach Fresno locals")).toBeInTheDocument();
   });
 
+  it("renders footer banner variant", async () => {
+    await renderWithSiteRouter(<AdSlot variant="banner-footer" />);
+    expect(screen.getByTestId("ad-slot")).toBeInTheDocument();
+  });
+
   it("renders card variant", async () => {
     await renderWithSiteRouter(<AdSlot variant="card" />);
     expect(screen.getByTestId("ad-slot-card")).toBeInTheDocument();
