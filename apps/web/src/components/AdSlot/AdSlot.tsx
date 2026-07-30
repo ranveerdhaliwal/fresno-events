@@ -1,4 +1,5 @@
 import { useRouterState } from "@tanstack/react-router";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/Button/Button";
 import { PlaceholderImage } from "@/components/PlaceholderImage";
@@ -19,11 +20,27 @@ export interface AdSlotProps {
 export function AdSlot({ variant = "banner-wide" }: AdSlotProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const clientId = import.meta.env.VITE_ADSENSE_CLIENT_ID?.trim();
+  // AdSense had nothing to serve here (or never loaded) — show the house ad
+  // rather than reserved empty space.
+  const [adUnavailable, setAdUnavailable] = useState(false);
+  const handleUnavailable = useCallback(() => setAdUnavailable(true), []);
 
-  if (clientId && isAdSenseLive(variant) && shouldShowLiveAds(pathname)) {
+  // Each navigation is a fresh ad request, so give the slot another chance.
+  useEffect(() => {
+    setAdUnavailable(false);
+  }, [pathname, variant]);
+
+  if (clientId && isAdSenseLive(variant) && shouldShowLiveAds(pathname) && !adUnavailable) {
     const slotId = getAdSenseSlotId(variant);
     if (slotId) {
-      return <AdSenseUnit clientId={clientId} slotId={slotId} variant={variant} />;
+      return (
+        <AdSenseUnit
+          clientId={clientId}
+          slotId={slotId}
+          variant={variant}
+          onUnavailable={handleUnavailable}
+        />
+      );
     }
   }
 
