@@ -83,7 +83,7 @@ Or in **`/admin` → Queue maintenance → Published orphan cleanup** → **Prev
 
 Run step 5 after every full promote (re-promote alone does not refresh stale `occurrence_id` on existing rows). Run step 6 after relink and **before** bulk approve when sources were approved in different orders — otherwise pre-approve audit may flag `published_content_duplicate`. See [CROSS_SOURCE_DEDUPE.md](CROSS_SOURCE_DEDUPE.md).
 
-**Then:** review queue (see **Cursor review** below) → `pnpm review:bulk-approve` → `pnpm review:bulk-approve-changes` if `needs_changes` > 0 (or use `/admin`).
+**Then:** agent audit + summary (see **Cursor review** below) → **user confirms** → `pnpm review:bulk-approve` → `pnpm review:bulk-approve-changes` if `needs_changes` > 0.
 
 ### One command (`pnpm ingest:scheduled-local`)
 
@@ -104,7 +104,7 @@ pnpm ingest:scheduled-local
 
 Skip maintenance: `INGEST_SCHEDULED_SKIP_MAINTENANCE=1 pnpm ingest:scheduled-local`
 
-The script exits non-zero if maintenance preview/apply fails — read the cursor review manifest before bulk approve.
+The script exits non-zero if maintenance preview/apply fails, or if a promote source FAILed (e.g. Rainbow 0 events) — post-promote and relink still run so the rest of the queue is ready.
 
 ---
 
@@ -190,20 +190,24 @@ curl -fsS "http://127.0.0.1:8790/review/candidates/pre-approve-audit" \
 # Expect: ok:true, issues: [] (or only warnings you accept)
 ```
 
-**7. Bulk approve**
+**7. Report to user (do not approve yet)**
+
+Summarize: `pending_review` / `needs_changes` counts by source, pre-approve-audit errors/warnings, dupes flagged in step 5, anything rejected or skipped. **Wait for explicit user OK before step 8.**
+
+**8. Bulk approve** (only after user confirms)
 
 ```bash
 pnpm review:bulk-approve
 ```
 
-**8. Approve re-scrape updates** (when `needs_changes` > 0)
+**9. Approve re-scrape updates** (when `needs_changes` > 0)
 
 ```bash
 pnpm review:bulk-approve-changes --dry-run
 pnpm review:bulk-approve-changes
 ```
 
-**9. Priority sanity check** (cloud-dev requires `--allow-remote`)
+**10. Priority sanity check** (cloud-dev requires `--allow-remote`)
 
 ```bash
 pnpm priority:rerank -- --allow-remote          # dry-run

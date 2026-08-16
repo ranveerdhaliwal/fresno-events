@@ -45,4 +45,14 @@ describe("title similarity", () => {
     expect(tokens).not.toContain("fresno");
     expect(tokens).not.toContain("tour");
   });
+
+  it("auto-links short headliner variants after tour/year noise", () => {
+    const tour = scoreTitleSimilarity("ZZ Top Tour", "ZZ Top");
+    expect(tour.sharedCount).toBe(2);
+    expect(tour.score).toBeGreaterThanOrEqual(0.95);
+    expect(isStrongCrossSourceTitleMatch(tour)).toBe(true);
+
+    const year = scoreTitleSimilarity("ZZ TOP 2026", "ZZ Top");
+    expect(isStrongCrossSourceTitleMatch(year)).toBe(true);
+  });
 });

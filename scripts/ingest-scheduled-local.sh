@@ -76,12 +76,22 @@ scheduled_record_step() {
   SCHEDULED_REVIEW_STEPS+=("${name}|${status}|${detail}")
 }
 
-run_step pnpm ingest:promote --source=ticketmaster --no-enrich
-scheduled_record_step "promote-ticketmaster" "ok" ""
-run_step pnpm ingest:promote --source=venunite --no-enrich
-scheduled_record_step "promote-venunite" "ok" ""
-run_step pnpm ingest:promote-all --no-enrich
-scheduled_record_step "promote-all" "ok" "venue-ingest"
+# One source FAIL (e.g. Rainbow 0 events) must not skip post-promote / maintenance.
+run_promote_step() {
+  local name="$1"
+  local detail="${2:-}"
+  shift 2
+  if run_step "$@"; then
+    scheduled_record_step "$name" "ok" "$detail"
+    return 0
+  fi
+  scheduled_record_step "$name" "failed" "continuing pipeline"
+  echo "[scheduled] $name failed — continuing so the rest of the workflow still runs." >&2
+}
+
+run_promote_step "promote-ticketmaster" "" pnpm ingest:promote --source=ticketmaster --no-enrich
+run_promote_step "promote-venunite" "" pnpm ingest:promote --source=venunite --no-enrich
+run_promote_step "promote-all" "venue-ingest" pnpm ingest:promote-all --no-enrich
 if run_step pnpm ingest:post-promote; then
   scheduled_record_step "post-promote" "ok" "detail-backfill, enrich, reject-exclusions, addresses"
 else

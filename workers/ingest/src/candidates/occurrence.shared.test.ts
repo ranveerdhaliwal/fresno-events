@@ -52,8 +52,8 @@ describe("occurrence fingerprints", () => {
   it("canonicalOccurrenceTitle aligns and vs & in co-headliner titles", () => {
     const downtown = normalizeTitle("Los Lobos and Los Lonely Boys - The Brotherhood Tour");
     const tm = normalizeTitle("Los Lobos & Los Lonely Boys: The Brotherhood Tour");
-    expect(canonicalOccurrenceTitle(downtown)).toBe("los lobos los lonely boys the brotherhood tour");
-    expect(canonicalOccurrenceTitle(tm)).toBe("los lobos los lonely boys the brotherhood tour");
+    expect(canonicalOccurrenceTitle(downtown)).toBe("los lobos los lonely boys the brotherhood");
+    expect(canonicalOccurrenceTitle(tm)).toBe("los lobos los lonely boys the brotherhood");
   });
 
   it("matches Los Lobos downtown all-day listing vs Ticketmaster timed show", async () => {
@@ -163,6 +163,27 @@ describe("occurrence fingerprints", () => {
       "William Saroyan Theatre"
     );
     expect(teen).not.toBe(main);
+  });
+
+  it("canonicalOccurrenceTitle strips tour and calendar year suffixes", () => {
+    expect(canonicalOccurrenceTitle(normalizeTitle("ZZ Top Tour"))).toBe("zz top");
+    expect(canonicalOccurrenceTitle(normalizeTitle("ZZ Top"))).toBe("zz top");
+    expect(canonicalOccurrenceTitle(normalizeTitle("ZZ TOP 2026"))).toBe("zz top");
+    expect(canonicalOccurrenceTitle(normalizeTitle("ZZ Top Tour 2026"))).toBe("zz top");
+  });
+
+  it("matches ZZ Top across Visit, FCC scrape, and Ticketmaster", async () => {
+    const ts = "2026-08-08T03:00:00.000Z";
+    const visit = await computeOccurrenceKey("ZZ Top Tour", ts, "William Saroyan Theatre");
+    const scrape = await computeOccurrenceKey("ZZ TOP 2026", ts, "WILLIAM SAROYAN THEATRE");
+    const tm = await computeOccurrenceKey(
+      "ZZ Top",
+      ts,
+      "William Saroyan Theatre Fresno Convention & Entertainment Center"
+    );
+    expect(visit).toBeTruthy();
+    expect(visit).toBe(scrape);
+    expect(scrape).toBe(tm);
   });
 
   it("canonicalOccurrenceTitle strips concert suffix noise", () => {

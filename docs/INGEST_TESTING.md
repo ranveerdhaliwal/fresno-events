@@ -39,11 +39,11 @@ Cloud dev Studio: [event_candidates table](https://supabase.com/dashboard/projec
 5. `pnpm ingest:post-promote` (detail backfill, enrich, reject-exclusions, venue addresses)
 6. `pnpm ingest:relink --dry-run` then `pnpm ingest:relink`
 7. Orphan cleanup — preview then apply (`pnpm review:orphan-cleanup` or `/admin` → Queue maintenance)
-8. **Agent review** — see [INGEST_LOCAL_OPS.md](INGEST_LOCAL_OPS.md) § Agent runbook (dupes, bad venues, pre-approve-audit)
-9. `pnpm review:bulk-approve` when audit is clean
-10. `pnpm review:bulk-approve-changes` if `needs_changes` count > 0 (re-scrape updates tab)
+8. **Agent audit + summary** — see [INGEST_LOCAL_OPS.md](INGEST_LOCAL_OPS.md) § Agent runbook; report notable items; **wait for user OK**
+9. `pnpm review:bulk-approve` (after user confirms)
+10. `pnpm review:bulk-approve-changes` if `needs_changes` count > 0
 
-**One command:** `pnpm ingest:scheduled-local` runs steps 2–7 (agent review still steps 8–10).
+**One command:** `pnpm ingest:scheduled-local` runs steps 2–7; steps 8–10 after user reviews the summary.
 
 ## Checklist (single source / preflight)
 

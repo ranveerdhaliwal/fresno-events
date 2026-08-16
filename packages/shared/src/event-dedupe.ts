@@ -1,3 +1,10 @@
+import {
+  canonicalOccurrenceTitle,
+  normalizeTitle as occurrenceNormalizeTitle,
+  normalizeVenue as occurrenceNormalizeVenue,
+  pacificTimeBucketKey
+} from "./occurrence.js";
+
 export interface EventContentSignatureInput {
   event: { title: string; startTs: string };
   venue: { name?: string | null };
@@ -12,23 +19,29 @@ export interface EventListingGroupInput {
   venue: { name?: string | null };
 }
 
-function normalizeTitle(title: string): string {
-  return title.trim().toLowerCase().replace(/\s+/g, " ");
+function contentTitle(title: string): string {
+  return canonicalOccurrenceTitle(occurrenceNormalizeTitle(title));
 }
 
-function normalizeVenue(name: string | null | undefined): string {
-  return (name ?? "").trim().toLowerCase();
+function contentVenue(name: string | null | undefined): string {
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) {
+    return "";
+  }
+  return occurrenceNormalizeVenue(trimmed);
 }
 
 /**
  * Content signature used to collapse near-identical listings (same show, same
  * venue, same start) that arrive as separate rows from different sources.
- * Title whitespace/case is normalized so cosmetic differences still collide.
+ * Uses occurrence title/venue canonicalization so "ZZ Top Tour" / Saroyan name
+ * variants collide with Ticketmaster "ZZ Top" at the same Pacific time bucket.
  */
 export function eventContentSignature(item: EventContentSignatureInput): string {
-  const title = normalizeTitle(item.event.title);
-  const venue = normalizeVenue(item.venue.name);
-  return `${title}|${venue}|${item.event.startTs}`;
+  const title = contentTitle(item.event.title);
+  const venue = contentVenue(item.venue.name);
+  const bucket = pacificTimeBucketKey(item.event.startTs) ?? item.event.startTs;
+  return `${title}|${venue}|${bucket}`;
 }
 
 /** Removes content-duplicate events, keeping the first occurrence (order preserved). */
@@ -53,8 +66,8 @@ export function dedupeEventsByContent<T extends EventContentSignatureInput>(item
  * the same series still collapse together.
  */
 export function eventListingGroupKeys(item: EventListingGroupInput): string[] {
-  const title = normalizeTitle(item.event.title);
-  const venue = normalizeVenue(item.venue.name);
+  const title = contentTitle(item.event.title);
+  const venue = contentVenue(item.venue.name);
   const keys = [`title:${title}|${venue}`];
   const seriesId = item.event.seriesId?.trim();
   if (seriesId) {

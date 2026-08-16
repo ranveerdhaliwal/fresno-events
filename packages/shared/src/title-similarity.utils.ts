@@ -71,10 +71,14 @@ export function scoreTitleSimilarity(leftTitle: string, rightTitle: string): Tit
 
 /** Auto-link threshold for ingest fuzzy occurrence matching. */
 export function isStrongCrossSourceTitleMatch(score: TitleSimilarityScore): boolean {
-  if (score.sharedCount < 3) {
+  if (score.tokenCountA < 2 || score.tokenCountB < 2) {
     return false;
   }
-  if (score.tokenCountA < 2 || score.tokenCountB < 2) {
+  // Short headliners ("ZZ Top" vs "ZZ Top Tour"): stop-words leave ≤2 tokens that fully overlap.
+  if (score.sharedCount >= 2 && score.score >= 0.95) {
+    return true;
+  }
+  if (score.sharedCount < 3) {
     return false;
   }
   return score.score >= 0.58;
