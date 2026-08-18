@@ -27,9 +27,9 @@ vi.mock("./useEventSections", () => ({
         untilIso: "2026-08-03"
       },
       weekend: {
-        preview: [],
-        hidden: 0,
-        total: 0,
+        preview: [sample],
+        hidden: 12,
+        total: 13,
         fromIso: "2026-08-01",
         untilIso: "2026-08-02"
       }
@@ -52,9 +52,9 @@ describe("UpcomingEvents", () => {
     expect(screen.getByTestId("upcoming-events")).toBeInTheDocument();
   });
 
-  it("renders a mustard view-all calendar button with the current month", async () => {
+  it("renders a single mustard view-all calendar button with the current month", async () => {
     await renderWithSiteRouter(<UpcomingEvents />);
     const month = formatMonthLong(new Date());
-    expect(screen.getByRole("link", { name: `View Events all in ${month} →` })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: `View Events all in ${month} →` })).toHaveLength(1);
   });
 });

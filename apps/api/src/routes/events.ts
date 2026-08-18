@@ -12,6 +12,7 @@ import { resolveEventSections } from "@/lib/event-sections";
 import { resolveHomepageCuration, HomepageCurationError } from "@/lib/homepage-curation";
 import { getEventFromSupabase, listEventsFromSupabase, SupabaseEventsError } from "@/lib/supabase-events";
 import { fail, ok } from "@/lib/responses";
+import { logError } from "@/lib/structured-log";
 
 import {
   parseBounds,
@@ -32,8 +33,11 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
         return fail(c, error.code, error.message, error.status as 400);
       }
       if (error instanceof SupabaseEventsError) {
+        logError("homepage_curation_supabase_failed", error, { status: error.status });
         return fail(c, "events_unavailable", error.message, error.status === 503 ? 503 : 502);
       }
+      // Previously discarded, which left the 502 with no explanation of its cause.
+      logError("homepage_curation_failed", error);
       return fail(c, "events_unavailable", "The homepage curation could not be loaded.", 502);
     }
   })

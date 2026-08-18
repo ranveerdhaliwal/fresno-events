@@ -53,7 +53,6 @@ function SectionBlock({
   dateLabel?: string;
 }) {
   const rows = bucket.preview.map((item) => toEventRowViewModel(item));
-  const monthLabel = formatMonthLong(new Date());
 
   return (
     <section className={styles.sectionBlock}>
@@ -73,19 +72,6 @@ function SectionBlock({
           ))}
         </div>
       )}
-      {bucket.hidden > 0 ? (
-        <div className={styles.viewAll}>
-          <Button
-            to="/calendar"
-            search={calendarSearchCurrent()}
-            variant="mustard"
-            size="md"
-            className={styles.viewAllBtn}
-          >
-            View Events all in {monthLabel} →
-          </Button>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -144,6 +130,14 @@ export function UpcomingEvents() {
   const showToday = filter === "All" || filter === "Today";
   const showWeek = filter === "All";
   const showWeekend = filter === "All" || filter === "This weekend";
+  const monthLabel = formatMonthLong(new Date());
+  const showViewAllCalendar = useMemo(() => {
+    let hidden = 0;
+    if (showToday) hidden += data.today.hidden;
+    if (showWeek) hidden += weekBucket.hidden;
+    if (showWeekend) hidden += weekendBucket.hidden;
+    return hidden > 0;
+  }, [data.today.hidden, showToday, showWeek, showWeekend, weekBucket.hidden, weekendBucket.hidden]);
 
   if (isLoading || !data || !weekBucket || !weekendBucket) {
     return <UpcomingEventsSkeleton />;
@@ -198,6 +192,19 @@ export function UpcomingEvents() {
               onSelect={handleSelect}
               dateLabel={sectionDateLabel(weekendBucket, "THIS WEEKEND")}
             />
+          ) : null}
+          {showViewAllCalendar ? (
+            <div className={styles.viewAll}>
+              <Button
+                to="/calendar"
+                search={calendarSearchCurrent()}
+                variant="mustard"
+                size="md"
+                className={styles.viewAllBtn}
+              >
+                View Events all in {monthLabel} →
+              </Button>
+            </div>
           ) : null}
         </div>
         <div className={patternStyles.detailCol}>
