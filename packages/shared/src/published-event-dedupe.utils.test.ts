@@ -77,4 +77,42 @@ describe("planPublishedOrphanDeletions", () => {
       }
     ]);
   });
+
+  it("collapses short headliner title and Saroyan venue variants", () => {
+    const visit: PublishedEventAuditRow = {
+      id: "evt-visit",
+      slug: "zz-top-tour",
+      title: "ZZ Top Tour",
+      startTs: "2026-08-08T03:00:00.000Z",
+      venueName: "WILLIAM SAROYAN THEATRE",
+      source: "api:visitfresnocounty",
+      occurrenceId: "occ-visit"
+    };
+    const scrape: PublishedEventAuditRow = {
+      id: "evt-scrape-zz",
+      slug: "zz-top-scrape",
+      title: "ZZ Top",
+      startTs: "2026-08-08T03:00:00.000Z",
+      venueName: "WILLIAM SAROYAN THEATRE",
+      source: "scrape:events.fresnoconventioncenter.com",
+      occurrenceId: "occ-scrape"
+    };
+    const tm: PublishedEventAuditRow = {
+      id: "evt-tm-zz",
+      slug: "zz-top-tm",
+      title: "ZZ Top",
+      startTs: "2026-08-08T03:00:00.000Z",
+      venueName: "William Saroyan Theatre Fresno Convention & Entertainment Center",
+      source: "ticketmaster",
+      occurrenceId: "occ-tm"
+    };
+
+    const plan = planPublishedOrphanDeletions(
+      [visit, scrape, tm],
+      new Map([["evt-scrape-zz", 1]])
+    );
+
+    expect(plan.map((row) => row.eventId).sort()).toEqual(["evt-tm-zz", "evt-visit"]);
+    expect(plan.every((row) => row.keepEventId === "evt-scrape-zz")).toBe(true);
+  });
 });

@@ -56,6 +56,9 @@ const OCCURRENCE_TITLE_SUFFIXES = [
   /\s+live in concert$/,
   /\s+in concert$/,
   /\s+live$/,
+  /\s+world tour$/,
+  /\s+tour$/,
+  /\s+(?:19|20)\d{2}$/,
   /\s+-\s+fresno$/,
   /\s+fresno$/
 ];
@@ -103,11 +106,14 @@ export function canonicalOccurrenceTitle(normalizedTitle: string): string {
 
   value = value.replace(/^fresno grizzlies vs\.?\s+/, "fresno grizzlies vs ");
 
-  for (const pattern of OCCURRENCE_TITLE_SUFFIXES) {
-    value = value.replace(pattern, "");
+  let previous = "";
+  while (previous !== value) {
+    previous = value;
+    for (const pattern of OCCURRENCE_TITLE_SUFFIXES) {
+      value = value.replace(pattern, "");
+    }
+    value = value.replace(/\s+/g, " ").trim();
   }
-
-  value = value.replace(/\s+/g, " ").trim();
 
   const missCalifornia = canonicalMissCaliforniaTitle(value);
   if (missCalifornia) {

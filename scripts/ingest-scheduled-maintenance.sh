@@ -121,7 +121,7 @@ scheduled_emit_cursor_review() {
     echo "  - post-promote: detail-backfill, enrich, reject-exclusions (away games, Shen Yun), venue addresses"
     echo "  - relink: dry-run must show errors=0 before apply"
     echo "  - orphan cleanup: apply only when wouldDelete>0 and under max (${INGEST_SCHEDULED_MAX_ORPHAN_DELETE:-50})"
-    echo "After maintenance: agent runbook (INGEST_LOCAL_OPS.md) → pre-approve-audit → bulk-approve → bulk-approve-changes if needed"
+    echo "After maintenance: agent runbook (INGEST_LOCAL_OPS.md) → pre-approve-audit → summary for user → bulk-approve only after user OK"
     echo ""
     echo "Step results:"
     local row name status detail

@@ -225,13 +225,19 @@ async function resolveBiggestMonth(env: Env, now: Date): Promise<EventListItem[]
 
 export async function resolveHomepageCuration(env: Env): Promise<HomepageCurationResponse> {
   const now = new Date();
-  const rows = await loadSlotRows(env);
+
+  // These three are independent: resolveSection needs the slot rows and the auto
+  // pool, and resolveBiggestMonth reads neither those nor placedIds. Running them
+  // in one batch cuts the Supabase round-trip depth from four hops to two.
+  const [rows, autoPool, biggestMonth] = await Promise.all([
+    loadSlotRows(env),
+    loadFeaturedAutoPool(env, now),
+    resolveBiggestMonth(env, now)
+  ]);
+
   const pins = slotMap(rows);
   const placedIds = new Set<string>();
-  const autoPool = await loadFeaturedAutoPool(env, now);
-
   const featured = await resolveSection(env, "featured", pins, placedIds, autoPool);
-  const biggestMonth = await resolveBiggestMonth(env, now);
 
   return {
     featured,

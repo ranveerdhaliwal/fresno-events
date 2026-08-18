@@ -93,6 +93,23 @@ describe("eventContentSignature", () => {
     const signature = eventContentSignature({ event: { title: "Show", startTs: "t" }, venue: { name: null } });
     expect(signature).toBe("show||t");
   });
+
+  it("collapses ZZ Top title/venue variants across sources", () => {
+    const visit = {
+      event: { title: "ZZ Top Tour", startTs: "2026-08-08T03:00:00.000Z" },
+      venue: { name: "WILLIAM SAROYAN THEATRE" }
+    };
+    const scrape = {
+      event: { title: "ZZ TOP 2026", startTs: "2026-08-08T03:00:00.000Z" },
+      venue: { name: "WILLIAM SAROYAN THEATRE" }
+    };
+    const tm = {
+      event: { title: "ZZ Top", startTs: "2026-08-08T03:00:00.000Z" },
+      venue: { name: "William Saroyan Theatre Fresno Convention & Entertainment Center" }
+    };
+    expect(eventContentSignature(visit)).toBe(eventContentSignature(scrape));
+    expect(eventContentSignature(scrape)).toBe(eventContentSignature(tm));
+  });
 });
 
 describe("dedupeEventsByContent", () => {
