@@ -132,12 +132,15 @@ export function UpcomingEvents() {
   const showWeekend = filter === "All" || filter === "This weekend";
   const monthLabel = formatMonthLong(new Date());
   const showViewAllCalendar = useMemo(() => {
+    if (!data || !weekBucket || !weekendBucket) {
+      return false;
+    }
     let hidden = 0;
     if (showToday) hidden += data.today.hidden;
     if (showWeek) hidden += weekBucket.hidden;
     if (showWeekend) hidden += weekendBucket.hidden;
     return hidden > 0;
-  }, [data.today.hidden, showToday, showWeek, showWeekend, weekBucket.hidden, weekendBucket.hidden]);
+  }, [data, showToday, showWeek, showWeekend, weekBucket, weekendBucket]);
 
   if (isLoading || !data || !weekBucket || !weekendBucket) {
     return <UpcomingEventsSkeleton />;
