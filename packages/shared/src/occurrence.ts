@@ -38,6 +38,7 @@ const VENUE_ALIASES: Record<string, string> = {
   "historic-crest-theatre": "crest-theatre",
   "the-crest-theatre-fresno": "crest-theatre",
   "tower-theatre-for-the-performing-arts": "tower-theatre",
+  "tower-theatre-fresno": "tower-theatre",
   "tower-theatre-lounge": "tower-theatre-lounge",
   "paul-paul-theatre": "big-fresno-fair",
   "paul-paul-theater": "big-fresno-fair",
@@ -113,6 +114,13 @@ export function canonicalOccurrenceTitle(normalizedTitle: string): string {
       value = value.replace(pattern, "");
     }
     value = value.replace(/\s+/g, " ").trim();
+  }
+
+  // "morgan jay the goofy guy" (Tower tour title) vs "morgan jay" (Ticketmaster).
+  const tourSubtitleTail = /^([a-z]+(?:\s+[a-z]+))\s+the\s+[a-z0-9]+(?:\s+[a-z0-9]+)*$/.exec(value);
+  const headliner = tourSubtitleTail?.[1]?.trim();
+  if (headliner) {
+    value = headliner;
   }
 
   const missCalifornia = canonicalMissCaliforniaTitle(value);

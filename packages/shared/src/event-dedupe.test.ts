@@ -110,6 +110,18 @@ describe("eventContentSignature", () => {
     expect(eventContentSignature(visit)).toBe(eventContentSignature(scrape));
     expect(eventContentSignature(scrape)).toBe(eventContentSignature(tm));
   });
+
+  it("collapses Morgan Jay Tower vs Ticketmaster title/venue variants", () => {
+    const tower = {
+      event: { title: "Morgan Jay: The Goofy Guy Tour", startTs: "2026-09-03T00:30:00.000Z" },
+      venue: { name: "Tower Theatre for the Performing Arts" }
+    };
+    const tm = {
+      event: { title: "Morgan Jay", startTs: "2026-09-03T00:30:00.000Z" },
+      venue: { name: "Tower Theatre-Fresno" }
+    };
+    expect(eventContentSignature(tower)).toBe(eventContentSignature(tm));
+  });
 });
 
 describe("dedupeEventsByContent", () => {
