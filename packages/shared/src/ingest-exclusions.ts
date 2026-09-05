@@ -61,6 +61,17 @@ const EXCLUSION_RULES: ReadonlyArray<{ id: string; label: string; pattern: RegEx
     id: "shen-yun",
     label: "Shen Yun (editorial exclusion)",
     pattern: /\bshen\s*yun\b/i
+  },
+  {
+    id: "professional-certification-training",
+    label: "Professional certification / corporate training course",
+    pattern:
+      /\b(?:CAPM|PMP(?:\s+certification)?|CEH|CISSP|CISA|CISM|ITIL)\b|\b(?:certification|certificate)\b.*\b(?:weekend|classroom|course|boot\s?camp|training)\b|\b(?:weekend|classroom)\b.*\b(?:certification|certificate)\b|\b(?:ethical hacking|project management professional|certified ethical hacker)\b|\b(?:professional certification|exam prep)\b/i
+  },
+  {
+    id: "franchise-scavenger-hunt",
+    label: "App-based franchise scavenger hunt (not a local event)",
+    pattern: /\bscavenger hunt\s*:/i
   }
 ];
 

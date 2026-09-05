@@ -37,6 +37,10 @@
     z-index: 10;
     background: var(--surface-page);
     padding-top: 8px;
+    margin-left: calc(-1 * var(--page-gutter));
+    margin-right: calc(-1 * var(--page-gutter));
+    padding-left: var(--page-gutter);
+    padding-right: var(--page-gutter);
   }
 
   .dates {

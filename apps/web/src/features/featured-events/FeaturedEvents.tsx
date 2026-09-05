@@ -24,7 +24,7 @@ export function FeaturedEvents() {
   return (
     <section className={styles.section} data-testid="featured-events">
       <div className={styles.header}>
-        <SectionTitle script="what's" size="md">
+        <SectionTitle script="what's" size="md" scriptJoin="tight">
           HAPPENING
         </SectionTitle>
       </div>

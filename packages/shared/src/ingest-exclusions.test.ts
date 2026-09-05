@@ -24,6 +24,25 @@ describe("ingest-exclusions", () => {
     expect(getIngestExclusion({ title: "Mrs. Doubtfire" })).toBeNull();
   });
 
+  it("rejects professional certification courses", () => {
+    expect(
+      getIngestExclusion({ title: "CAPM Certification Weekend Classroom Training" })?.id
+    ).toBe("professional-certification-training");
+    expect(getIngestExclusion({ title: "Ethical Hacking(CEH) Course Weekend Classroom" })?.id).toBe(
+      "professional-certification-training"
+    );
+  });
+
+  it("rejects franchise scavenger hunts", () => {
+    expect(getIngestExclusion({ title: "Fresno Scavenger Hunt: Fresno Art & Culture" })?.id).toBe(
+      "franchise-scavenger-hunt"
+    );
+  });
+
+  it("keeps local community scavenger hunts without franchise title pattern", () => {
+    expect(getIngestExclusion({ title: "Downtown Scavenger Hunt Night" })).toBeNull();
+  });
+
   it("rejects Fresno State away games by title pattern", () => {
     expect(
       getIngestExclusion({
