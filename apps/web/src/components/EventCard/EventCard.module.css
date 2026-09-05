@@ -3,8 +3,8 @@
   grid-template-columns: 104px minmax(0, 1fr);
   gap: 12px 12px;
   background: var(--surface-card);
-  border: var(--border-card);
-  box-shadow: var(--shadow-md);
+  border: var(--border-card-on-page);
+  box-shadow: var(--shadow-card-on-page);
   padding: 14px 16px;
   text-decoration: none;
   color: var(--text-primary);
@@ -23,6 +23,10 @@
 .selected {
   outline: 2px solid var(--coral);
   outline-offset: -2px;
+}
+
+.live {
+  border-color: var(--coral);
 }
 
 .thumb {
@@ -159,9 +163,12 @@
   opacity: 0.62;
 }
 
-.live {
-  outline: 2px solid var(--coral);
-  outline-offset: -2px;
+@media (max-width: 1080px) {
+  .selected,
+  .live {
+    outline: none;
+    border-color: var(--border-default);
+  }
 }
 
 @media (max-width: 600px) {

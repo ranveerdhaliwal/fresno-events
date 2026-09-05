@@ -33,6 +33,7 @@
     "review:bulk-approve": "bash scripts/review-bulk-approve.sh",
     "review:bulk-approve-changes": "bash scripts/review-bulk-approve-changes.sh",
     "review:reject-exclusions": "bash scripts/review-reject-exclusions.sh",
+    "published:reject-exclusions": "bash scripts/published-reject-exclusions.sh",
     "review:orphan-cleanup": "bash scripts/review-published-orphan-cleanup.sh",
     "priority:rerank": "bash scripts/priority-rerank.sh",
     "env:status": "bash scripts/env-status.sh",

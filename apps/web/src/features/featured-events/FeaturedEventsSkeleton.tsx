@@ -9,7 +9,7 @@ export function FeaturedEventsSkeleton() {
   return (
     <section className={styles.section} data-testid="featured-events-skeleton" aria-busy="true">
       <div className={styles.header}>
-        <SectionTitle script="what's" size="md">
+        <SectionTitle script="what's" size="md" scriptJoin="tight">
           HAPPENING
         </SectionTitle>
       </div>
