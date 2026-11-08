@@ -1,0 +1,39 @@
+{
+  "git_head": "dab3ba1689008c6344fe8691f7ef2646ad9047e0",
+  "worktree_sha256": {
+    "workers/ingest/src/venues/fresno-library/branches.json": "faf968a4a647446a47cc6e8dc49a386435c032890c086babe0c933d46ac0e4c8",
+    "workers/ingest/src/venues/fresno-library/library-events.utils.test.ts": "601c2bbb157b145a6f6a9cab21ce6c93198f4c76ecb7d3d138418c3665edf5c7",
+    "workers/ingest/src/venues/fresno-library/library-events.utils.ts": "f1ecb6bf8bfc64b0bcea9ceb8b2226cb829a7e73b198cb356f5e72f59a9a972b",
+    "workers/ingest/src/venues/fresno-library/run.ts": "47cd474d6d823dc4c3fac04c3a31d3c5bed1a4de683fa1b1fc43433d1bcad1bc",
+    "workers/ingest/src/venues/fresno-library/venue.config.json": "689b8edecc35272e467b3c850b2636d99996c60cbd00fb15b373327902b29342",
+    "workers/ingest/src/venues/fresno-state-arts/arts-events.utils.test.ts": "106ab141e4a70530e5aeb8dbf6a05f94b6c3cd3f5b396295ec9d42cc56d3af62",
+    "workers/ingest/src/venues/fresno-state-arts/arts-events.utils.ts": "614a8b67a4e00eda67ed731b233ffebeeab16e1a4f0367724e4b7279808ad673",
+    "workers/ingest/src/venues/fresno-state-arts/run.ts": "aae3cbb82dffe2753ef71d0054cf6a55f436e56a56d34afb7c3f8cb8524a98a1",
+    "workers/ingest/src/venues/fresno-state-arts/venue.config.json": "1dab8de495fb8a501b7bd229c28473c6c7d91f7755a10352832b5072b01cefcc",
+    "workers/ingest/src/venues/fresno-state-arts/venues.json": "08fe40eb9691cc91977ac74d6231d57837c94556987e3e5b99679bfa4f31af0b",
+    "workers/ingest/src/venues/fresno-philharmonic/philharmonic-events.utils.test.ts": "e1b23e28d8dcc2080efa0330ae7c46884e689901c66c2bdfb278a9b389f2010e",
+    "workers/ingest/src/venues/fresno-philharmonic/philharmonic-events.utils.ts": "d1e3956f7916edcec213036c295429436769670be2e0dd9a1414e80c2e10e5f1",
+    "workers/ingest/src/venues/fresno-philharmonic/run.ts": "c9f3d580680adae7e60c0129d5769e66dae1f34ed3b189e11b2d566a12daa090",
+    "workers/ingest/src/venues/fresno-philharmonic/venue.config.json": "4f1f7732c9beb9b063d51d7f75709556e35c47d957f0850fcc817e956e00f553",
+    "workers/ingest/src/venues/fresno-philharmonic/venues.json": "e921c5d02645b0f44ce0445d9343e2b9234eaf40163e2f05706639419106b79c",
+    "workers/ingest/src/venues/registry.ts": "1c9d57ca2510daa506b035beef143b9d1d57b168ba242bc72ea372d8d81ef4cf",
+    "workers/ingest/src/venues/api-venues.ts": "5ba02511bf6a12eb859b7388992a525030a088dddadcdc2720f9204e120e21d1",
+    "workers/ingest/src/venues/registry.test.ts": "e08f338c0861c27e362ac4bea21d9ab4872f9e4d2a1491afd052ea6aa349ad09",
+    "workers/ingest/src/enrichment.ts": "f39bb88d8bd1f59b585a5649ed7742ef4d924c71a9769780195ac0fc7f1e4ca7",
+    "workers/ingest/src/enrichment-backend-failure.test.ts": "766fa1cb87f5edeb2101b31333ba54955f4ff5353540f04994b92d5f16ff5342",
+    "scripts/ingest-enrich.sh": "b3c672efc0c383c2df1051df55b27c5c6e84e559ec1dc649a5e0d8cb3f9f1c1e",
+    "scripts/ingest-enrich.test.mjs": "88718187ada54d744fdb588191160f039e7474951b6f475112530f3a8ded71ce",
+    "scripts/ingest-post-promote.sh": "ea52855755197a0154c2f1e31401748e5d752f49ee1ad0b64c1311205d6d40c1",
+    "scripts/ingest-scheduled-local.sh": "e50ed4cd368912fa7b43cc5e0f7d50be35033ee5e02a74605689c5f768be1ea7"
+  },
+  "typecheck": "passed",
+  "worker_tests": 440,
+  "preflight": {
+    "library": 145,
+    "arts": 20,
+    "philharmonic": 10
+  },
+  "worker_test_files": 77,
+  "workflow_tests": 27,
+  "cloudflare_code_deployed_this_turn": false
+}

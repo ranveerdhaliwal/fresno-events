@@ -32,19 +32,22 @@ export function addDaysToIsoDate(isoDate: string, days: number): string {
   return next.toISOString().slice(0, 10);
 }
 
-function pacificOffsetHoursAtNoonUtc(isoDate: string): number {
+function pacificOffsetHoursAtStartOfDay(isoDate: string): number {
   const [year, month, day] = isoDate.split("-").map(Number);
-  const probe = new Date(Date.UTC(year!, month! - 1, day!, 12, 0, 0));
+  // 08:00 UTC is midnight PST or 01:00 PDT, before the 02:00 DST change.
+  // A noon-UTC probe would use the new offset on a transition date even
+  // though that date's midnight still used the previous offset.
+  const probe = new Date(Date.UTC(year!, month! - 1, day!, 8, 0, 0));
   const pacificHour = Number(
-    new Intl.DateTimeFormat("en-US", { timeZone: PACIFIC_TZ, hour: "numeric", hour12: false }).format(probe)
+    new Intl.DateTimeFormat("en-US", { timeZone: PACIFIC_TZ, hour: "numeric", hourCycle: "h23" }).format(probe)
   );
-  return 12 - pacificHour;
+  return 8 - pacificHour;
 }
 
 export function pacificStartOfDay(isoDate: string): Date {
   const [year, month, day] = isoDate.split("-").map(Number);
-  const offsetHours = pacificOffsetHoursAtNoonUtc(isoDate);
-  return new Date(Date.UTC(year!, month! - 1, day!, 0, 0, 0) - offsetHours * 60 * 60 * 1000);
+  const offsetHours = pacificOffsetHoursAtStartOfDay(isoDate);
+  return new Date(Date.UTC(year!, month! - 1, day!, 0, 0, 0) + offsetHours * 60 * 60 * 1000);
 }
 
 export function pacificEndOfDay(isoDate: string): Date {

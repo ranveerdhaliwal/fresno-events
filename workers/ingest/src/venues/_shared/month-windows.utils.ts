@@ -1,3 +1,5 @@
+import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
+
 const PACIFIC_TZ = "America/Los_Angeles";
 
 export interface SaveMartApiMonthRange {
@@ -38,7 +40,11 @@ function lastDayOfMonth(year: number, monthIndex: number): number {
 }
 
 /** Build Save-Mart-style daterange listing URLs for N months from now (Pacific). */
-export function buildSaveMartMonthListingUrls(baseListingUrl: string, monthWindows: number, now: Date): string[] {
+export function buildSaveMartMonthListingUrls(
+  baseListingUrl: string,
+  monthWindows: number,
+  now: Date
+): string[] {
   const origin = new URL(baseListingUrl);
   const { year, monthIndex } = pacificYearMonth(now);
   const urls: string[] = [];
@@ -62,7 +68,10 @@ export function buildSaveMartMonthListingUrls(baseListingUrl: string, monthWindo
 }
 
 /** Pacific calendar month windows for Save Mart REST `date_range` queries. */
-export function buildSaveMartApiMonthRanges(monthWindows: number, now: Date): SaveMartApiMonthRange[] {
+export function buildSaveMartApiMonthRanges(
+  monthWindows: number,
+  now: Date
+): SaveMartApiMonthRange[] {
   const { year, monthIndex } = pacificYearMonth(now);
   const ranges: SaveMartApiMonthRange[] = [];
 
@@ -75,9 +84,8 @@ export function buildSaveMartApiMonthRanges(monthWindows: number, now: Date): Sa
     ranges.push({
       startYmd,
       endYmd,
-      // Save Mart API uses Pacific-midnight-style UTC anchors (e.g. 2026-06-05T07:00:00.000Z).
-      start: new Date(`${startYmd}T07:00:00.000Z`),
-      end: new Date(`${addDaysYmd(endYmd, 1)}T07:00:00.000Z`)
+      start: new Date(instantFromPacificLocal(startYmd, "00:00")!),
+      end: new Date(instantFromPacificLocal(addDaysYmd(endYmd, 1), "00:00")!)
     });
   }
 

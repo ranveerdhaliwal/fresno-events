@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { OccurrenceMatchIndex } from "@/candidates/occurrence-match.types";
-import { pickPrimaryCandidate, resolveOccurrenceForPersist } from "@/candidates/occurrence-resolve.utils";
+import {
+  pickPrimaryCandidate,
+  resolveOccurrenceForPersist
+} from "@/candidates/occurrence-resolve.utils";
 
 const emptyIndex: OccurrenceMatchIndex = {
   candidatesByOccurrenceKey: new Map(),
@@ -13,6 +16,139 @@ const emptyIndex: OccurrenceMatchIndex = {
 };
 
 describe("occurrence-resolve.utils", () => {
+  it("keeps separate timed sets hours apart while retaining explicit TBA matching", async () => {
+    const { venueDateLookupKey } = await import("@fresno-events/shared");
+    const event = {
+      source: "api:visitfresnocounty" as const,
+      sourceEventId: "new-set",
+      title: "Candlelight Tribute",
+      venueName: "The Grand 1401",
+      startTs: "2026-11-07T02:15:00Z",
+      category: "music" as const
+    };
+    const peer = {
+      id: "old-set",
+      source: event.source,
+      source_event_id: "old-set",
+      title: event.title,
+      venue_name: event.venueName,
+      start_ts: "2026-11-07T04:30:00Z",
+      status: "pending_review",
+      matched_event_id: null,
+      occurrence_id: "old-occ",
+      canonical_candidate_id: null,
+      created_at: "2026-01-01T00:00:00Z",
+      occurrence_key: null,
+      url_key: null
+    };
+    for (const time_unknown of [false, true]) {
+      const row = { ...peer, time_unknown };
+      const result = await resolveOccurrenceForPersist({
+        event,
+        baseStatus: "pending_review",
+        crossSourceDedupe: true,
+        matchIndex: {
+          ...emptyIndex,
+          candidatesByVenueDate: new Map([
+            [venueDateLookupKey(event.venueName, event.startTs)!, [row]]
+          ]),
+          candidatesByOccurrenceId: new Map([["old-occ", [row]]])
+        }
+      });
+      if (time_unknown) expect(result.occurrenceId).toBe("old-occ");
+      else expect(result.canonicalCandidateId).toBeNull();
+    }
+  });
+  it("does not let a third source bridge two distinct Fair CMS performances", async () => {
+    const { venueDateLookupKey } = await import("@fresno-events/shared");
+    const event = {
+      source: "scrape:www.fresnofair.com" as const,
+      sourceEventId: "venue:big-fresno-fair:second",
+      title: "Juggling",
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-16T00:00:00.000Z",
+      category: "festival" as const
+    };
+    const fair = {
+      id: "first",
+      source: event.source,
+      source_event_id: "venue:big-fresno-fair:first",
+      title: event.title,
+      venue_name: event.venueName,
+      start_ts: event.startTs,
+      status: "pending_review",
+      matched_event_id: null,
+      occurrence_id: "first-occ",
+      canonical_candidate_id: null,
+      created_at: "2026-01-01T00:00:00Z",
+      occurrence_key: null,
+      url_key: null
+    };
+    const third = {
+      ...fair,
+      id: "third",
+      source: "ticketmaster",
+      source_event_id: "tm-third"
+    };
+    const result = await resolveOccurrenceForPersist({
+      event,
+      baseStatus: "pending_review",
+      crossSourceDedupe: true,
+      matchIndex: {
+        ...emptyIndex,
+        candidatesByVenueDate: new Map([
+          [venueDateLookupKey(event.venueName, event.startTs)!, [fair, third]]
+        ]),
+        candidatesByOccurrenceId: new Map([["first-occ", [fair, third]]])
+      }
+    });
+    expect(result.canonicalCandidateId).toBeNull();
+    expect(result.occurrenceId).not.toBe("first-occ");
+  });
+  it("does not fuzzy-link a new Fair set to another time on the same day", async () => {
+    const { venueDateLookupKey } = await import("@fresno-events/shared");
+    const event = {
+      source: "scrape:www.fresnofair.com" as const,
+      sourceEventId: "set-2",
+      title: "Kids Town Dance Party",
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-15T21:15:00.000Z",
+      category: "festival" as const
+    };
+    const old = {
+      id: "old",
+      source: event.source,
+      source_event_id: "set-1",
+      title: event.title,
+      venue_name: event.venueName,
+      start_ts: "2026-10-15T21:05:00.000Z",
+      status: "pending_review",
+      matched_event_id: null,
+      occurrence_id: "old-occ",
+      canonical_candidate_id: null,
+      created_at: "2026-01-01T00:00:00Z",
+      occurrence_key: null,
+      url_key: null
+    };
+    const index = {
+      ...emptyIndex,
+      candidatesByVenueDate: new Map([
+        [venueDateLookupKey(event.venueName, event.startTs)!, [old]]
+      ]),
+      candidatesByOccurrenceId: new Map([["old-occ", [old]]])
+    };
+    for (const existingOccurrenceId of [null, "old-occ"]) {
+      const result = await resolveOccurrenceForPersist({
+        event,
+        baseStatus: "pending_review",
+        crossSourceDedupe: true,
+        matchIndex: index,
+        existingOccurrenceId
+      });
+      expect(result.canonicalCandidateId).toBeNull();
+      expect(result.occurrenceId).not.toBe("old-occ");
+    }
+  });
   it("prefers ticketmaster over scrape when both are pending", () => {
     const primary = pickPrimaryCandidate([
       {
@@ -136,6 +272,16 @@ describe("occurrence-resolve.utils", () => {
     expect(result.occurrenceId).toBe("occ-1");
     expect(result.statusOverride).toBe("duplicate");
     expect(result.canonicalCandidateId).toBe("primary");
+
+    const rejected = await resolveOccurrenceForPersist({
+      event,
+      existingStatus: "rejected",
+      baseStatus: "rejected",
+      crossSourceDedupe: true,
+      matchIndex: index
+    });
+    expect(rejected.statusOverride).toBe("rejected");
+    expect(rejected.canonicalCandidateId).toBe("primary");
   });
 
   it("does not link url_key when occurrence buckets differ (multi-night series URL)", async () => {

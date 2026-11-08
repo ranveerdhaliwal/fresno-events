@@ -1,5 +1,9 @@
 import type { NormalizedEvent } from "@fresno-events/shared";
-import { computeOccurrenceFingerprints, startTsLookupWindow, venueDateLookupKey } from "@fresno-events/shared";
+import {
+  computeOccurrenceFingerprints,
+  startTsLookupWindow,
+  venueDateLookupKey
+} from "@fresno-events/shared";
 
 import type {
   OccurrenceMatchCandidate,
@@ -23,7 +27,7 @@ export const MAX_IN_FILTER_BATCHES_COMPACT = 3;
 const START_TS_WINDOW_CANDIDATE_LIMIT = "2000";
 
 const CANDIDATE_SELECT =
-  "id,source,source_event_id,title,venue_name,start_ts,status,matched_event_id,occurrence_id,canonical_candidate_id,created_at,occurrence_key,url_key";
+  "id,source,source_event_id,title,venue_name,start_ts,status,matched_event_id,occurrence_id,canonical_candidate_id,created_at,occurrence_key,url_key,time_unknown:normalized_event->timeUnknown";
 
 function supabaseHeaders(config: SupabaseConfig) {
   return {
@@ -267,7 +271,11 @@ async function fetchCandidatesByKeys(
 ): Promise<OccurrenceMatchCandidate[]> {
   const maxWindowFetches = options?.maxWindowFetches ?? MAX_START_TS_WINDOW_FETCHES;
   const batchOccurrence = options?.maxInFilterBatches
-    ? capInFilterBatches(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE, options.maxInFilterBatches)
+    ? capInFilterBatches(
+        occurrenceKeys,
+        OCCURRENCE_IN_FILTER_BATCH_SIZE,
+        options.maxInFilterBatches
+      )
     : chunkValues(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE);
   const batchUrl = options?.maxInFilterBatches
     ? capInFilterBatches(urlKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE, options.maxInFilterBatches)
@@ -390,7 +398,11 @@ async function fetchPublishedEvents(
 
   if (includeOccurrenceKeyLookup) {
     const batchKeys = options?.maxInFilterBatches
-      ? capInFilterBatches(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE, options.maxInFilterBatches)
+      ? capInFilterBatches(
+          occurrenceKeys,
+          OCCURRENCE_IN_FILTER_BATCH_SIZE,
+          options.maxInFilterBatches
+        )
       : chunkValues(occurrenceKeys, OCCURRENCE_IN_FILTER_BATCH_SIZE);
     for (const batch of batchKeys) {
       merged.push(...(await fetchPublishedEventsInFilter(config, "occurrence_key", batch)));

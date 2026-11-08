@@ -11,7 +11,7 @@ describe("venues/registry", () => {
 
   it("loads all enabled venue modules", () => {
     const enabled = loadEnabledVenues();
-    expect(enabled.length).toBe(12);
+    expect(enabled.length).toBe(15);
     expect(enabled.map((v) => v.key)).toContain("tower-theatre");
     expect(enabled.map((v) => v.key)).toContain("gobulldogs");
     for (const apiKey of API_VENUE_KEYS) {

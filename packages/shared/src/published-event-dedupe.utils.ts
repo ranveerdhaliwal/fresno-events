@@ -7,6 +7,7 @@ export interface PublishedEventAuditRow {
   startTs: string;
   venueName: string;
   source: string;
+  sourceEventId?: string;
   occurrenceId: string | null;
 }
 
@@ -20,12 +21,22 @@ export interface PublishedOrphanDeletion {
 }
 
 /** Groups scheduled events that describe the same real-world show. */
-export function groupPublishedEventsByContent(events: PublishedEventAuditRow[]): PublishedEventAuditRow[][] {
+export function groupPublishedEventsByContent(
+  events: PublishedEventAuditRow[]
+): PublishedEventAuditRow[][] {
   const map = new Map<string, PublishedEventAuditRow[]>();
 
   for (const event of events) {
     const signature = eventContentSignature({
-      event: { title: event.title, startTs: event.startTs },
+      event: {
+        title: event.title,
+        startTs: event.startTs,
+        ...(event.sourceEventId
+          ? { sourceEventId: event.sourceEventId }
+          : event.source === "scrape:www.fresnofair.com"
+            ? { sourceEventId: `venue:big-fresno-fair:published:${event.id}` }
+            : {})
+      },
       venue: { name: event.venueName }
     });
     const bucket = map.get(signature) ?? [];
@@ -39,7 +50,9 @@ export function groupPublishedEventsByContent(events: PublishedEventAuditRow[]):
 const SOURCE_KEEP_ORDER = ["scrape:", "api:", "ticketmaster", "venunite"];
 
 function sourceKeepRank(source: string): number {
-  const index = SOURCE_KEEP_ORDER.findIndex((prefix) => source.startsWith(prefix) || source === prefix);
+  const index = SOURCE_KEEP_ORDER.findIndex(
+    (prefix) => source.startsWith(prefix) || source === prefix
+  );
   return index === -1 ? SOURCE_KEEP_ORDER.length : index;
 }
 

@@ -23,7 +23,8 @@ export function SeriesPage() {
   });
 
   const rows = (data?.items ?? []).map((item) => toEventRowViewModel(item));
-  const title = rows[0]?.title ?? "Series";
+  const isFair = /^series:bigfresnofair:\d{4}$/.test(decodedId);
+  const title = isFair ? "Big Fresno Fair" : (data?.items[0]?.event.seriesName ?? rows[0]?.title ?? "Series");
 
   return (
     <PageChrome mobileNav={{ variant: "day", title: "SERIES" }}>
@@ -32,7 +33,9 @@ export function SeriesPage() {
           {title}
         </Text>
         <Text variant="body2" tone="mutedOnPage" as="p" className={styles.sub}>
-          All upcoming dates in this series
+          {isFair
+            ? "All upcoming events and performances at the Big Fresno Fair"
+            : "All upcoming dates in this series"}
         </Text>
         {isLoading ? (
           <div className={styles.list} data-testid="series-page-skeleton" aria-busy="true">

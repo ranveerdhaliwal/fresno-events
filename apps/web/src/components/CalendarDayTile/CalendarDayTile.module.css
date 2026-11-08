@@ -116,3 +116,60 @@
   font-weight: var(--text-weight-bold);
   letter-spacing: 0.5px;
 }
+
+/* A day becomes a readable event card when the calendar stacks on a phone. */
+@media (max-width: 520px) {
+  .tile {
+    min-height: 120px;
+    padding: 14px;
+  }
+
+  .dateCorner {
+    position: static;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .dnum {
+    margin-top: 0;
+  }
+
+  .body {
+    margin-top: 14px;
+  }
+
+  .previewList {
+    gap: 10px;
+  }
+
+  .previewRow {
+    gap: 12px;
+  }
+
+  .thumb,
+  .thumbFallback {
+    flex-basis: 44px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .previewTitle {
+    font-size: 15px;
+    line-height: 1.4;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .more,
+  .empty {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .more {
+    padding-top: 12px;
+  }
+}

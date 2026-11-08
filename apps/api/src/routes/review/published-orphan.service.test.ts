@@ -94,3 +94,20 @@ describe("runPublishedOrphanCleanupOps", () => {
     );
   });
 });
+
+it("finds an orphan beyond row 1,000 while dry-run sends no deletes", async () => {
+  const common = {title:"Touring show",start_ts:"2026-11-05T03:00:00Z",source:"ticketmaster",venues:{name:"Theatre"}};
+  const rows=Array.from({length:1001},(_,i)=>({ ...common,id:`event-${i}`,slug:`event-${i}`,title:`Show ${i}`,occurrence_id:`occ-${i}`}));
+  rows[1000]={...rows[1000]!,title:rows[0]!.title};
+  const offsets: number[]=[];
+  mockedRequest.mockImplementation(async (_env,path,init)=>{
+    expect(init?.method).not.toBe("DELETE");
+    const url=new URL(path,"https://database.test");
+    if(path.includes('event_candidates'))return [{matched_event_id:'event-0'}];
+    const offset=Number(url.searchParams.get('offset'));offsets.push(offset);
+    return rows.slice(offset,offset+Number(url.searchParams.get('limit')));
+  });
+  const result=await runPublishedOrphanCleanupOps({} as never,true);
+  expect(result.summary.scheduledScanned).toBe(1001);expect(result.summary.wouldDelete).toBe(1);
+  expect(result.summary.deletions[0]?.eventId).toBe('event-1000');expect(offsets).toEqual([0,500,1000]);
+});

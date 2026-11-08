@@ -17,6 +17,28 @@ const ringlingScrape: PublishedEventAuditRow = {
   occurrenceId: "occ-scrape"
 };
 
+describe("Fair orphan protection", () => {
+  it("never deletes distinct Fair CMS performances sharing an artist and start time", () => {
+    const rows: PublishedEventAuditRow[] = [4009, 3941].map((id) => ({
+      id: String(id),
+      slug: `fair-${id}`,
+      title: "VIOLIN ON FIRE",
+      startTs: "2026-10-18T00:00:00Z",
+      venueName: "Big Fresno Fair",
+      source: "scrape:www.fresnofair.com",
+      sourceEventId: `venue:big-fresno-fair:${id}:2026-10-17`,
+      occurrenceId: `occ-${id}`
+    }));
+    expect(planPublishedOrphanDeletions(rows, new Map())).toEqual([]);
+    expect(
+      planPublishedOrphanDeletions(
+        rows.map(({ sourceEventId: _id, ...row }) => row),
+        new Map()
+      )
+    ).toEqual([]);
+  });
+});
+
 const ringlingTicketmaster: PublishedEventAuditRow = {
   id: "evt-tm",
   slug: "ringling-tm",
@@ -51,11 +73,15 @@ describe("pickCanonicalPublishedEvent", () => {
       ["evt-scrape", 3],
       ["evt-tm", 0]
     ]);
-    expect(pickCanonicalPublishedEvent([ringlingTicketmaster, ringlingScrape], votes).id).toBe("evt-scrape");
+    expect(pickCanonicalPublishedEvent([ringlingTicketmaster, ringlingScrape], votes).id).toBe(
+      "evt-scrape"
+    );
   });
 
   it("prefers venue scraper over ticketmaster when votes tie", () => {
-    expect(pickCanonicalPublishedEvent([ringlingTicketmaster, ringlingScrape], new Map()).id).toBe("evt-scrape");
+    expect(pickCanonicalPublishedEvent([ringlingTicketmaster, ringlingScrape], new Map()).id).toBe(
+      "evt-scrape"
+    );
   });
 });
 
@@ -107,10 +133,7 @@ describe("planPublishedOrphanDeletions", () => {
       occurrenceId: "occ-tm"
     };
 
-    const plan = planPublishedOrphanDeletions(
-      [visit, scrape, tm],
-      new Map([["evt-scrape-zz", 1]])
-    );
+    const plan = planPublishedOrphanDeletions([visit, scrape, tm], new Map([["evt-scrape-zz", 1]]));
 
     expect(plan.map((row) => row.eventId).sort()).toEqual(["evt-tm-zz", "evt-visit"]);
     expect(plan.every((row) => row.keepEventId === "evt-scrape-zz")).toBe(true);

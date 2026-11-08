@@ -49,6 +49,8 @@ export async function listEventsFromSupabase(
     limit: number;
     maxPriority?: number;
     seriesId?: string;
+    seriesOffset?: number;
+    offset?: number;
     requireCoords?: boolean;
     bounds?: MapBounds;
   }
@@ -57,7 +59,7 @@ export async function listEventsFromSupabase(
   const filters: Record<string, string> = {
     status: `in.(${scheduledStatuses.join(",")})`,
     start_ts: `gte.${options.from.toISOString()}`,
-    order: "priority.asc,start_ts.asc",
+    order: "priority.asc,start_ts.asc,id.asc",
     limit: String(options.limit)
   };
 
@@ -65,8 +67,16 @@ export async function listEventsFromSupabase(
     filters.priority = `lte.${options.maxPriority}`;
   }
 
+  if (options.offset !== undefined) {
+    filters.offset = String(options.offset);
+  }
+
   if (options.seriesId) {
     filters.series_id = `eq.${options.seriesId}`;
+    filters.order = "start_ts.asc,id.asc";
+    filters.offset = String(options.seriesOffset ?? 0);
+    // One lookahead row distinguishes a full last page from another page.
+    filters.limit = String(options.limit + 1);
   }
 
   const params = createEventParams(filters);
@@ -77,12 +87,14 @@ export async function listEventsFromSupabase(
   }
 
   const rows = await fetchEventRows(url, key, params);
-  const mapped = rows.map(mapEventRow);
+  const mapped = (options.seriesId ? rows.slice(0, options.limit) : rows).map(mapEventRow);
   const { items, omittedNoCoords } = filterMapEvents(mapped, options);
 
   return {
     items,
-    nextCursor: null,
+    nextCursor: options.seriesId && rows.length > options.limit
+      ? String((options.seriesOffset ?? 0) + options.limit)
+      : null,
     generatedAt: new Date().toISOString(),
     ...(omittedNoCoords > 0 ? { meta: { omittedNoCoords } } : {})
   };
@@ -123,10 +135,22 @@ export async function getEventFromSupabase(env: Env, slug: string): Promise<Even
     limit: "1"
   });
   const rows = await fetchEventRows(url, key, params);
-  const [row] = rows;
+  let [row] = rows;
 
   if (!row) {
-    return null;
+    // A merged duplicate retains its ID, source evidence and old URL. Only a
+    // verified internal pointer may resolve it to the surviving publication.
+    const archived = await fetchEventRows(url, key, createEventParams({
+      slug: `eq.${slug}`, status: "eq.superseded", limit: "1"
+    }));
+    const refs = archived[0]?.source_refs;
+    const target = refs && typeof refs === "object" && !Array.isArray(refs)
+      ? (refs as Record<string, unknown>).canonical_event_id : undefined;
+    if (typeof target !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target)) return null;
+    [row] = await fetchEventRows(url, key, createEventParams({
+      id: `eq.${target}`, status: `in.(${scheduledStatuses.join(",")})`, limit: "1"
+    }));
+    if (!row) return null;
   }
 
   const item = mapEventRow(row);

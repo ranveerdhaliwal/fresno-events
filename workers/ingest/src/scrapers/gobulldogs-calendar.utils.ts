@@ -255,7 +255,8 @@ function parseVenueCity(location: string): string {
 
 /** Sidearm `time` is a Pacific wall clock like "6:00 PM" / "7 PM" (or "TBA"/"TBD"). */
 function parseGobulldogsClock(time: string): string | null {
-  const match = time.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  const clock = time.trim().replace(/\./g, "").replace(/\s*(?:PT|PDT|PST)$/i, "").trim();
+  const match = clock.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
   if (!match?.[1] || !match[3]) {
     return null;
   }
@@ -336,8 +337,18 @@ export function gobulldogsGameToNormalizedEvent(
     return null;
   }
 
-  const venueName = game.facility?.title || game.location || "Fresno State";
-  const venueCity = parseVenueCity(game.location || "Fresno, CA");
+  const placeholder = !game.facility?.title && !parseGobulldogsClock(game.time)
+    && /conference|championship|tournament/i.test(game.opponent.title);
+  const venueName = placeholder ? "Venue to be announced" : game.facility?.title || game.location || "Fresno State";
+  const venueCity = placeholder ? undefined : parseVenueCity(game.location || "Fresno, CA");
+  // Verified university facilities; apply only to home events explicitly in Fresno.
+  const facilities: Record<string, { venueAddress: string; venueLat: number; venueLng: number }> = {
+    "aquatics center": { venueAddress: "Campus Dr", venueLat: 36.8148064, venueLng: -119.7516787 },
+    "margie wright diamond": { venueAddress: "5352-5378 N Cedar Ave", venueLat: 36.814919, venueLng: -119.753052 },
+    "student horse center": { venueAddress: "2415 E San Ramon Ave", venueLat: 36.8137561, venueLng: -119.7401431 }
+  };
+  const facility = venueCity?.toLowerCase() === "fresno" && game.atVs.toLowerCase() !== "at"
+    ? facilities[venueName.toLowerCase()] : undefined;
   const tags = buildGobulldogsTags(game, title);
   const descriptionText = buildGobulldogsDescription(game);
   const footballHome =
@@ -354,8 +365,10 @@ export function gobulldogsGameToNormalizedEvent(
     sourceEventId: `gobulldogs:game:${game.id}`,
     title,
     venueName,
-    venueCity,
+    ...(venueCity ? { venueCity } : {}),
+    ...(facility ?? {}),
     startTs,
+    ...((game.tbd || !parseGobulldogsClock(game.time)) ? { timeUnknown: true } : {}),
     timezone: "America/Los_Angeles",
     externalUrl: gameExternalUrl(game),
     category: "sports",

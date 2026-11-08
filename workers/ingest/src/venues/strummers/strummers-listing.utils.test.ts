@@ -112,3 +112,18 @@ describe("parseStrummersListingHtml", () => {
     expect(end.minute).toBe(30);
   });
 });
+
+it('recovers the unique official TicketWeb purchase link omitted from HTML cards',async()=>{
+ const {addStrummersTicketLinks}=await import('./strummers-listing.utils');
+ const events=parseStrummersListingHtml(STEVE_HOFSTETTER_CARD,config);
+ const enriched=addStrummersTicketLinks(events,{upcoming:[{fullUrl:'/shows/2026/2/19/steve-hofstetter',body:'<a href="https://www.ticketweb.com/event/steve-strummers/12345?pl=promoter">Tickets</a>'}]});
+ expect(enriched[0]?.ticketUrl).toBe('https://www.ticketweb.com/event/steve-strummers/12345');
+ expect(enriched[0]?.sourceEventId).toBe(events[0]?.sourceEventId);
+ expect(enriched[0]?.startTs).toBe(events[0]?.startTs);
+});
+it('does not guess among multiple distinct ticket performances on one venue page',async()=>{
+ const {addStrummersTicketLinks}=await import('./strummers-listing.utils');
+ const events=parseStrummersListingHtml(STEVE_HOFSTETTER_CARD,config);
+ const r=addStrummersTicketLinks(events,{upcoming:[{fullUrl:'/shows/2026/2/19/steve-hofstetter',body:'<a href="https://ticketweb.com/event/show/123">Early</a><a href="https://ticketweb.com/event/show/124">Late</a>'}]});
+ expect(r[0]?.ticketUrl).toBeUndefined();
+});

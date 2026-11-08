@@ -6,6 +6,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { isExpectedSeasonalEmpty } from "./ingest-source-health.utils.mjs";
 
 const PST = "America/Los_Angeles";
 const TITLE_MAX = 34;
@@ -494,6 +495,9 @@ function healthFromSeedMetric(metric, errors, softIssues) {
   } else if (eventsFound === 0 && detailUrlsPlanned > 0 && dryRunPlan) {
     status = "OK";
     detail = `${detailUrlsPlanned} detail URL(s) on promote`;
+  } else if (eventsFound === 0 && isExpectedSeasonalEmpty(key)) {
+    status = "WARN";
+    detail = "No upcoming Fair/Fairgrounds listings; outside annual Fair season";
   } else if (eventsFound === 0) {
     status = "FAIL";
     detail =

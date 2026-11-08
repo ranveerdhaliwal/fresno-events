@@ -25,6 +25,8 @@ export interface TicketmasterEvent {
   info?: string;
   dates?: {
     timezone?: string;
+    access?: { startDateTime?: string };
+    status?: { code?: string };
     start?: {
       dateTime?: string;
       localDate?: string;

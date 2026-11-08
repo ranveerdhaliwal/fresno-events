@@ -7,6 +7,21 @@ import { parseMilbSchedule, toNormalizedEvents, buildMilbGamedayUrl, GRIZZLIES_D
 const fixturePath = join(process.cwd(), "../../tools/spikes/fixtures/milb-sample.json");
 
 describe("milb-api.utils", () => {
+  it("keeps games in their actual season when the schedule spans years", () => {
+    const game = {
+      gamePk: 866929,
+      gameDate: "2027-04-03T02:00:00Z",
+      officialDate: "2027-04-02",
+      teams: {
+        away: { team: { id: 524, name: "Stockton Ports" } },
+        home: { team: { id: 259, name: "Fresno Grizzlies" } }
+      }
+    };
+    const events = toNormalizedEvents({ dates: [{ games: [game, { ...game, gamePk: 2, officialDate: "2026-12-31", gameDate: "2027-01-01T02:00:00Z" }] }] });
+    expect(events.map(event => event.seriesId)).toEqual(["series:milb-grizzlies:2027", "series:milb-grizzlies:2026"]);
+    expect(events[0]?.seriesName).toBe("Fresno Grizzlies 2027");
+    expect(events[0]?.startTs).toBe("2027-04-03T02:00:00.000Z");
+  });
   it("builds gameday preview URLs from away-vs-home slug", () => {
     const url = buildMilbGamedayUrl({
       gamePk: 821367,

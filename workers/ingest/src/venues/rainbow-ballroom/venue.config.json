@@ -4,7 +4,7 @@
   "label": "Rainbow Ballroom",
   "enabled": true,
   "strategy": "html_parse",
-  "listingUrl": "https://www.rainbowballroom.com/blog-grid",
+  "listingUrl": "https://www.rainbowballroom.com/events",
   "allowedExternalHosts": [
     "eventmania.com",
     "www.eventmania.com",
@@ -13,7 +13,9 @@
     "eventbrite.com",
     "www.eventbrite.com",
     "ticketon.com",
-    "www.ticketon.com"
+    "www.ticketon.com",
+    "posh.vip",
+    "tickets.klinevents.com"
   ],
   "sourceHostname": "www.rainbowballroom.com",
   "ingestLane": "direct",

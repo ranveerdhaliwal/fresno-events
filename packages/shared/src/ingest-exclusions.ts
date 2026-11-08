@@ -51,6 +51,16 @@ export function isMilbAwayGame(input: IngestExclusionInput): boolean {
   return /^fresno grizzlies\s+at\s+/i.test(title);
 }
 
+/** Venue marked the listing cancelled in the title — do not clean that off and publish. */
+export function isCancelledListingTitle(input: IngestExclusionInput): boolean {
+  const title = input.title.trim();
+  if (!title) {
+    return false;
+  }
+
+  return /^(?:cancelled|canceled)\b/i.test(title) || /\bshow\s+(?:cancelled|canceled)\b/i.test(title);
+}
+
 export interface IngestExclusion {
   id: string;
   label: string;
@@ -88,6 +98,13 @@ export function getIngestExclusion(input: IngestExclusionInput): IngestExclusion
     return {
       id: "milb-away",
       label: "Fresno Grizzlies away game (out of area)"
+    };
+  }
+
+  if (isCancelledListingTitle(input)) {
+    return {
+      id: "cancelled-listing",
+      label: "Source marked this listing cancelled"
     };
   }
 

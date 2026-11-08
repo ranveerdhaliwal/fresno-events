@@ -1,4 +1,7 @@
-import { resolveVenueLocationFields, type NormalizedEvent } from "@fresno-events/shared";
+import {
+  resolveVenueLocationFields,
+  type NormalizedEvent,
+} from "@fresno-events/shared";
 import { z } from "zod";
 
 import { instantFromPacificLocal } from "@/lib/pacific-instant.utils";
@@ -9,7 +12,7 @@ const FairLocationSchema = z.object({
   Name: z.string().nullish(),
   AddressLine1: z.string().nullish(),
   Latitude: z.number().nullish(),
-  Longitude: z.number().nullish()
+  Longitude: z.number().nullish(),
 });
 
 const FairItemSchema = z.object({
@@ -25,7 +28,7 @@ const FairItemSchema = z.object({
   ShortDescription: z.string().nullish(),
   LongDescription: z.string().nullish(),
   ExternalLink: z.string().nullish(),
-  Locations: z.array(FairLocationSchema).optional()
+  Locations: z.array(FairLocationSchema).optional(),
 });
 
 const FairDaySchema = z.object({
@@ -33,16 +36,16 @@ const FairDaySchema = z.object({
   Times: z
     .array(
       z.object({
-        Items: z.array(FairItemSchema).optional()
-      })
+        Items: z.array(FairItemSchema).optional(),
+      }),
     )
-    .optional()
+    .optional(),
 });
 
 const FairResponseSchema = z.object({
   d: z.object({
-    Days: z.array(FairDaySchema).optional()
-  })
+    Days: z.array(FairDaySchema).optional(),
+  }),
 });
 
 export const FRESNO_FAIR_API_URL =
@@ -54,7 +57,9 @@ export const FRESNO_FAIR_SEASON_MONTH = 10;
 /** October day count used for `GetEventDaysByList` date windows. */
 export const FRESNO_FAIR_SEASON_DAY_COUNT = 31;
 
-export function parseSeriesSeasonYear(seriesId: string | undefined): number | null {
+export function parseSeriesSeasonYear(
+  seriesId: string | undefined,
+): number | null {
   const match = seriesId?.match(/:(\d{4})$/);
   if (!match?.[1]) {
     return null;
@@ -63,24 +68,42 @@ export function parseSeriesSeasonYear(seriesId: string | undefined): number | nu
   return Number.isFinite(year) ? year : null;
 }
 
-/**
- * Fair listings are keyed to the season year (e.g. Oct 2026), not always the clock year.
- * Prefer an explicit `seriesId` suffix when configured on the venue.
- */
-export function resolveFresnoFairScheduleYear(now: Date, seriesId?: string): number {
-  const fromSeries = parseSeriesSeasonYear(seriesId);
-  if (fromSeries !== null) {
-    return fromSeries;
-  }
-  return now.getFullYear();
+/** Choose the upcoming/current season in Pacific time; stale configuration cannot pin history. */
+export function resolveFresnoFairScheduleYear(
+  now: Date,
+  seriesId?: string,
+): number {
+  const local = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now);
+  const year = Number(local.find((p) => p.type === "year")!.value);
+  const month = Number(local.find((p) => p.type === "month")!.value);
+  return Math.max(
+    year + (month > 10 ? 1 : 0),
+    parseSeriesSeasonYear(seriesId) ?? 0,
+  );
 }
+
+/** Official published season dates; unknown seasons require verification before approval. */
+export const FRESNO_FAIR_SEASONS: Record<
+  number,
+  { start: string; end: string }
+> = {
+  2026: { start: "2026-10-07", end: "2026-10-18" },
+  2027: { start: "2027-10-06", end: "2027-10-17" },
+};
 
 /** Years to query when the primary season window is empty (stale seriesId, pre-season). */
 export function fresnoFairScheduleYearsToTry(primaryYear: number): number[] {
   return [primaryYear, primaryYear + 1];
 }
 
-export function seriesIdForFresnoFairSeasonYear(year: number, configuredSeriesId?: string): string {
+export function seriesIdForFresnoFairSeasonYear(
+  year: number,
+  configuredSeriesId?: string,
+): string {
   const configuredYear = parseSeriesSeasonYear(configuredSeriesId);
   if (configuredYear === year && configuredSeriesId) {
     return configuredSeriesId;
@@ -89,9 +112,51 @@ export function seriesIdForFresnoFairSeasonYear(year: number, configuredSeriesId
 }
 
 /** Fairgrounds mailing address when the API omits `AddressLine1`. */
-export const FRESNO_FAIR_DEFAULT_VENUE_ADDRESS = "1121 S. Chance Avenue, Fresno, CA 93702";
+export const FRESNO_FAIR_DEFAULT_VENUE_ADDRESS =
+  "1121 S. Chance Avenue, Fresno, CA 93702";
 
-export function buildFresnoFairDateList(year: number, month: number, dayCount: number): string {
+/** Existing verified Fairgrounds address pin; never use it for another explicit address. */
+export const FRESNO_FAIR_COORDINATES = {
+  venueLat: 36.7311013,
+  venueLng: -119.750295,
+};
+
+export function resolveFairCoordinates(
+  location?: z.infer<typeof FairLocationSchema>,
+): Pick<NormalizedEvent, "venueLat" | "venueLng"> {
+  const address = location?.AddressLine1?.trim();
+  const onGrounds =
+    !address ||
+    /^1121\s+(?:s\.?|south)\s+chance\s+(?:ave(?:nue)?\.?)(?:\s|,|$)/i.test(
+      address,
+    );
+  const lat = location?.Latitude;
+  const lng = location?.Longitude;
+  const valid =
+    lat != null &&
+    lng != null &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lng) <= 180 &&
+    !(lat === 0 && lng === 0);
+  if (onGrounds) {
+    // Keep precise stage pins inside the grounds; replace zero/state-centroid placeholders.
+    if (
+      valid &&
+      Math.abs(lat - FRESNO_FAIR_COORDINATES.venueLat) < 0.02 &&
+      Math.abs(lng - FRESNO_FAIR_COORDINATES.venueLng) < 0.02
+    ) {
+      return { venueLat: lat, venueLng: lng };
+    }
+    return { ...FRESNO_FAIR_COORDINATES };
+  }
+  return valid ? { venueLat: lat, venueLng: lng } : {};
+}
+
+export function buildFresnoFairDateList(
+  year: number,
+  month: number,
+  dayCount: number,
+): string {
   const dates: string[] = [];
   for (let day = 1; day <= dayCount; day += 1) {
     const mm = String(month).padStart(2, "0");
@@ -101,7 +166,9 @@ export function buildFresnoFairDateList(year: number, month: number, dayCount: n
   return dates.join(",");
 }
 
-export function buildFresnoFairApiPayload(datesCsv: string): Record<string, unknown> {
+export function buildFresnoFairApiPayload(
+  datesCsv: string,
+): Record<string, unknown> {
   return {
     dates: datesCsv,
     day: "",
@@ -117,7 +184,7 @@ export function buildFresnoFairApiPayload(datesCsv: string): Record<string, unkn
     showCategoryExceptionID: 0,
     isolatedSchedule: 0,
     customFieldFilters: [],
-    searchInDescription: true
+    searchInDescription: true,
   };
 }
 
@@ -174,29 +241,44 @@ function clockFromAmPm(hour12: number, minute: number, ampm: string): string {
 
 /** Parse fair CMS copy like "10 a.m. – 1 p.m." or "10:00 AM - 1:00 PM". */
 export function parseFairTimeRangeFromText(
-  text: string
+  text: string,
 ): { startClock: string; endClock?: string } | null {
   const normalized = text.replace(/[\u2013\u2014]/g, "-");
 
   const rangeMatch = normalized.match(
     new RegExp(
       String.raw`(\d{1,2})(?::(\d{2}))?\s*(${AM_PM})\s*-\s*(\d{1,2})(?::(\d{2}))?\s*(${AM_PM})`,
-      "i"
-    )
+      "i",
+    ),
   );
   if (rangeMatch) {
     return {
-      startClock: clockFromAmPm(Number(rangeMatch[1]), Number(rangeMatch[2] ?? 0), rangeMatch[3]!),
-      endClock: clockFromAmPm(Number(rangeMatch[4]), Number(rangeMatch[5] ?? 0), rangeMatch[6]!)
+      startClock: clockFromAmPm(
+        Number(rangeMatch[1]),
+        Number(rangeMatch[2] ?? 0),
+        rangeMatch[3]!,
+      ),
+      endClock: clockFromAmPm(
+        Number(rangeMatch[4]),
+        Number(rangeMatch[5] ?? 0),
+        rangeMatch[6]!,
+      ),
     };
   }
 
   const gatesOpen = normalized.match(
-    new RegExp(String.raw`gates open at\s+(\d{1,2})(?::(\d{2}))?\s*(${AM_PM})`, "i")
+    new RegExp(
+      String.raw`gates open at\s+(\d{1,2})(?::(\d{2}))?\s*(${AM_PM})`,
+      "i",
+    ),
   );
   if (gatesOpen) {
     return {
-      startClock: clockFromAmPm(Number(gatesOpen[1]), Number(gatesOpen[2] ?? 0), gatesOpen[3]!)
+      startClock: clockFromAmPm(
+        Number(gatesOpen[1]),
+        Number(gatesOpen[2] ?? 0),
+        gatesOpen[3]!,
+      ),
     };
   }
 
@@ -208,7 +290,7 @@ function fairScheduleText(item: z.infer<typeof FairItemSchema>): string {
     item.EventTimeRangeString,
     item.TimeDisplay,
     item.ShortDescription,
-    item.LongDescription ? stripHtmlToText(item.LongDescription) : undefined
+    item.LongDescription ? stripHtmlToText(item.LongDescription) : undefined,
   ]
     .filter((value): value is string => Boolean(value?.trim()))
     .join(" ");
@@ -216,7 +298,7 @@ function fairScheduleText(item: z.infer<typeof FairItemSchema>): string {
 
 export function resolveFairEventSchedule(
   item: z.infer<typeof FairItemSchema>,
-  dateYmd: string
+  dateYmd: string,
 ): { startTs: string; endTs?: string } | null {
   if (item.TimeIsSpecified !== false && item.Time != null && item.Time > 0) {
     const clock = fairTimeToClock(item.Time);
@@ -237,7 +319,9 @@ export function resolveFairEventSchedule(
     return null;
   }
 
-  const endTs = parsed.endClock ? instantFromPacificLocal(dateYmd, parsed.endClock) : undefined;
+  const endTs = parsed.endClock
+    ? instantFromPacificLocal(dateYmd, parsed.endClock)
+    : undefined;
   return { startTs, ...(endTs ? { endTs } : {}) };
 }
 
@@ -250,9 +334,13 @@ function stripHtmlToText(html: string): string {
     .trim();
 }
 
-function fairDescriptionText(item: z.infer<typeof FairItemSchema>): string | undefined {
+function fairDescriptionText(
+  item: z.infer<typeof FairItemSchema>,
+): string | undefined {
   const short = item.ShortDescription?.trim();
-  const long = item.LongDescription?.trim() ? stripHtmlToText(item.LongDescription) : undefined;
+  const long = item.LongDescription?.trim()
+    ? stripHtmlToText(item.LongDescription)
+    : undefined;
 
   if (long && (!short || long.length > short.length + 50)) {
     return long;
@@ -265,7 +353,7 @@ function fairDescriptionText(item: z.infer<typeof FairItemSchema>): string | und
 
 export function fresnoFairResponseToEvents(
   json: unknown,
-  opts: { seriesId?: string; listingUrl: string }
+  opts: { seriesId?: string; listingUrl: string },
 ): NormalizedEvent[] {
   const parsed = FairResponseSchema.safeParse(json);
   if (!parsed.success) {
@@ -279,7 +367,9 @@ export function fresnoFairResponseToEvents(
     const dateYmd = day.DateString
       ? (() => {
           const [mm, dd, yyyy] = day.DateString.split("/");
-          return yyyy && mm && dd ? `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}` : null;
+          return yyyy && mm && dd
+            ? `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`
+            : null;
         })()
       : null;
 
@@ -289,34 +379,43 @@ export function fresnoFairResponseToEvents(
         if (!itemDate) {
           continue;
         }
-        const key = `${item.EventID}:${itemDate}:${item.Time ?? 0}`;
-        if (seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-
         const schedule = resolveFairEventSchedule(item, itemDate);
         if (!schedule) {
           continue;
         }
         const { startTs, endTs } = schedule;
+        const key = `${item.EventID}:${itemDate}:${startTs}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         const location = item.Locations?.[0];
         const { venueAddress, venueCity } = resolveVenueLocationFields(
           location?.AddressLine1?.trim() || FRESNO_FAIR_DEFAULT_VENUE_ADDRESS,
           "Fresno",
-          "CA"
+          "CA",
         );
 
-        const descriptionText = fairDescriptionText(item);
+        const description = fairDescriptionText(item);
+        const space = location?.Name?.trim();
+        const descriptionText = space
+          ? `Location at the Fair: ${space}.${description ? `\n\n${description}` : ""}`
+          : description;
         const imageUrl = item.ImageOrVideoThumbnailWithPath?.trim();
         const ticketUrl = item.ExternalLink?.trim();
+        const season = FRESNO_FAIR_SEASONS[Number(itemDate.slice(0, 4))];
+        const yearRoundGroundsEvent =
+          !season ||
+          itemDate < season.start ||
+          itemDate > season.end ||
+          /flea market|museum.*open|christmas in the valley/i.test(item.Name);
 
         events.push(
           applyFresnoFairPricePolicy({
             source: "scrape:www.fresnofair.com",
-            sourceEventId: `venue:big-fresno-fair:${item.EventID}:${itemDate}`,
+            sourceEventId: `venue:big-fresno-fair:${item.EventID}:${itemDate}:time-${startTs.slice(11, 16).replace(":", "")}`,
             title: item.Name.trim(),
-            venueName: "Big Fresno Fair",
+            venueName: yearRoundGroundsEvent
+              ? "Fresno Fairgrounds"
+              : "Big Fresno Fair",
             venueCity: venueCity ?? "Fresno",
             startTs,
             ...(endTs ? { endTs } : {}),
@@ -326,14 +425,22 @@ export function fresnoFairResponseToEvents(
             ...(imageUrl?.startsWith("http") ? { imageUrl } : {}),
             ...(ticketUrl?.startsWith("http") ? { ticketUrl } : {}),
             ...(venueAddress ? { venueAddress } : {}),
-            ...(location?.Latitude != null ? { venueLat: location.Latitude } : {}),
-            ...(location?.Longitude != null ? { venueLng: location.Longitude } : {}),
-            ...(opts.seriesId ? { seriesId: opts.seriesId, seriesName: "Big Fresno Fair" } : {})
-          })
+            ...resolveFairCoordinates(location),
+            ...(yearRoundGroundsEvent
+              ? {
+                  seriesId: "series:fresno-fairgrounds",
+                  seriesName: "Fresno Fairgrounds",
+                }
+              : opts.seriesId
+                ? { seriesId: opts.seriesId, seriesName: "Big Fresno Fair" }
+                : {}),
+          }),
         );
       }
     }
   }
 
+  // Every performance uses the same deterministic identity format, including
+  // single-show days. Adding or removing another showing cannot steal its ID.
   return events;
 }

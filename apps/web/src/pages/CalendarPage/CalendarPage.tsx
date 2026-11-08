@@ -6,6 +6,8 @@ import { isoDateInPacificMonth, pacificTodayIso } from "@fresno-events/shared";
 import { CalendarDayTile } from "@/components/CalendarDayTile";
 import { isPacificWeekend } from "@/components/CalendarDayTile/CalendarDayTile.utils";
 import { CalendarMonthStrip } from "@/components/CalendarMonthStrip";
+import { Button } from "@/components/Button/Button";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { PageChrome } from "@/components/PageChrome";
 import { SectionTitle } from "@/components/SectionTitle";
 import { SelectableEventRow } from "@/components/SelectableEventRow";
@@ -35,9 +37,10 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const todayIso = pacificTodayIso();
   useSeoHead(useMemo(() => buildCalendarSeo(year, month), [year, month]));
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: eventsKeys.calendar(year, month),
-    queryFn: ({ signal }) => getCalendarMonth(year, month, signal)
+    queryFn: ({ signal }) => getCalendarMonth(year, month, signal),
+    retry: 1
   });
 
   const handleSelect = useBrowseEventSelect({
@@ -71,9 +74,17 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
           </SectionTitle>
         </header>
 
-        {isLoading || !data ? (
+        {isError && (
+          <section role="alert" className={styles.error}>
+            <ErrorBanner error={new Error(`We couldn't load events for ${monthLabel}. Please try again.`)} />
+            <Button variant="secondary" onClick={() => void refetch()} disabled={isFetching}>
+              {isFetching ? "Trying again…" : "Try again"}
+            </Button>
+          </section>
+        )}
+        {isLoading ? (
           <CalendarPageSkeleton monthLabel={monthLabel} />
-        ) : (
+        ) : data ? (
           <>
             <div className={styles.dowRow}>
               {DOW_HEADERS.map((label) => (
@@ -138,7 +149,7 @@ export function CalendarPage({ year, month }: CalendarPageProps) {
               </div>
             </div>
           </>
-        )}
+        ) : null}
       </div>
     </PageChrome>
   );

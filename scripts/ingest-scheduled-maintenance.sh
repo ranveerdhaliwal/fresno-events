@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Post-promote maintenance for scheduled local ingest: relink + orphan cleanup.
-# Always dry-runs first; apply only when preview is clean (errors=0).
+# Always preview. Applying a broad relink or orphan plan requires explicit opt-in.
 # Orphan apply is skipped when wouldDelete=0; aborted when over INGEST_SCHEDULED_MAX_ORPHAN_DELETE.
 #
 # Sourced by ingest-scheduled-local.sh — not meant to run standalone.
@@ -43,6 +43,11 @@ scheduled_run_relink_maintenance() {
     return 1
   fi
   scheduled_record_step "relink-dry-run" "ok" "preview passed"
+
+  if [[ "${INGEST_SCHEDULED_APPLY_RELINK:-}" != "1" ]]; then
+    scheduled_record_step "relink-apply" "skipped" "preview saved; inspect held events and fair performances before opting in"
+    return 0
+  fi
 
   echo ""
   echo ">>> pnpm ingest:relink"
@@ -90,6 +95,11 @@ scheduled_run_orphan_maintenance() {
     return 0
   fi
 
+  if [[ "${INGEST_SCHEDULED_APPLY_ORPHANS:-}" != "1" ]]; then
+    scheduled_record_step "orphan-apply" "skipped" "wouldDelete=${would_delete}; review explicit IDs before opting in"
+    return 0
+  fi
+
   local max_delete="${INGEST_SCHEDULED_MAX_ORPHAN_DELETE:-50}"
   if [[ "${would_delete:-0}" -gt "${max_delete}" && "${INGEST_SCHEDULED_FORCE_ORPHAN:-}" != "1" ]]; then
     echo "[scheduled] Orphan apply aborted — wouldDelete=${would_delete} exceeds INGEST_SCHEDULED_MAX_ORPHAN_DELETE=${max_delete}." >&2
@@ -119,8 +129,9 @@ scheduled_emit_cursor_review() {
     echo ""
     echo "Verify each step in the log above."
     echo "  - post-promote: detail-backfill, enrich, reject-exclusions (away games, Shen Yun), venue addresses"
-    echo "  - relink: dry-run must show errors=0 before apply"
-    echo "  - orphan cleanup: apply only when wouldDelete>0 and under max (${INGEST_SCHEDULED_MAX_ORPHAN_DELETE:-50})"
+    echo "  - relink: preview by default; apply requires INGEST_SCHEDULED_APPLY_RELINK=1 after reviewing the plan"
+    echo "  - orphan cleanup: preview by default; apply requires INGEST_SCHEDULED_APPLY_ORPHANS=1 and the deletion cap"
+    echo "  - event-quality: full pending/published duplicate, series, coordinate and venue checks; inspect the quality JSON"
     echo "After maintenance: agent runbook (INGEST_LOCAL_OPS.md) → pre-approve-audit → summary for user → bulk-approve only after user OK"
     echo ""
     echo "Step results:"

@@ -1,0 +1,12 @@
+{
+  "key": "fresno-state-arts",
+  "promoteSource": "fresnostatearts",
+  "label": "Fresno State Public Arts",
+  "enabled": true,
+  "strategy": "api",
+  "listingUrl": "https://cah.fresnostate.edu/calendar.html",
+  "eventSource": "api:fresno-state-arts",
+  "sourceHostname": "cah.fresnostate.edu",
+  "ingestLane": "direct",
+  "detailMode": "api_embedded"
+}

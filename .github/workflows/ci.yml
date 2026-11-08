@@ -36,6 +36,12 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Workflow regression tests
+        run: node --test scripts/*.test.mjs
+
+      - name: Build web application
+        run: pnpm --filter @fresno-events/web build
+
   deploy-workers:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: check

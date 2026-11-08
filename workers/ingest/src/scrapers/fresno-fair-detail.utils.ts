@@ -21,8 +21,7 @@ export interface FresnoFairDetailFields {
   isFree?: boolean;
 }
 
-const BOX_OFFICE_PRICES_RE =
-  /In-Person Box Office Prices?:[\s\S]*?<span[^>]*>([^<]+)<\/span>/i;
+const BOX_OFFICE_PRICES_RE = /In-Person Box Office Prices?:[\s\S]*?<span[^>]*>([^<]+)<\/span>/i;
 const ONLINE_PRICES_RE = /Online Prices[^:]*:[\s\S]*?<span[^>]*>([^<]+)<\/span>/i;
 const ETIX_TICKET_URL_RE = /href="(https:\/\/www\.etix\.com\/[^"]+)"/i;
 const TICKETS_START_AT_RE = /tickets?\s+start(?:ing)?\s+at\s+\$(\d+(?:\.\d{2})?)/i;
@@ -59,7 +58,9 @@ function formatPriceTier(amount: number): string {
   return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
 }
 
-function priceRangeFromAmounts(amounts: number[]): Pick<FresnoFairDetailFields, "priceMin" | "priceMax" | "currency"> {
+function priceRangeFromAmounts(
+  amounts: number[]
+): Pick<FresnoFairDetailFields, "priceMin" | "priceMax" | "currency"> {
   if (amounts.length === 0) {
     return {};
   }
@@ -81,10 +82,9 @@ function buildPriceNotes(boxOfficePrices: number[], onlinePrices: number[]): str
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
-function parseFresnoFairPricing(html: string): Pick<
-  FresnoFairDetailFields,
-  "priceMin" | "priceMax" | "priceNotes" | "ticketUrl" | "currency"
-> {
+function parseFresnoFairPricing(
+  html: string
+): Pick<FresnoFairDetailFields, "priceMin" | "priceMax" | "priceNotes" | "ticketUrl" | "currency"> {
   const boxOfficeMatch = html.match(BOX_OFFICE_PRICES_RE);
   const onlineMatch = html.match(ONLINE_PRICES_RE);
   const etixMatch = html.match(ETIX_TICKET_URL_RE);
@@ -135,7 +135,10 @@ export function cleanFresnoFairDescriptionText(text: string): string {
     .filter((line) => !/^transcript$/i.test(line))
     .filter((line) => !/^of\s+transcript$/i.test(line));
 
-  return lines.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+  return lines
+    .join("\n\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function textMediaBlockToPlainText($: ReturnType<typeof load>, el: AnyNode): string {
@@ -215,7 +218,10 @@ export function parseFresnoFairDescription(html: string): string | undefined {
   }
 
   if (primary.length > MAX_DETAIL_DESCRIPTION_LENGTH) {
-    primary = primary.slice(0, MAX_DETAIL_DESCRIPTION_LENGTH).replace(/\s+\S*$/, "").trim();
+    primary = primary
+      .slice(0, MAX_DETAIL_DESCRIPTION_LENGTH)
+      .replace(/\s+\S*$/, "")
+      .trim();
   }
 
   return primary.length > 0 ? primary : undefined;
@@ -281,9 +287,7 @@ export function parseTicketsStartAtPrice(
 
 function eventHasPrice(event: NormalizedEvent): boolean {
   return (
-    event.isFree === true ||
-    typeof event.priceMin === "number" ||
-    Boolean(event.priceNotes?.trim())
+    event.isFree === true || typeof event.priceMin === "number" || Boolean(event.priceNotes?.trim())
   );
 }
 
@@ -295,7 +299,15 @@ export function mergeFresnoFairDetail(
     return applyFresnoFairPricePolicy(listing);
   }
 
-  const descriptionText = pickFresnoFairDescription(listing.descriptionText, detail.descriptionText);
+  const selectedDescription = pickFresnoFairDescription(
+    listing.descriptionText,
+    detail.descriptionText
+  );
+  const stagePrefix = listing.descriptionText?.match(/^Location at the Fair: [^\n]+/)?.[0];
+  const descriptionText =
+    stagePrefix && selectedDescription && !selectedDescription.startsWith(stagePrefix)
+      ? `${stagePrefix}\n\n${selectedDescription}`
+      : selectedDescription;
 
   if (detail.isFree === true) {
     return applyFresnoFairPricePolicy({
@@ -347,7 +359,9 @@ export async function enrichFresnoFairEventsWithDetails(
 
   if (dryRun) {
     return {
-      events: events.map((event) => applyFresnoFairPricePolicy(applyDescriptionPriceFallback(event))),
+      events: events.map((event) =>
+        applyFresnoFairPricePolicy(applyDescriptionPriceFallback(event))
+      ),
       errors: [],
       detailUrlsVisited: 0,
       fetchUrls: []
@@ -374,7 +388,9 @@ export async function enrichFresnoFairEventsWithDetails(
         .map((event) => event.externalUrl?.replace(/\/+$/, ""))
         .filter((url): url is string => Boolean(url?.startsWith("http")))
     );
-    console.log(`[ingest] ${venueLabel}: fetching ${uniqueUrls.size} detail page(s) for pricing and descriptions…`);
+    console.log(
+      `[ingest] ${venueLabel}: fetching ${uniqueUrls.size} detail page(s) for pricing and descriptions…`
+    );
   }
 
   for (const event of events) {
@@ -431,7 +447,9 @@ export async function enrichFresnoFairEventsWithDetails(
       step: "detail_enrich_end",
       detail_urls_visited: detailUrlsVisited,
       priced_events: enriched.filter(eventHasPrice).length,
-      described_events: enriched.filter((event) => (event.descriptionText?.trim().length ?? 0) >= 250).length,
+      described_events: enriched.filter(
+        (event) => (event.descriptionText?.trim().length ?? 0) >= 250
+      ).length,
       errors: errors.length
     })
   );

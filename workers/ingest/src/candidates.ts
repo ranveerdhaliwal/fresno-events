@@ -1,12 +1,8 @@
 import type { EventSource, NormalizedEvent, ScrapeResult } from "@fresno-events/shared";
 
 import { buildCandidateUpsertRow } from "@/candidates/candidate-upsert.utils";
-import {
-  harmonizeLinkedOccurrencePricingBatch
-} from "@/candidates/linked-price-harmonize.utils";
-import {
-  type ExistingCandidateRow
-} from "@/candidates/content-fingerprint.utils";
+import { harmonizeLinkedOccurrencePricingBatch } from "@/candidates/linked-price-harmonize.utils";
+import { type ExistingCandidateRow } from "@/candidates/content-fingerprint.utils";
 import {
   capOccurrenceIdsForPriceHarmonize,
   shouldSkipPublishedEventSync
@@ -56,7 +52,10 @@ export async function previewPersistScrapeResult(
   return summary;
 }
 
-export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult): Promise<PersistenceResult> {
+export async function persistScrapeResult(
+  env: IngestEnv,
+  result: ScrapeResult
+): Promise<PersistenceResult> {
   const config = getSupabaseConfig(env);
   const uniqueEvents = prepareEventsForPersist(result.events, result.runId);
 
@@ -160,8 +159,17 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
     const migrationRows: Array<Record<string, unknown>> = [];
 
     for (const analysis of analyses) {
-      const { event, existing, fingerprint, status, contentChanged, auditKind, auditNew: newItem, auditChanged: changedItem, ingestExclusion } =
-        analysis;
+      const {
+        event,
+        existing,
+        fingerprint,
+        status,
+        contentChanged,
+        auditKind,
+        auditNew: newItem,
+        auditChanged: changedItem,
+        ingestExclusion
+      } = analysis;
 
       if (auditKind === "new" && newItem) {
         auditNew.push(newItem);
@@ -285,14 +293,18 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
     }
 
     if (rows.length > 0) {
-      await supabaseRequest(config, "/rest/v1/event_candidates?on_conflict=source,source_event_id", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Prefer: "resolution=merge-duplicates,return=minimal"
-        },
-        body: JSON.stringify(rows)
-      });
+      await supabaseRequest(
+        config,
+        "/rest/v1/event_candidates?on_conflict=source,source_event_id",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=minimal"
+          },
+          body: JSON.stringify(rows)
+        }
+      );
     }
   }
 
@@ -350,7 +362,11 @@ export async function persistScrapeResult(env: IngestEnv, result: ScrapeResult):
 }
 
 /** Postgres upsert rejects duplicate (source, source_event_id) in one batch. */
-function prepareEventsForPersist(events: NormalizedEvent[], runId: string, now = new Date()): NormalizedEvent[] {
+function prepareEventsForPersist(
+  events: NormalizedEvent[],
+  runId: string,
+  now = new Date()
+): NormalizedEvent[] {
   const unique = dedupeEventsBySourceId(events);
   const upcoming = filterUpcomingIngestEvents(unique, now);
   const skippedPast = unique.length - upcoming.length;
@@ -431,7 +447,7 @@ async function fetchExistingCandidatesForEvents(
   return merged;
 }
 
-async function fetchExistingCandidatesForSource(
+export async function fetchExistingCandidatesForSource(
   config: SupabaseConfig,
   source: string
 ): Promise<Map<string, ExistingCandidateRow>> {
@@ -442,22 +458,23 @@ async function fetchExistingCandidatesForSource(
     limit: "2000"
   });
 
-  const response = await fetch(`${config.url}/rest/v1/event_candidates?${params}`, {
-    headers: supabaseHeaders(config)
-  });
-
-  if (!response.ok) {
-    console.log(
-      JSON.stringify({
-        event: "ingest_persist_fetch_existing_failed",
-        source,
-        status: response.status
-      })
-    );
-    return new Map();
+  // Supabase caps responses at 1,000 rows even when a larger limit is requested.
+  // Missing an existing row here would reset its review and publication metadata.
+  const rows: ExistingCandidateRowRaw[] = [];
+  params.set("limit", "1000");
+  params.set("order", "id.asc");
+  for (let offset = 0; ; offset += 1000) {
+    params.set("offset", String(offset));
+    const response = await fetch(`${config.url}/rest/v1/event_candidates?${params}`, {
+      headers: supabaseHeaders(config)
+    });
+    if (!response.ok) {
+      throw new Error(`Could not load existing candidates for ${source}: HTTP ${response.status}`);
+    }
+    const page = (await response.json()) as ExistingCandidateRowRaw[];
+    rows.push(...page);
+    if (page.length < 1000) break;
   }
-
-  const rows = (await response.json()) as ExistingCandidateRowRaw[];
   const map = new Map<string, ExistingCandidateRow>();
   for (const row of rows) {
     const parsed: ExistingCandidateRow = {
@@ -577,6 +594,8 @@ async function supabaseRequest(config: SupabaseConfig, path: string, init: Reque
   });
 
   if (!response.ok) {
-    throw new Error(`Supabase candidate persistence failed with ${response.status}: ${await response.text()}`);
+    throw new Error(
+      `Supabase candidate persistence failed with ${response.status}: ${await response.text()}`
+    );
   }
 }

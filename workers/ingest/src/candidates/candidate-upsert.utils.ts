@@ -34,7 +34,9 @@ export function shouldResetConfidenceOnChangedUpsert(status: string): boolean {
 }
 
 function legacyDedupeHashInput(event: NormalizedEvent): string {
-  return [event.source, event.sourceEventId, event.title, event.venueName, event.startTs].join("|").toLowerCase();
+  return [event.source, event.sourceEventId, event.title, event.venueName, event.startTs]
+    .join("|")
+    .toLowerCase();
 }
 
 export async function buildCandidateUpsertRow(
@@ -75,7 +77,10 @@ function buildUnchangedUpsertRow(
     matched_event_id: occurrence.matchedEventId ?? existing?.matched_event_id ?? null
   };
 
-  if (occurrence.statusOverride !== null || (existing !== undefined && existing.status !== status)) {
+  if (
+    occurrence.statusOverride !== null ||
+    (existing !== undefined && existing.status !== status)
+  ) {
     row.status = status;
   }
 
@@ -86,9 +91,28 @@ async function buildFullUpsertRow(
   input: BuildCandidateUpsertRowInput,
   now: string
 ): Promise<Record<string, unknown>> {
-  const { auditKind, runId, event: rawEvent, fingerprint, status, existing, contentChanged, occurrence, ingestExclusion } =
-    input;
-  let event = applyIngestDefaults(rawEvent);
+  const {
+    auditKind,
+    runId,
+    event: rawEvent,
+    fingerprint,
+    status,
+    existing,
+    contentChanged,
+    occurrence,
+    ingestExclusion
+  } = input;
+  // The coordinator persists the same source payload again after venue enrichment.
+  // A matching source fingerprint must keep the reviewed/enriched payload intact.
+  let event = applyIngestDefaults(
+    existing && !contentChanged
+      ? {
+          ...existing.normalized_event,
+          source: rawEvent.source,
+          sourceEventId: rawEvent.sourceEventId
+        }
+      : rawEvent
+  );
 
   if (existing) {
     event = preserveEventbriteEnrichedDescription(
@@ -133,7 +157,7 @@ async function buildFullUpsertRow(
   // PostgREST bulk upsert requires identical keys on every object (PGRST102).
   row.raw_payload = auditKind === "new" ? {} : (existing?.raw_payload ?? {});
   row.confidence_score =
-    auditKind === "new" || shouldResetConfidenceOnChangedUpsert(status)
+    auditKind === "new" || (contentChanged && shouldResetConfidenceOnChangedUpsert(status))
       ? defaultConfidenceScore(event.source)
       : (existing?.confidence_score ?? defaultConfidenceScore(event.source));
 
@@ -142,9 +166,7 @@ async function buildFullUpsertRow(
 
 /** Legacy dedupe_hash (unique constraint); unchanged algorithm for compatibility. */
 export async function legacyDedupeHash(event: NormalizedEvent): Promise<string> {
-  return sha256Hex(
-    legacyDedupeHashInput(event)
-  );
+  return sha256Hex(legacyDedupeHashInput(event));
 }
 
 async function sha256Hex(value: string) {

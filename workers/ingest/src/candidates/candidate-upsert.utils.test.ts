@@ -58,6 +58,52 @@ function existingRow(overrides: Partial<ExistingCandidateRow> = {}): ExistingCan
 }
 
 describe("candidate-upsert.utils", () => {
+  it("keeps the enriched title, category, tags and confidence on an unchanged source re-upsert", async () => {
+    const existing = existingRow({
+      normalized_event: { ...base, title: "Reviewed title", category: "comedy", tags: ["Comedy"] }
+    });
+    const row = await buildCandidateUpsertRow({
+      auditKind: "unchanged",
+      runId: "run-2",
+      event: base,
+      fingerprint: "fp-1",
+      status: "pending_review",
+      existing,
+      contentChanged: false,
+      occurrence: baseOccurrence
+    });
+    expect(row.normalized_event).toMatchObject({
+      title: "Reviewed title",
+      category: "comedy",
+      tags: ["Comedy"]
+    });
+    expect(row.title).toBe("Reviewed title");
+    expect(row.confidence_score).toBe(0.98);
+    expect(row.review_notes).toBe("[ai] enriched");
+  });
+  it("uses changed source content and clears stale enrichment for a real update", async () => {
+    const existing = existingRow({
+      normalized_event: {
+        ...base,
+        title: "Old reviewed title",
+        category: "comedy",
+        tags: ["Comedy"]
+      }
+    });
+    const row = await buildCandidateUpsertRow({
+      auditKind: "changed",
+      runId: "run-2",
+      event: { ...base, title: "New source title" },
+      fingerprint: "fp-2",
+      status: "needs_changes",
+      existing,
+      contentChanged: true,
+      occurrence: baseOccurrence
+    });
+    expect(row.title).toBe("New source title");
+    expect(row.review_notes).toBeNull();
+    expect((row.normalized_event as { tags: string[] }).tags).not.toContain("Comedy");
+  });
   it("unchanged upsert only touches run metadata and occurrence fields", async () => {
     const row = await buildCandidateUpsertRow({
       auditKind: "unchanged",

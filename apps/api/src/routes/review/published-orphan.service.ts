@@ -7,6 +7,7 @@ import {
 import type { Env } from "@/env";
 import { logStructured } from "@/lib/structured-log";
 import { supabaseReviewRequest } from "@/routes/review/supabase.utils";
+import { fetchAllReviewRows } from "@/routes/review/fetch-all-review-rows.utils";
 
 interface ScheduledEventDbRow {
   id: string;
@@ -14,6 +15,7 @@ interface ScheduledEventDbRow {
   title: string;
   start_ts: string;
   source: string;
+  source_event_id?: string | null;
   occurrence_id: string | null;
   venues: { name: string } | { name: string }[] | null;
 }
@@ -30,13 +32,10 @@ function venueNameFromRow(row: ScheduledEventDbRow): string {
 }
 
 async function fetchScheduledEventsForOrphanScan(env: Env): Promise<PublishedEventAuditRow[]> {
-  const params = new URLSearchParams({
-    select: "id,slug,title,start_ts,source,occurrence_id,venues(name)",
-    status: "eq.scheduled",
-    limit: "5000"
+  const rows = await fetchAllReviewRows<ScheduledEventDbRow>(env, "events", {
+    select: "id,slug,title,start_ts,source,source_event_id,occurrence_id,venues(name)",
+    status: "eq.scheduled"
   });
-
-  const rows = await supabaseReviewRequest<ScheduledEventDbRow[]>(env, `/rest/v1/events?${params}`);
 
   return rows.map((row) => ({
     id: row.id,
@@ -45,22 +44,17 @@ async function fetchScheduledEventsForOrphanScan(env: Env): Promise<PublishedEve
     startTs: row.start_ts,
     venueName: venueNameFromRow(row),
     source: row.source,
+    ...(row.source_event_id ? { sourceEventId: row.source_event_id } : {}),
     occurrenceId: row.occurrence_id
   }));
 }
 
 async function fetchCanonicalVotes(env: Env): Promise<Map<string, number>> {
-  const params = new URLSearchParams({
+  const rows = await fetchAllReviewRows<CandidateVoteRow>(env, "event_candidates", {
     select: "matched_event_id",
     status: "eq.duplicate",
-    matched_event_id: "not.is.null",
-    limit: "5000"
+    matched_event_id: "not.is.null"
   });
-
-  const rows = await supabaseReviewRequest<CandidateVoteRow[]>(
-    env,
-    `/rest/v1/event_candidates?${params}`
-  );
 
   const votes = new Map<string, number>();
   for (const row of rows) {
@@ -100,7 +94,9 @@ export async function runPublishedOrphanCleanupOps(
     for (const item of planned) {
       try {
         const params = new URLSearchParams({ id: `eq.${item.eventId}` });
-        await supabaseReviewRequest(env, `/rest/v1/events?${params}`, { method: "DELETE" });
+        await supabaseReviewRequest(env, `/rest/v1/events?${params}`, {
+          method: "DELETE"
+        });
         deleted += 1;
       } catch (error) {
         errors += 1;

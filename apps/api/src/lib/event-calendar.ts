@@ -82,13 +82,21 @@ export async function resolveCalendarMonth(
 ): Promise<CalendarMonthResponse> {
   const bounds = pacificMonthBounds(year, month);
   const from = bounds.from.getTime() < now.getTime() ? now : bounds.from;
-  const result = await listEventsFromSupabase(env, {
-    from,
-    until: bounds.until,
-    limit: 200
-  });
+  const until = new Date(bounds.until.getTime() + 1);
+  const items: EventListItem[] = [];
+  const pageSize = 200;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await listEventsFromSupabase(env, {
+      from,
+      until,
+      limit: pageSize,
+      offset
+    });
+    items.push(...page.items);
+    if (page.items.length < pageSize) break;
+  }
 
-  const byDate = groupEventsByIsoDate(result.items);
+  const byDate = groupEventsByIsoDate(items);
   const gridDays = calendarGridDays(year, month);
 
   const days: CalendarDayBucket[] = gridDays.map((isoDate) => {

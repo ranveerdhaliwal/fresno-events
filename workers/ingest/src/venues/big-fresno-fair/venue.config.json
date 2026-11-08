@@ -8,7 +8,6 @@
   "sourceHostname": "www.fresnofair.com",
   "eventSource": "scrape:www.fresnofair.com",
   "extractorVariant": "festival",
-  "seriesId": "series:bigfresnofair:2026",
   "ingestLane": "direct",
   "detailMode": "api_embedded"
 }

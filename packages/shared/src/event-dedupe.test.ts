@@ -10,17 +10,59 @@ import {
 } from "./event-dedupe.js";
 
 const ringlingA = {
-  event: { title: "Ringling Bros. And Barnum & Bailey", startTs: "2026-07-05T13:00:00.000-07:00" },
+  event: {
+    title: "Ringling Bros. And Barnum & Bailey",
+    startTs: "2026-07-05T13:00:00.000-07:00"
+  },
   venue: { name: "Save Mart Center" }
 };
 
+describe("Fair parent listing groups", () => {
+  it("retains separate CMS performances with identical artist and time", () => {
+    const items = [4009, 3941].map((id) => ({
+      event: {
+        title: "VIOLIN ON FIRE",
+        startTs: "2026-10-18T00:00:00Z",
+        sourceEventId: `venue:big-fresno-fair:${id}:2026-10-17`,
+        seriesId: "series:bigfresnofair:2026"
+      },
+      venue: { name: "Big Fresno Fair" }
+    }));
+    expect(dedupeEventsByContent(items)).toHaveLength(2);
+    expect(dedupeEventsByListingGroup(items)).toHaveLength(2);
+  });
+  it("keeps different acts and close repeated sets as separate events under the same parent", () => {
+    const items = ["21:05", "21:15", "23:15"].map((clock) => ({
+      event: {
+        title: "Kids Town",
+        startTs: `2026-10-15T${clock}:00.000Z`,
+        seriesId: "series:bigfresnofair:2026"
+      },
+      venue: { name: "Big Fresno Fair" }
+    }));
+    items.push({
+      ...items[0]!,
+      event: { ...items[0]!.event, title: "Concert" }
+    });
+    expect(dedupeEventsByContent(items)).toHaveLength(4);
+    expect(dedupeEventsByListingGroup(items)).toHaveLength(4);
+    expect(dedupeEventsByListingGroup([...items, items[0]!])).toHaveLength(4);
+  });
+});
+
 const ringlingB = {
-  event: { title: "  Ringling Bros.  And Barnum & Bailey ", startTs: "2026-07-05T13:00:00.000-07:00" },
+  event: {
+    title: "  Ringling Bros.  And Barnum & Bailey ",
+    startTs: "2026-07-05T13:00:00.000-07:00"
+  },
   venue: { name: "Save Mart Center" }
 };
 
 const otherEvent = {
-  event: { title: "Garden Brothers Circus", startTs: "2026-07-05T19:00:00.000-07:00" },
+  event: {
+    title: "Garden Brothers Circus",
+    startTs: "2026-07-05T19:00:00.000-07:00"
+  },
   venue: { name: "Fresno Fairgrounds" }
 };
 
@@ -90,7 +132,10 @@ describe("eventContentSignature", () => {
   });
 
   it("treats a null venue name as empty", () => {
-    const signature = eventContentSignature({ event: { title: "Show", startTs: "t" }, venue: { name: null } });
+    const signature = eventContentSignature({
+      event: { title: "Show", startTs: "t" },
+      venue: { name: null }
+    });
     expect(signature).toBe("show||t");
   });
 
@@ -105,7 +150,9 @@ describe("eventContentSignature", () => {
     };
     const tm = {
       event: { title: "ZZ Top", startTs: "2026-08-08T03:00:00.000Z" },
-      venue: { name: "William Saroyan Theatre Fresno Convention & Entertainment Center" }
+      venue: {
+        name: "William Saroyan Theatre Fresno Convention & Entertainment Center"
+      }
     };
     expect(eventContentSignature(visit)).toBe(eventContentSignature(scrape));
     expect(eventContentSignature(scrape)).toBe(eventContentSignature(tm));
@@ -113,7 +160,10 @@ describe("eventContentSignature", () => {
 
   it("collapses Morgan Jay Tower vs Ticketmaster title/venue variants", () => {
     const tower = {
-      event: { title: "Morgan Jay: The Goofy Guy Tour", startTs: "2026-09-03T00:30:00.000Z" },
+      event: {
+        title: "Morgan Jay: The Goofy Guy Tour",
+        startTs: "2026-09-03T00:30:00.000Z"
+      },
       venue: { name: "Tower Theatre for the Performing Arts" }
     };
     const tm = {
@@ -146,11 +196,19 @@ describe("eventListingGroupKey", () => {
 
   it("still exposes a shared series key when seriesIds match", () => {
     const a = {
-      event: { title: "A", seriesId: "series:grizzlies:2026", category: "sports" },
+      event: {
+        title: "A",
+        seriesId: "series:grizzlies:2026",
+        category: "sports"
+      },
       venue: { name: "Park" }
     };
     const b = {
-      event: { title: "B different", seriesId: "series:grizzlies:2026", category: "sports" },
+      event: {
+        title: "B different",
+        seriesId: "series:grizzlies:2026",
+        category: "sports"
+      },
       venue: { name: "Other" }
     };
     expect(eventListingGroupKeys(a)).toContain("series:series:grizzlies:2026");
@@ -169,7 +227,10 @@ describe("dedupeEventsByListingGroup", () => {
 
   it("collapses multi-night shows with different seriesIds", () => {
     const result = dedupeEventsByListingGroup([cinderellaNight1, cinderellaNight2, comedy]);
-    expect(result.map((item) => item.event.title)).toEqual(["CMT Presents Cinderella", "Nate Bargatze"]);
+    expect(result.map((item) => item.event.title)).toEqual([
+      "CMT Presents Cinderella",
+      "Nate Bargatze"
+    ]);
   });
 
   it("collapses differently titled siblings that share a seriesId", () => {
@@ -197,7 +258,10 @@ describe("diversifyHomepageFeatured", () => {
 
   it("keeps one Cinderella night when seriesIds differ", () => {
     const result = diversifyHomepageFeatured([cinderellaNight1, cinderellaNight2, comedy]);
-    expect(result.map((item) => item.event.title)).toEqual(["CMT Presents Cinderella", "Nate Bargatze"]);
+    expect(result.map((item) => item.event.title)).toEqual([
+      "CMT Presents Cinderella",
+      "Nate Bargatze"
+    ]);
   });
 
   it("keeps one Shakira night when both share a seriesId despite title/venue drift", () => {

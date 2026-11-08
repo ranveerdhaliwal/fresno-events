@@ -127,7 +127,7 @@ export async function runIngest(env: IngestEnv, options: RunOptions = {}): Promi
     })
   );
 
-  const runCtx: RunOneContext = { now, userAgent, supabase };
+  const runCtx: RunOneContext = { now, userAgent, supabase, skipEnrichment: options.skipEnrichment ?? false };
   if (options.dryRun) {
     runCtx.dryRun = true;
   }
@@ -287,6 +287,7 @@ function parsePositiveInt(value: string | undefined, fallback: number) {
 }
 
 interface RunOneContext {
+  skipEnrichment?: boolean;
   now: Date;
   userAgent: string;
   supabase: ReturnType<typeof getSupabaseConfig>;
@@ -337,7 +338,7 @@ async function runOne(
     })
   );
 
-  const scrapeConfig: Record<string, unknown> = { ...plan.config };
+  const scrapeConfig: Record<string, unknown> = { ...plan.config, skipEnrichment: ctx.skipEnrichment ?? false };
   if (ctx.venueFilter?.length && plan.key === "venue-ingest") {
     scrapeConfig.venues = ctx.venueFilter;
   }

@@ -14,6 +14,84 @@ const TOWER_DETAIL_HTML = `
 `;
 
 describe("enrichApiVenueEventsWithDetailPrices", () => {
+  it("retains a detail description even when the venue advertises no prices", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            `<script type="application/ld+json">${JSON.stringify({
+              "@type": "MusicEvent",
+              name: "YG",
+              startDate: "2026-11-02T03:00:00Z",
+              location: { name: "Save Mart Center" },
+              description: "YG performs with special guests."
+            })}</script>`
+          )
+      )
+    );
+    const result = await enrichApiVenueEventsWithDetailPrices(
+      [
+        {
+          source: "scrape:www.savemartcenter.com",
+          sourceEventId: "yg",
+          title: "YG",
+          venueName: "Save Mart Center",
+          startTs: "2026-11-02T03:00:00Z",
+          category: "music",
+          externalUrl: "https://www.savemartcenter.com/event/yg/"
+        }
+      ],
+      {
+        key: "save-mart",
+        label: "Save Mart Center",
+        enabled: true,
+        strategy: "api",
+        listingUrl: "https://www.savemartcenter.com/events-tickets/",
+        detailMode: "plain_html"
+      },
+      "test-agent"
+    );
+    expect(result.events[0]?.descriptionText).toBe("YG performs with special guests.");
+    expect(result.events[0]?.priceMin).toBeUndefined();
+    expect(result.events[0]?.startTs).toBe("2026-11-02T03:00:00Z");
+    vi.unstubAllGlobals();
+  });
+  it("keeps the API date when a detail page has no date metadata", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            '<h1>YG</h1><meta property="og:description" content="YG performs live at Save Mart Center.">'
+          )
+      )
+    );
+    const result = await enrichApiVenueEventsWithDetailPrices(
+      [
+        {
+          source: "scrape:www.savemartcenter.com",
+          sourceEventId: "yg",
+          title: "YG",
+          venueName: "Save Mart Center",
+          startTs: "2026-11-02T03:00:00Z",
+          category: "music",
+          externalUrl: "https://www.savemartcenter.com/event/yg/"
+        }
+      ],
+      {
+        key: "save-mart",
+        label: "Save Mart Center",
+        enabled: true,
+        strategy: "api",
+        listingUrl: "https://www.savemartcenter.com/events-tickets/",
+        detailMode: "plain_html"
+      },
+      "test-agent"
+    );
+    expect(result.events[0]?.startTs).toBe("2026-11-02T03:00:00Z");
+    vi.unstubAllGlobals();
+  });
   it("merges JSON-LD prices from venue detail pages for API listings", async () => {
     const fetchMock = vi.fn(async () => new Response(TOWER_DETAIL_HTML, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

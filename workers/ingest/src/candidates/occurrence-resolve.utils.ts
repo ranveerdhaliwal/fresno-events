@@ -2,6 +2,8 @@ import type { NormalizedEvent } from "@fresno-events/shared";
 import {
   computeOccurrenceFingerprints,
   isStrongCrossSourceTitleMatch,
+  normalizeVenue,
+  isUtcNoonAllDaySentinel,
   scoreTitleSimilarity,
   sourcePriorityRank,
   venueDateLookupKey
@@ -70,7 +72,9 @@ function rankPrimary(a: OccurrenceMatchCandidate, b: OccurrenceMatchCandidate): 
   return a.created_at.localeCompare(b.created_at);
 }
 
-export function pickPrimaryCandidate(candidates: OccurrenceMatchCandidate[]): OccurrenceMatchCandidate | null {
+export function pickPrimaryCandidate(
+  candidates: OccurrenceMatchCandidate[]
+): OccurrenceMatchCandidate | null {
   const pool = candidates.filter(
     (row) => row.canonical_candidate_id === null && ACTIVE_PRIMARY_STATUSES.has(row.status)
   );
@@ -125,6 +129,27 @@ function collectFuzzyTitleMatches(
     if (candidateKey(row.source, row.source_event_id) === selfKey) {
       continue;
     }
+    if (
+      event.sourceEventId.startsWith("venue:big-fresno-fair:") &&
+      row.source_event_id.startsWith("venue:big-fresno-fair:")
+    )
+      continue;
+    // The fair has multiple separately scheduled sets by the same act each day.
+    // Fuzzy title matching must not undo its precise performance fingerprints.
+    if (
+      normalizeVenue(event.venueName) === "big-fresno-fair" &&
+      Date.parse(event.startTs) !== Date.parse(row.start_ts)
+    )
+      continue;
+    const flexibleIncoming = event.timeUnknown === true || isUtcNoonAllDaySentinel(event.startTs);
+    const flexiblePeer = row.time_unknown === true || isUtcNoonAllDaySentinel(row.start_ts);
+    // Shared artist words cannot join separate timed performances hours apart.
+    if (
+      !flexibleIncoming &&
+      !flexiblePeer &&
+      Math.abs(Date.parse(event.startTs) - Date.parse(row.start_ts)) > 60 * 60 * 1000
+    )
+      continue;
     const score = scoreTitleSimilarity(event.title, row.title);
     if (isStrongCrossSourceTitleMatch(score)) {
       matches.push(row);
@@ -183,13 +208,36 @@ export async function resolveOccurrenceForPersist(
   const selfKey = candidateKey(input.event.source, input.event.sourceEventId);
 
   if (input.existingOccurrenceId) {
-    const siblings = input.matchIndex.candidatesByOccurrenceId.get(input.existingOccurrenceId) ?? [];
-    const group = siblings.length > 0 ? siblings : [];
+    const siblings =
+      input.matchIndex.candidatesByOccurrenceId.get(input.existingOccurrenceId) ?? [];
+    const group = siblings.filter(
+      (row) =>
+        normalizeVenue(input.event.venueName) !== "big-fresno-fair" ||
+        Date.parse(row.start_ts) === Date.parse(input.event.startTs)
+    );
     const primary = pickPrimaryCandidate(group) ?? group[0] ?? null;
-    const published = findScheduledEvent(input.matchIndex, input.existingOccurrenceId, occurrenceKey);
+    const published = findScheduledEvent(
+      input.matchIndex,
+      input.existingOccurrenceId,
+      occurrenceKey
+    );
     const isSelfReingest =
       Boolean(input.existingId) &&
       (primary?.id === input.existingId || !group.some((row) => row.id !== input.existingId));
+
+    if (
+      normalizeVenue(input.event.venueName) === "big-fresno-fair" &&
+      siblings.some((row) => Date.parse(row.start_ts) !== Date.parse(input.event.startTs))
+    ) {
+      // Old day-level relinking may have left different performances with one ID.
+      // Resolve afresh rather than retaining that poisoned identity on reingest.
+      return resolveOccurrenceForPersist({
+        ...input,
+        existingOccurrenceId: null,
+        existingCanonicalCandidateId: null,
+        existingMatchedEventId: null
+      });
+    }
 
     return finalizeOccurrenceFields({
       ...input,
@@ -198,16 +246,37 @@ export async function resolveOccurrenceForPersist(
       urlKey,
       matchStep: "new",
       group,
-      primary: isSelfReingest ? (primary && primary.id === input.existingId ? primary : null) : primary,
+      primary: isSelfReingest
+        ? primary && primary.id === input.existingId
+          ? primary
+          : null
+        : primary,
       published,
       forceSelfPrimary: isSelfReingest
     });
   }
 
-  const { group, step } = collectCandidatesForMatch(input.matchIndex, fingerprints, urlKey, input.event);
-  const externalGroup = group.filter(
+  const { group, step } = collectCandidatesForMatch(
+    input.matchIndex,
+    fingerprints,
+    urlKey,
+    input.event
+  );
+  let externalGroup = group.filter(
     (row) => candidateKey(row.source, row.source_event_id) !== selfKey
   );
+  if (
+    input.event.sourceEventId.startsWith("venue:big-fresno-fair:") &&
+    externalGroup.some((row) => {
+      const siblings = input.matchIndex.candidatesByOccurrenceId.get(row.occurrence_id) ?? [row];
+      return siblings.some(
+        (sibling) =>
+          sibling.source_event_id.startsWith("venue:big-fresno-fair:") &&
+          sibling.source_event_id !== input.event.sourceEventId
+      );
+    })
+  )
+    externalGroup = [];
 
   if (externalGroup.length === 0) {
     const occurrenceId = crypto.randomUUID();
@@ -302,6 +371,9 @@ function finalizeOccurrenceFields(
       })
     );
   }
+
+  // Linking provenance must not undo a reviewed rejection or an ingest exclusion.
+  if (input.baseStatus === "rejected") statusOverride = "rejected";
 
   return {
     occurrenceId: input.occurrenceId,

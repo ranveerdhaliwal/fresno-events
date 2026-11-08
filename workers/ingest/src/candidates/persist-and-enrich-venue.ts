@@ -24,7 +24,8 @@ export async function persistAndEnrichVenueEvents(
   env: IngestEnv,
   runId: string,
   events: NormalizedEvent[],
-  sourceFilter: string
+  sourceFilter: string,
+  options: { skipEnrichment?: boolean } = {}
 ): Promise<PersistAndEnrichVenueResult> {
   if (events.length === 0) {
     return {
@@ -60,6 +61,13 @@ export async function persistAndEnrichVenueEvents(
       persistence
     })
   );
+
+  // The full workflow runs detail and enrichment once after collection. Honor
+  // --no-enrich here too, avoiding repeated queue scans and provider calls.
+  if (options.skipEnrichment) {
+    return { persistence, sourceFilter, enrichment: null,
+      audit: persistence.persisted ? (persistence.audit ?? null) : null, events: eventsWithSeries };
+  }
 
   const eventbriteLimit = Math.min(Math.max(events.length, 5), 20);
   const eventbriteSummary = await runEventbriteDetailBackfill(env, {

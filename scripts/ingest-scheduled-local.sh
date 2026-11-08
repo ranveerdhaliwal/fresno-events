@@ -91,12 +91,12 @@ run_promote_step() {
 
 run_promote_step "promote-ticketmaster" "" pnpm ingest:promote --source=ticketmaster --no-enrich
 run_promote_step "promote-venunite" "" pnpm ingest:promote --source=venunite --no-enrich
-run_promote_step "promote-all" "venue-ingest" pnpm ingest:promote-all --no-enrich
+run_promote_step "promote-all" "venue-ingest" pnpm ingest:promote-all --venues-only --no-enrich
 if run_step pnpm ingest:post-promote; then
   scheduled_record_step "post-promote" "ok" "detail-backfill, enrich, reject-exclusions, addresses"
 else
   scheduled_record_step "post-promote" "failed" ""
-  exit 1
+  echo "[scheduled] Post-promote incomplete. Continuing maintenance previews and the quality report." >&2
 fi
 
 # shellcheck source=scripts/ingest-scheduled-maintenance.sh
@@ -107,6 +107,11 @@ source "$REPO_ROOT/scripts/ingest-lib.sh"
 if [[ "${INGEST_SCHEDULED_SKIP_MAINTENANCE:-}" != "1" ]]; then
   scheduled_run_relink_maintenance || true
   scheduled_run_orphan_maintenance || true
+  if run_step node "$REPO_ROOT/scripts/review-event-quality.mjs" --out="$LOG_DIR/run-${STAMP}-quality.json"; then
+    scheduled_record_step "event-quality" "ok" "duplicate, series, coordinates and venue checks saved"
+  else
+    scheduled_record_step "event-quality" "failed" "audit request or report failed"
+  fi
 else
   echo "[scheduled] Skipping relink + orphan maintenance (INGEST_SCHEDULED_SKIP_MAINTENANCE=1)"
   scheduled_record_step "maintenance" "skipped" "INGEST_SCHEDULED_SKIP_MAINTENANCE=1"

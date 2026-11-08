@@ -50,6 +50,114 @@ function row(input: {
 }
 
 describe("computeRelinkPatches", () => {
+  it("keeps all separately timed Fair sets under one parent, even within a 30-minute bucket", async () => {
+    const common = {
+      venueName: "Big Fresno Fair",
+      externalUrl: "https://www.fresnofair.com/events/2026/kids-town",
+      seriesId: "series:bigfresnofair:2026",
+      seriesName: "Big Fresno Fair"
+    };
+    const rows = ["21:05", "21:15", "21:25", "23:15"].map((clock, i) =>
+      row({
+        id: `fair-${i}`,
+        source: "scrape:www.fresnofair.com",
+        title: "Kids Town Dance Party",
+        source_event_id: `venue:big-fresno-fair:${4001 + i}:2026-10-15`,
+        status: i ? "duplicate" : "pending_review",
+        canonical_candidate_id: i ? "fair-0" : null,
+        normalized_event: { ...common, startTs: `2026-10-15T${clock}:00.000Z` }
+      })
+    );
+    rows.push(
+      row({
+        id: "unknown",
+        source: "api:visitfresnocounty",
+        title: "Kids Town Dance Party",
+        normalized_event: {
+          ...common,
+          startTs: "2026-10-15T12:00:00.000Z",
+          timeUnknown: true
+        }
+      })
+    );
+    const { patches } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
+    expect(new Set(patches.map((p) => p.occurrence_id)).size).toBe(5);
+    expect(
+      patches.every((p) => p.canonical_candidate_id === null && p.status === "pending_review")
+    ).toBe(true);
+    expect(rows.every((r) => r.normalized_event.seriesId === "series:bigfresnofair:2026")).toBe(
+      true
+    );
+  });
+  it("still links the same timed Fair performance from two sources", async () => {
+    const normalized_event = {
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-15T21:15:00.000Z",
+      ticketUrl: "https://www.ticketmaster.com/event/FAIR123"
+    };
+    const { patches } = await computeRelinkPatches(
+      [
+        row({
+          id: "fair",
+          source: "scrape:www.fresnofair.com",
+          source_event_id: "venue:big-fresno-fair:4001:2026-10-15",
+          title: "Artist",
+          normalized_event
+        }),
+        row({
+          id: "tm",
+          source: "ticketmaster",
+          title: "Artist",
+          normalized_event: {
+            ...normalized_event,
+            venueName: "Paul Paul Theatre"
+          }
+        })
+      ],
+      [],
+      { crossSourceDedupe: true }
+    );
+    expect(new Set(patches.map((p) => p.occurrence_id)).size).toBe(1);
+    expect(patches.find((p) => p.id === "fair")?.canonical_candidate_id).toBe("tm");
+  });
+  it("does not merge distinct same-time Fair CMS listings through a third shared ticket source", async () => {
+    const normalized_event = {
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-15T21:15:00.000Z",
+      ticketUrl: "https://www.ticketmaster.com/event/FAIR123"
+    };
+    const { patches } = await computeRelinkPatches(
+      [
+        row({
+          id: "fair-a",
+          source: "scrape:www.fresnofair.com",
+          source_event_id: "venue:big-fresno-fair:4001:2026-10-15",
+          title: "Artist",
+          normalized_event
+        }),
+        row({
+          id: "fair-b",
+          source: "scrape:www.fresnofair.com",
+          source_event_id: "venue:big-fresno-fair:4002:2026-10-15",
+          title: "Artist",
+          normalized_event
+        }),
+        row({
+          id: "tm",
+          source: "ticketmaster",
+          title: "Artist",
+          normalized_event
+        })
+      ],
+      [],
+      { crossSourceDedupe: true }
+    );
+    expect(patches.find((p) => p.id === "fair-a")?.occurrence_id).not.toBe(
+      patches.find((p) => p.id === "fair-b")?.occurrence_id
+    );
+  });
   it("links Miss California rows across title variants and prefers ticketmaster", async () => {
     const rows = [
       row({
@@ -73,7 +181,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches, summary } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches, summary } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const byId = new Map(patches.map((patch) => [patch.id, patch]));
 
     expect(summary.multi_source_groups).toBe(1);
@@ -99,7 +209,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches, summary } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches, summary } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const main = patches.find((patch) => patch.id === "main");
     const teen = patches.find((patch) => patch.id === "teen");
 
@@ -124,7 +236,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches, summary } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches, summary } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
 
     expect(summary.skipped_rejected).toBe(1);
     expect(summary.relinkable).toBe(1);
@@ -149,7 +263,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const tm = patches.find((patch) => patch.id === "tm");
 
     expect(tm?.status).toBe("pending_review");
@@ -184,7 +300,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches, summary } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches, summary } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const byId = new Map(patches.map((patch) => [patch.id, patch]));
 
     expect(summary.multi_source_groups).toBe(1);
@@ -223,7 +341,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches, summary } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches, summary } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const tm = patches.find((patch) => patch.id === "tm");
 
     expect(summary.priority_inherited).toBe(1);
@@ -269,7 +389,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const byId = new Map(patches.map((patch) => [patch.id, patch]));
 
     expect(byId.get("tm-16")?.occurrence_id).toBe(byId.get("visit-16")?.occurrence_id);
@@ -299,7 +421,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const byId = new Map(patches.map((patch) => [patch.id, patch]));
 
     expect(byId.get("visit-17")?.status).toBe("approved");
@@ -325,7 +449,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const one = patches.find((patch) => patch.id === "night-one");
     const two = patches.find((patch) => patch.id === "night-two");
 
@@ -352,9 +478,13 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const changedIds = new Set(patches.map((patch) => patch.id));
-    const summary = summarizeRelinkLinkGroups(rows, patches, changedIds, { crossSourceDedupe: true });
+    const summary = summarizeRelinkLinkGroups(rows, patches, changedIds, {
+      crossSourceDedupe: true
+    });
 
     expect(summary.link_groups).toBe(1);
     expect(summary.link_groups_changed).toBe(1);
@@ -391,7 +521,9 @@ describe("computeRelinkPatches", () => {
       })
     ];
 
-    const { patches } = await computeRelinkPatches(rows, [], { crossSourceDedupe: true });
+    const { patches } = await computeRelinkPatches(rows, [], {
+      crossSourceDedupe: true
+    });
     const tmPatch = patches.find((patch) => patch.id === "tm");
 
     expect(tmPatch?.canonical_candidate_id).toBe("primary");

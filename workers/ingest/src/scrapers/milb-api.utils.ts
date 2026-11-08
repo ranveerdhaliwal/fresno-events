@@ -119,6 +119,7 @@ export function toNormalizedEvents(schedule: MilbSchedule): NormalizedEvent[] {
       const opponent = away.name;
       const title = `Fresno Grizzlies vs ${opponent}`;
       const venue = resolveMilbVenue(game, true, opponent);
+      const seasonYear = (game.officialDate ?? game.gameDate).slice(0, 4);
 
       events.push({
         source: "api:milb",
@@ -133,8 +134,8 @@ export function toNormalizedEvents(schedule: MilbSchedule): NormalizedEvent[] {
         imageUrl: GRIZZLIES_DEFAULT_IMAGE_URL,
         showVenueLogoInList: true,
         listVenueLogoPadding: 10,
-        seriesId: GRIZZLIES_SEASON_SERIES_ID,
-        seriesName: GRIZZLIES_SEASON_SERIES_NAME
+        seriesId: `series:milb-grizzlies:${seasonYear}`,
+        seriesName: `Fresno Grizzlies ${seasonYear}`
       });
     }
   }

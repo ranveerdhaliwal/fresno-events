@@ -67,7 +67,10 @@ export function resolveStatusOnRescrape(
     return "duplicate";
   }
 
-  if (existing.status === "approved" && existing.matched_event_id) {
+  if (
+    (existing.status === "approved" || existing.status === "needs_changes") &&
+    existing.matched_event_id
+  ) {
     return "needs_changes";
   }
 

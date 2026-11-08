@@ -151,3 +151,25 @@ ingest_resolve_user_source() {
   eval "$resolved"
   export INGEST_DISPLAY_SOURCE INGEST_SCRAPER INGEST_VENUE_FILTER
 }
+
+# A shared-package build can trigger several Wrangler watch reloads. Require a
+# stable health window before the next maintenance request reaches the worker.
+ingest_wait_for_worker_ready() {
+  local port="${1:-${INGEST_PORT:-8788}}"
+  local consecutive=0 attempt
+  echo "[ingest] Waiting for stable worker health on :${port}" >&2
+  for attempt in $(seq 1 45); do
+    if curl -fsS --connect-timeout 1 --max-time 2 "http://127.0.0.1:${port}/health" >/dev/null 2>&1; then
+      consecutive=$((consecutive + 1))
+      if [[ "$consecutive" -ge 3 ]]; then
+        echo "[ingest] Worker ready after ${attempt} health checks" >&2
+        return 0
+      fi
+    else
+      consecutive=0
+    fi
+    sleep 1
+  done
+  echo "[ingest] Worker did not stabilize on :${port}; maintenance was not sent." >&2
+  return 1
+}

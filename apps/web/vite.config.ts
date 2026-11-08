@@ -1,9 +1,15 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { assertProductionApiUrl } from "./build/production-api";
 
-export default defineConfig({
+export default defineConfig(({ command, mode }) => {
+  if (command === "build" && mode === "production") {
+    const env = loadEnv(mode, process.cwd(), "VITE_");
+    assertProductionApiUrl(process.env.VITE_API_URL ?? env.VITE_API_URL);
+  }
+  return {
   resolve: {
     alias: {
       "@": new URL("./src", import.meta.url).pathname
@@ -50,4 +56,5 @@ export default defineConfig({
       }
     }
   }
+  };
 });

@@ -55,14 +55,19 @@ export function toNormalizedEvent(event: TicketmasterEvent): NormalizedEvent[] {
   const category = toCategory(event.classifications?.[0]);
   const venueLat = readCoordinate(venue.location?.latitude);
   const venueLng = readCoordinate(venue.location?.longitude);
+  const access = event.dates?.access?.startDateTime;
+  const doorsTs = access && Number.isFinite(Date.parse(access)) && Date.parse(access) <= Date.parse(startTs)
+    ? access : undefined;
+  const cancelled = /^(cancelled|canceled)$/i.test(event.dates?.status?.code ?? "");
 
   return [
     {
       source: "ticketmaster",
       sourceEventId: event.id,
-      title: event.name,
+      title: cancelled && !/^cancelled|^canceled/i.test(event.name) ? `CANCELLED - ${event.name}` : event.name,
       venueName: venue.name,
       startTs,
+      ...(doorsTs ? { doorsTs } : {}),
       timezone: event.dates?.timezone ?? "America/Los_Angeles",
       category,
       subcategories:

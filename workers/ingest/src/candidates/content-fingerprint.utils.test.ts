@@ -61,6 +61,11 @@ describe("content-fingerprint.utils", () => {
     expect(resolveStatusOnRescrape(existing, "new")).toBe("needs_changes");
   });
 
+  it("keeps an unpublished update in needs_changes when the source changes again", () => {
+    const existing = existingRow({ status: "needs_changes", content_fingerprint: "old" });
+    expect(resolveStatusOnRescrape(existing, "new")).toBe("needs_changes");
+  });
+
   it("resolveStatusOnRescrape keeps linked secondaries duplicate when content changes", () => {
     const existing = existingRow({
       content_fingerprint: "old",

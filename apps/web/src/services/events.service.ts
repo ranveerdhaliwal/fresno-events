@@ -1,5 +1,7 @@
 import {
   resolvePacificDateWindow,
+  pacificStartOfDay,
+  pacificEndOfDay,
   type ApiResponse,
   type CalendarMonthResponse,
   type EventDetailResponse,
@@ -11,11 +13,18 @@ import {
 } from "@fresno-events/shared";
 
 import { getMockEventBySlug, getMockEventList } from "@/services/events.mock";
-import type { EventDetailResult, EventListResult, HomepageCurationResult } from "@/services/events.types";
+import type {
+  EventDetailResult,
+  EventListResult,
+  HomepageCurationResult
+} from "@/services/events.types";
 
-export async function listDayEvents(isoDate: string, signal?: AbortSignal): Promise<EventListResult> {
-  const from = new Date(`${isoDate}T00:00:00-07:00`);
-  const until = new Date(`${isoDate}T23:59:59.999-07:00`);
+export async function listDayEvents(
+  isoDate: string,
+  signal?: AbortSignal
+): Promise<EventListResult> {
+  const from = pacificStartOfDay(isoDate);
+  const until = new Date(pacificEndOfDay(isoDate).getTime() + 1);
   return listEvents({ from, until, limit: 100, ...(signal ? { signal } : {}) });
 }
 
@@ -55,7 +64,10 @@ export async function listWeekThroughSunday(signal?: AbortSignal): Promise<Event
   });
 }
 
-export async function listSeriesEvents(seriesId: string, signal?: AbortSignal): Promise<EventListResult> {
+export async function listSeriesEvents(
+  seriesId: string,
+  signal?: AbortSignal
+): Promise<EventListResult> {
   const apiUrl = getApiUrl();
   if (!apiUrl) {
     return createMockResult({});
@@ -65,19 +77,27 @@ export async function listSeriesEvents(seriesId: string, signal?: AbortSignal): 
     const url = new URL("/events", apiUrl);
     url.searchParams.set("series_id", seriesId);
     url.searchParams.set("limit", "50");
-    const response = await fetch(url, createRequestInit(signal));
-    if (!response.ok) {
-      throw new Error(`Events API responded with ${response.status}`);
-    }
-    const payload = (await response.json()) as ApiResponse<EventListResponse>;
-    if (!payload.ok) {
-      throw new Error(payload.error.message);
+    const items: EventListItem[] = [];
+    const seenCursors = new Set<string>();
+    let generatedAt = "";
+    while (true) {
+      const response = await fetch(url, createRequestInit(signal));
+      if (!response.ok) throw new Error(`Events API responded with ${response.status}`);
+      const payload = (await response.json()) as ApiResponse<EventListResponse>;
+      if (!payload.ok) throw new Error(payload.error.message);
+      items.push(...payload.data.items);
+      generatedAt = payload.data.generatedAt;
+      const cursor = payload.data.nextCursor;
+      if (!cursor) break;
+      if (seenCursors.has(cursor)) throw new Error("Events API repeated a series cursor");
+      seenCursors.add(cursor);
+      url.searchParams.set("cursor", cursor);
     }
     return {
-      items: payload.data.items,
-      nextCursor: payload.data.nextCursor,
+      items,
+      nextCursor: null,
       source: "api",
-      generatedAt: payload.data.generatedAt
+      generatedAt
     };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -87,7 +107,9 @@ export async function listSeriesEvents(seriesId: string, signal?: AbortSignal): 
   }
 }
 
-export async function getEventSections(signal?: AbortSignal): Promise<EventSectionsResponse & { source: "api" | "mock" }> {
+export async function getEventSections(
+  signal?: AbortSignal
+): Promise<EventSectionsResponse & { source: "api" | "mock" }> {
   const apiUrl = getApiUrl();
   if (!apiUrl) {
     return createMockSectionsResult(signal);
@@ -118,28 +140,21 @@ export async function getCalendarMonth(
 ): Promise<CalendarMonthResponse & { source: "api" | "mock" }> {
   const apiUrl = getApiUrl();
   if (!apiUrl) {
-    return createMockCalendarResult(year, month);
+    throw new Error("The calendar API is not configured.");
   }
 
-  try {
-    const url = new URL("/events/calendar", apiUrl);
-    url.searchParams.set("year", String(year));
-    url.searchParams.set("month", String(month));
-    const response = await fetch(url, createRequestInit(signal));
-    if (!response.ok) {
-      throw new Error(`Calendar API responded with ${response.status}`);
-    }
-    const payload = (await response.json()) as ApiResponse<CalendarMonthResponse>;
-    if (!payload.ok) {
-      throw new Error(payload.error.message);
-    }
-    return { ...payload.data, source: "api" };
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw error;
-    }
-    return createMockCalendarResult(year, month);
+  const url = new URL("/events/calendar", apiUrl);
+  url.searchParams.set("year", String(year));
+  url.searchParams.set("month", String(month));
+  const response = await fetch(url, createRequestInit(signal));
+  if (!response.ok) {
+    throw new Error(`Calendar API responded with ${response.status}`);
   }
+  const payload = (await response.json()) as ApiResponse<CalendarMonthResponse>;
+  if (!payload.ok) {
+    throw new Error(payload.error.message);
+  }
+  return { ...payload.data, source: "api" };
 }
 
 export async function getVenueDetail(slug: string, signal?: AbortSignal) {
@@ -159,7 +174,10 @@ export async function getVenueDetail(slug: string, signal?: AbortSignal) {
   return payload.data;
 }
 
-export async function getEventDetail(slug: string, signal?: AbortSignal): Promise<EventDetailResult> {
+export async function getEventDetail(
+  slug: string,
+  signal?: AbortSignal
+): Promise<EventDetailResult> {
   const apiUrl = getApiUrl();
 
   if (!apiUrl) {
@@ -236,7 +254,10 @@ export async function getHomepageCuration(signal?: AbortSignal): Promise<Homepag
       throw error;
     }
 
-    console.warn("Falling back to mock homepage curation because the Events API is unavailable.", error);
+    console.warn(
+      "Falling back to mock homepage curation because the Events API is unavailable.",
+      error
+    );
     return createMockHomepageResult(signal);
   }
 }
@@ -362,23 +383,6 @@ async function createMockSectionsResult(signal?: AbortSignal) {
   };
 }
 
-function createMockCalendarResult(year: number, month: number): CalendarMonthResponse & { source: "mock" } {
-  const days = Array.from({ length: 35 }, (_, index) => {
-    const day = index + 1;
-    const isoDate = `${year}-${String(month).padStart(2, "0")}-${String(Math.min(day, 28)).padStart(2, "0")}`;
-    return { isoDate, total: 0, preview: [], hidden: 0 };
-  });
-
-  return {
-    year,
-    month,
-    days,
-    weeks: [],
-    generatedAt: new Date().toISOString(),
-    source: "mock"
-  };
-}
-
 function createMockDetailResult(slug: string): EventDetailResult {
   const item = getMockEventBySlug(slug);
 
@@ -390,11 +394,15 @@ function createMockDetailResult(slug: string): EventDetailResult {
     detail: {
       event: item.event,
       venue: item.venue,
-      ...(item.heroImage ? { heroImage: item.heroImage, galleryImages: [item.heroImage] } : { galleryImages: [] }),
+      ...(item.heroImage
+        ? { heroImage: item.heroImage, galleryImages: [item.heroImage] }
+        : { galleryImages: [] }),
       relatedEvents: getMockEventList()
         .filter((related) => related.event.id !== item.event.id)
         .slice(0, 3)
-        .map(({ event, venue, heroImage }) => (heroImage ? { event, venue, heroImage } : { event, venue }))
+        .map(({ event, venue, heroImage }) =>
+          heroImage ? { event, venue, heroImage } : { event, venue }
+        )
     },
     item,
     source: "mock",
