@@ -1,0 +1,20 @@
+{
+  "William Saroyan Theatre": {
+    "address": "730 M Street",
+    "city": "Fresno",
+    "lat": 36.7342117,
+    "lng": -119.7838906
+  },
+  "Warkentine Culture & Arts Center": {
+    "address": "Warkentine Culture and Arts Center, 1717 S Chestnut Ave",
+    "city": "Fresno",
+    "lat": 36.7283435,
+    "lng": -119.7346655
+  },
+  "Paul Shaghoian Concert Hall": {
+    "address": "2770 E International Ave",
+    "city": "Fresno",
+    "lat": 36.8905677,
+    "lng": -119.734641
+  }
+}

@@ -7,6 +7,7 @@ export interface OccurrenceMatchCandidate {
   title: string;
   venue_name: string;
   start_ts: string;
+  time_unknown?: boolean | null;
   status: string;
   matched_event_id: string | null;
   occurrence_id: string;

@@ -98,15 +98,18 @@ async function fingerprintKeys(event: NormalizedEvent): Promise<{
 }> {
   const fp = await computeOccurrenceFingerprints(event);
   const occurrenceKey =
-    fp.occurrenceKey ||
-    (await computeOccurrenceKey(event.title, event.startTs, event.venueName));
-  const looseKey = await computeLooseOccurrenceKey(event.title, event.startTs, event.venueName);
+    fp.occurrenceKey || (await computeOccurrenceKey(event.title, event.startTs, event.venueName));
+  const looseKey = event.sourceEventId.startsWith("venue:big-fresno-fair:")
+    ? null
+    : await computeLooseOccurrenceKey(event.title, event.startTs, event.venueName);
   const all = [occurrenceKey, looseKey].filter((key): key is string => Boolean(key));
   return { occurrenceKey, looseKey, all };
 }
 
 /** Collapse accidental within-batch duplicates before validation/persist (all scrapers). */
-export async function dedupeScrapeBatch(events: NormalizedEvent[]): Promise<ScrapeBatchDedupeResult> {
+export async function dedupeScrapeBatch(
+  events: NormalizedEvent[]
+): Promise<ScrapeBatchDedupeResult> {
   const uniqueBySource = dedupeBySourceEventId(events);
   const kept: KeptEntry[] = [];
   const duplicates: PersistAuditItemBatchDuplicate[] = [];

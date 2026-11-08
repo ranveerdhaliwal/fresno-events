@@ -5,11 +5,32 @@ import {
   buildNextPacificMonths,
   daysFromIsoThroughSunday,
   isoDateInPacificMonth,
+  pacificStartOfDay,
+  pacificEndOfDay,
+  pacificMonthBounds,
   resolvePacificDateWindow,
   upcomingSundayIso
 } from "./pacific-date-ranges.js";
 
 describe("pacific-date-ranges", () => {
+  it.each([
+    ["2026-06-07", "2026-06-07T07:00:00.000Z"],
+    ["2026-01-09", "2026-01-09T08:00:00.000Z"],
+    ["2026-03-08", "2026-03-08T08:00:00.000Z"],
+    ["2026-11-01", "2026-11-01T07:00:00.000Z"]
+  ])("resolves actual Pacific midnight for %s", (date, expected) => {
+    expect(pacificStartOfDay(date).toISOString()).toBe(expected);
+  });
+  it("covers 23-hour and 25-hour daylight-saving days", () => {
+    expect(pacificEndOfDay("2026-03-08").getTime() + 1 - pacificStartOfDay("2026-03-08").getTime()).toBe(23 * 3600000);
+    expect(pacificEndOfDay("2026-11-01").getTime() + 1 - pacificStartOfDay("2026-11-01").getTime()).toBe(25 * 3600000);
+  });
+  it("includes the last Pacific evening of November across the UTC month boundary", () => {
+    const bounds = pacificMonthBounds(2026, 11);
+    expect(bounds.from.toISOString()).toBe("2026-11-01T07:00:00.000Z");
+    expect(bounds.until.toISOString()).toBe("2026-12-01T07:59:59.999Z");
+    expect(new Date("2026-12-01T04:00:00Z").getTime()).toBeLessThan(bounds.until.getTime());
+  });
   it("finds upcoming Sunday from Wednesday", () => {
     expect(upcomingSundayIso("2026-06-03")).toBe("2026-06-07");
   });

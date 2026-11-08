@@ -51,13 +51,25 @@ if [[ "$DRY_RUN" == "true" ]]; then
 fi
 
 run_step bash "$REPO_ROOT/scripts/ingest-detail-backfill.sh" "${DETAIL_ARGS[@]}"
-run_step bash "$REPO_ROOT/scripts/ingest-enrich.sh" "${ENRICH_ARGS[@]}"
+ENRICH_FAILED=0
+if ! run_step bash "$REPO_ROOT/scripts/ingest-enrich.sh" "${ENRICH_ARGS[@]}"; then
+  ENRICH_FAILED=1
+  echo "Enrichment incomplete. Continuing exclusions and address checks." >&2
+fi
 if [[ "$DRY_RUN" != "true" ]]; then
   run_step bash "$REPO_ROOT/scripts/review-reject-exclusions.sh" --apply
 else
   run_step bash "$REPO_ROOT/scripts/review-reject-exclusions.sh" --dry-run
 fi
+# reject-exclusions rebuilds shared; let Wrangler finish reacting to those files.
+# shellcheck source=scripts/ingest-lib.sh
+source "$REPO_ROOT/scripts/ingest-lib.sh"
+run_step ingest_wait_for_worker_ready "$PORT"
 run_step bash "$REPO_ROOT/scripts/backfill-venue-addresses.sh" "${ADDRESS_ARGS[@]}"
 
 echo ""
 echo "Post-promote complete (detail-backfill, enrich, reject-exclusions, venue-address backfill)."
+if [[ "$ENRICH_FAILED" -eq 1 ]]; then
+  echo "Post-promote finished with pending AI enrichment." >&2
+  exit 1
+fi

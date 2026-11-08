@@ -1,0 +1,13 @@
+{
+  "key": "fresno-library",
+  "promoteSource": "fresnolibrary",
+  "label": "Fresno County Public Library",
+  "enabled": true,
+  "strategy": "api",
+  "listingUrl": "https://fresnolibrary.libcal.com/calendar",
+  "eventSource": "api:fresno-library",
+  "sourceHostname": "fresnolibrary.libcal.com",
+  "ingestLane": "direct",
+  "detailMode": "api_embedded",
+  "minEventsWarn": 1
+}

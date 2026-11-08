@@ -25,8 +25,8 @@ const VENUE_ALIASES: Record<string, string> = {
   "save-mart-center-at-fresno-state": "save-mart-center",
   "save-mart-center-at-fresno-state-smg": "save-mart-center",
   "fresno-convention-entertainment-center": "fresno-convention-center",
-  "fcc": "fresno-convention-center",
-  "strummers": "strummers-club",
+  fcc: "fresno-convention-center",
+  strummers: "strummers-club",
   "strummer-s": "strummers-club",
   "strummers-club-fresno": "strummers-club",
   "warnors-center": "warnors-theatre",
@@ -38,6 +38,7 @@ const VENUE_ALIASES: Record<string, string> = {
   "historic-crest-theatre": "crest-theatre",
   "the-crest-theatre-fresno": "crest-theatre",
   "tower-theatre-for-the-performing-arts": "tower-theatre",
+  "tower-theatre-fresno": "tower-theatre",
   "tower-theatre-lounge": "tower-theatre-lounge",
   "paul-paul-theatre": "big-fresno-fair",
   "paul-paul-theater": "big-fresno-fair",
@@ -113,6 +114,13 @@ export function canonicalOccurrenceTitle(normalizedTitle: string): string {
       value = value.replace(pattern, "");
     }
     value = value.replace(/\s+/g, " ").trim();
+  }
+
+  // "morgan jay the goofy guy" (Tower tour title) vs "morgan jay" (Ticketmaster).
+  const tourSubtitleTail = /^([a-z]+(?:\s+[a-z]+))\s+the\s+[a-z0-9]+(?:\s+[a-z0-9]+)*$/.exec(value);
+  const headliner = tourSubtitleTail?.[1]?.trim();
+  if (headliner) {
+    value = headliner;
   }
 
   const missCalifornia = canonicalMissCaliforniaTitle(value);
@@ -194,9 +202,7 @@ export function adjacentPacificBucketKeys(bucketKey: string): string[] {
     const shifted = shiftPacificDate(date, minutes + delta);
     const hour = Math.floor(shifted.minutes / 60);
     const minute = shifted.minutes % 60;
-    keys.add(
-      `${shifted.date}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
-    );
+    keys.add(`${shifted.date}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
   }
 
   return [...keys];
@@ -208,7 +214,9 @@ export function isUtcNoonAllDaySentinel(startTs: string): boolean {
   if (Number.isNaN(instant.getTime())) {
     return false;
   }
-  return instant.getUTCHours() === 12 && instant.getUTCMinutes() === 0 && instant.getUTCSeconds() === 0;
+  return (
+    instant.getUTCHours() === 12 && instant.getUTCMinutes() === 0 && instant.getUTCSeconds() === 0
+  );
 }
 
 export function pacificDateFromStartTs(startTs: string): string | null {
@@ -298,6 +306,12 @@ export function normalizeListingUrl(url: string | undefined | null): string | nu
       return `ticketmaster.com/event/${ticketmasterEventId}`;
     }
 
+    // TicketWeb's numeric ID survives lineup/SEO-slug and promoter changes.
+    const ticketwebEventId = host === "ticketweb.com"
+      ? /^\/event\/(?:[^/]+\/)?(\d+)$/i.exec(path)?.[1]
+      : undefined;
+    if (ticketwebEventId) return `ticketweb.com/event/${ticketwebEventId}`;
+
     const eventbriteEventId = host.includes("eventbrite.com")
       ? /\/e\/[^/]*-(\d+)/i.exec(path)?.[1]
       : undefined;
@@ -321,13 +335,16 @@ export function normalizeListingUrl(url: string | undefined | null): string | nu
 }
 
 /** True when normalizeListingUrl encodes one performance (not a multi-night series landing page). */
-export function isUniquePerPerformanceListingUrl(normalizedUrl: string | null | undefined): boolean {
+export function isUniquePerPerformanceListingUrl(
+  normalizedUrl: string | null | undefined
+): boolean {
   if (!normalizedUrl) {
     return false;
   }
   return (
     /^ticketmaster\.com\/event\/[^/?#]+/.test(normalizedUrl) ||
-    /^eventbrite\.com\/e\/\d+/.test(normalizedUrl)
+    /^eventbrite\.com\/e\/\d+/.test(normalizedUrl) ||
+    /^ticketweb\.com\/event\/\d+$/.test(normalizedUrl)
   );
 }
 
@@ -365,7 +382,11 @@ export async function computeOccurrenceKey(
     return null;
   }
 
-  return sha256Hex(`${normalizedTitle}|${bucket}|${normalizedVenue}`);
+  // Fair acts can repeat within the same 30-minute bucket. The parent festival
+  // and a common artist name are not evidence that two timed sets are one show.
+  const performanceTime =
+    normalizedVenue === "big-fresno-fair" ? new Date(startTs).toISOString() : bucket;
+  return sha256Hex(`${normalizedTitle}|${performanceTime}|${normalizedVenue}`);
 }
 
 /** Batch dedupe only — collapses "Backyard 101" vs "Backyard101" at same time/venue. */
@@ -385,7 +406,9 @@ export async function computeLooseOccurrenceKey(
     return null;
   }
 
-  return sha256Hex(`loose|${looseTitle}|${bucket}|${normalizedVenue}`);
+  const performanceTime =
+    normalizedVenue === "big-fresno-fair" ? new Date(startTs).toISOString() : bucket;
+  return sha256Hex(`loose|${looseTitle}|${performanceTime}|${normalizedVenue}`);
 }
 
 export async function computeOccurrenceKeyForBucket(
@@ -412,12 +435,53 @@ export async function computeUrlKey(event: ListingUrls): Promise<string | null> 
 }
 
 export async function computeOccurrenceFingerprints(
-  event: ListingUrls & { title: string; startTs: string; venueName: string; timeUnknown?: boolean }
+  event: ListingUrls & {
+    title: string;
+    startTs: string;
+    venueName: string;
+    timeUnknown?: boolean;
+    sourceEventId?: string;
+  }
 ): Promise<OccurrenceFingerprints> {
   const bucket = pacificTimeBucketKey(event.startTs);
   const lookupBuckets = bucket ? adjacentPacificBucketKeys(bucket) : [];
   const occurrenceKeysForLookup: string[] = [];
   const flexible = isFlexiblePacificStartMatch(event.startTs, event.timeUnknown);
+
+  if (
+    event.sourceEventId?.startsWith("venue:big-fresno-fair:") &&
+    Number.isFinite(Date.parse(event.startTs))
+  ) {
+    // Distinct Saffire listings can even share an artist and time (different
+    // stages or conflicting source listings). Keep them reviewable separately.
+    const key = await sha256Hex(
+      `fair-performance|${event.sourceEventId}|${new Date(event.startTs).toISOString()}`
+    );
+    return {
+      occurrenceKey: key,
+      occurrenceKeysForLookup: [key],
+      dateOnlyOccurrenceKey: await computeDateOnlyOccurrenceKey(
+        event.title,
+        event.startTs,
+        event.venueName
+      ),
+      urlKey: await computeUrlKey(event)
+    };
+  }
+
+  if (normalizeVenue(event.venueName) === "big-fresno-fair" && !flexible) {
+    const key = await computeOccurrenceKey(event.title, event.startTs, event.venueName);
+    return {
+      occurrenceKey: key ?? "",
+      occurrenceKeysForLookup: key ? [key] : [],
+      dateOnlyOccurrenceKey: await computeDateOnlyOccurrenceKey(
+        event.title,
+        event.startTs,
+        event.venueName
+      ),
+      urlKey: await computeUrlKey(event)
+    };
+  }
 
   for (const bucketKey of lookupBuckets) {
     const key = await computeOccurrenceKeyForBucket(event.title, bucketKey, event.venueName);
@@ -432,7 +496,7 @@ export async function computeOccurrenceFingerprints(
     event.venueName
   );
 
-  if (dateOnlyOccurrenceKey) {
+  if (flexible && dateOnlyOccurrenceKey) {
     occurrenceKeysForLookup.push(dateOnlyOccurrenceKey);
   }
 
@@ -449,7 +513,9 @@ export async function computeOccurrenceFingerprints(
   }
 
   const preciseOccurrenceKey =
-    bucket !== null ? await computeOccurrenceKey(event.title, event.startTs, event.venueName) : null;
+    bucket !== null
+      ? await computeOccurrenceKey(event.title, event.startTs, event.venueName)
+      : null;
 
   const occurrenceKey =
     flexible && dateOnlyOccurrenceKey
@@ -489,7 +555,11 @@ export function sourcePriorityRank(source: string): number {
   return 10;
 }
 
-function getPacificDateTimeParts(instant: Date): { date: string; hour: number; minute: number } {
+function getPacificDateTimeParts(instant: Date): {
+  date: string;
+  hour: number;
+  minute: number;
+} {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: PACIFIC_TZ,
     year: "numeric",
@@ -500,7 +570,8 @@ function getPacificDateTimeParts(instant: Date): { date: string; hour: number; m
     hour12: false
   }).formatToParts(instant);
 
-  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "00";
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "00";
   return {
     date: `${get("year")}-${get("month")}-${get("day")}`,
     hour: Number(get("hour")),
@@ -508,7 +579,10 @@ function getPacificDateTimeParts(instant: Date): { date: string; hour: number; m
   };
 }
 
-function shiftPacificDate(dateYmd: string, totalMinutes: number): { date: string; minutes: number } {
+function shiftPacificDate(
+  dateYmd: string,
+  totalMinutes: number
+): { date: string; minutes: number } {
   let minutes = totalMinutes;
   let date = dateYmd;
 

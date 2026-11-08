@@ -1,0 +1,13 @@
+{
+  "key": "fresno-philharmonic",
+  "promoteSource": "fresnophilharmonic",
+  "label": "Fresno Philharmonic",
+  "enabled": true,
+  "strategy": "api",
+  "listingUrl": "https://fresnophil.org/upcoming-events/",
+  "eventSource": "scrape:fresnophil.org",
+  "sourceHostname": "fresnophil.org",
+  "ingestLane": "direct",
+  "detailMode": "api_embedded",
+  "minEventsWarn": 1
+}

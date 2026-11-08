@@ -28,8 +28,15 @@ import {
   toStringRecord
 } from "@/routes/review/mappers.utils";
 import { supabaseReviewRequest } from "@/routes/review/supabase.utils";
-import { fetchVenueCoordsByAddress, fetchVenueCoordsBySlug } from "@/routes/review/venue-preview.utils";
-import type { SupabaseEventRow, SupabaseEventWithVenueRow, SupabaseVenueRow } from "@/routes/review/types";
+import {
+  fetchVenueCoordsByAddress,
+  fetchVenueCoordsBySlug
+} from "@/routes/review/venue-preview.utils";
+import type {
+  SupabaseEventRow,
+  SupabaseEventWithVenueRow,
+  SupabaseVenueRow
+} from "@/routes/review/types";
 
 export function mapEventRow(row: SupabaseEventRow): Event {
   const lineup = parseLineup(row.lineup);
@@ -60,6 +67,7 @@ export function mapEventRow(row: SupabaseEventRow): Event {
     ...(row.last_verified_at ? { lastVerifiedAt: row.last_verified_at } : {}),
     ...(row.source_sync_id ? { sourceSyncId: row.source_sync_id } : {}),
     ...(row.end_ts ? { endTs: row.end_ts } : {}),
+    ...(row.doors_ts ? { doorsTs: row.doors_ts } : {}),
     ...(row.price_min !== null ? { priceMin: toNumber(row.price_min) } : {}),
     ...(row.price_max !== null ? { priceMax: toNumber(row.price_max) } : {}),
     ...(row.is_free !== null ? { isFree: row.is_free } : {}),
@@ -89,13 +97,27 @@ export async function upsertVenue(env: Env, event: NormalizedEvent) {
   };
 
   let lat =
-    typeof event.venueLat === "number" && Number.isFinite(event.venueLat) ? event.venueLat : undefined;
+    typeof event.venueLat === "number" && Number.isFinite(event.venueLat)
+      ? event.venueLat
+      : undefined;
   let lng =
-    typeof event.venueLng === "number" && Number.isFinite(event.venueLng) ? event.venueLng : undefined;
+    typeof event.venueLng === "number" && Number.isFinite(event.venueLng)
+      ? event.venueLng
+      : undefined;
+
+  // Some CMS feeds use (0,0) for an unmapped stage, not its physical location.
+  if (lat === 0 && lng === 0) {
+    lat = undefined;
+    lng = undefined;
+  }
 
   if (lat === undefined || lng === undefined) {
     const existing = await fetchVenueCoordsBySlug(env, venueSlug);
-    if (existing?.lat != null && existing?.lng != null) {
+    if (
+      existing?.lat != null &&
+      existing?.lng != null &&
+      !(existing.lat === 0 && existing.lng === 0)
+    ) {
       lat = existing.lat;
       lng = existing.lng;
     }
@@ -103,7 +125,7 @@ export async function upsertVenue(env: Env, event: NormalizedEvent) {
 
   if ((lat === undefined || lng === undefined) && address) {
     const byAddress = await fetchVenueCoordsByAddress(env, address, city);
-    if (byAddress) {
+    if (byAddress && !(byAddress.lat === 0 && byAddress.lng === 0)) {
       lat = byAddress.lat;
       lng = byAddress.lng;
     }
@@ -115,7 +137,10 @@ export async function upsertVenue(env: Env, event: NormalizedEvent) {
       if (geocoded) {
         lat = geocoded.lat;
         lng = geocoded.lng;
-        logStructured("venue_geocoded_on_upsert", { venueSlug, provider: geocoded.provider });
+        logStructured("venue_geocoded_on_upsert", {
+          venueSlug,
+          provider: geocoded.provider
+        });
       }
     } catch (error) {
       logStructured("venue_geocode_on_upsert_failed", {
@@ -132,14 +157,18 @@ export async function upsertVenue(env: Env, event: NormalizedEvent) {
     venueRow.lng = lng;
   }
 
-  const rows = await supabaseReviewRequest<SupabaseVenueRow[]>(env, "/rest/v1/venues?on_conflict=slug", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=representation"
-    },
-    body: JSON.stringify(venueRow)
-  });
+  const rows = await supabaseReviewRequest<SupabaseVenueRow[]>(
+    env,
+    "/rest/v1/venues?on_conflict=slug",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation"
+      },
+      body: JSON.stringify(venueRow)
+    }
+  );
 
   const venue = rows[0];
 
@@ -167,6 +196,7 @@ export async function getScheduledEventByOccurrenceId(
       "venue_id",
       "start_ts",
       "end_ts",
+      "doors_ts",
       "timezone",
       "category",
       "subcategories",
@@ -177,6 +207,7 @@ export async function getScheduledEventByOccurrenceId(
       "is_free",
       "ticket_url",
       "external_url",
+      "hero_image_id",
       "dedupe_hash",
       "confidence_score",
       "last_seen_at",
@@ -200,6 +231,7 @@ export async function getScheduledEventByOccurrenceId(
 const scheduledEventSelect = [
   "id",
   "slug",
+  "status",
   "source",
   "source_event_id",
   "source_refs",
@@ -209,6 +241,7 @@ const scheduledEventSelect = [
   "venue_id",
   "start_ts",
   "end_ts",
+  "doors_ts",
   "timezone",
   "category",
   "subcategories",
@@ -219,6 +252,7 @@ const scheduledEventSelect = [
   "is_free",
   "ticket_url",
   "external_url",
+  "hero_image_id",
   "dedupe_hash",
   "confidence_score",
   "last_seen_at",
@@ -232,12 +266,28 @@ const scheduledEventSelect = [
   "venue:venues(name)"
 ].join(",");
 
+export async function getScheduledEventById(env: Env, eventId: string): Promise<SupabaseEventRow | null> {
+  const params = new URLSearchParams({
+    select: scheduledEventSelect,
+    id: `eq.${eventId}`,
+    status: "eq.scheduled",
+    limit: "1"
+  });
+  const rows = await supabaseReviewRequest<SupabaseEventRow[]>(env, `/rest/v1/events?${params}`);
+  return rows[0] ?? null;
+}
+
 export async function getScheduledEventByContentSignature(
   env: Env,
-  normalized: Pick<NormalizedEvent, "title" | "startTs" | "venueName">
+  normalized: Pick<NormalizedEvent, "title" | "startTs" | "venueName"> &
+    Partial<Pick<NormalizedEvent, "sourceEventId">>
 ): Promise<SupabaseEventRow | null> {
   const targetSignature = eventContentSignature({
-    event: { title: normalized.title, startTs: normalized.startTs },
+    event: {
+      title: normalized.title,
+      startTs: normalized.startTs,
+      ...(normalized.sourceEventId ? { sourceEventId: normalized.sourceEventId } : {})
+    },
     venue: { name: normalized.venueName }
   });
 
@@ -252,7 +302,11 @@ export async function getScheduledEventByContentSignature(
 
   for (const row of rows) {
     const signature = eventContentSignature({
-      event: { title: row.title, startTs: row.start_ts },
+      event: {
+        title: row.title,
+        startTs: row.start_ts,
+        ...(row.source_event_id ? { sourceEventId: row.source_event_id } : {})
+      },
       venue: { name: row.venue?.name ?? normalized.venueName }
     });
     if (signature === targetSignature) {
@@ -379,6 +433,7 @@ async function insertApprovedEventWithSlug(
         venue_id: venueId,
         start_ts: normalized.startTs,
         end_ts: normalized.endTs ?? null,
+        doors_ts: normalized.doorsTs ?? null,
         last_verified_at: now,
         source_sync_id: normalized.sourceEventId ?? null,
         timezone: normalized.timezone ?? "America/Los_Angeles",
@@ -389,7 +444,9 @@ async function insertApprovedEventWithSlug(
         price_max: normalized.priceMax ?? null,
         currency: normalized.currency ?? "USD",
         is_free:
-          normalized.isFree === true || (normalized.priceMin === 0 && normalized.priceMax === 0) ? true : null,
+          normalized.isFree === true || (normalized.priceMin === 0 && normalized.priceMax === 0)
+            ? true
+            : null,
         ticket_url: normalized.ticketUrl ?? null,
         external_url: normalized.externalUrl ?? candidate.sourceUrl ?? null,
         status: "scheduled",
@@ -450,11 +507,25 @@ export async function patchApprovedEvent(
       venue_id: venueId,
       start_ts: normalized.startTs,
       end_ts: normalized.endTs ?? null,
+      doors_ts: normalized.doorsTs ?? existing.doors_ts ?? null,
       last_verified_at: now,
       source_sync_id: normalized.sourceEventId ?? null,
+      timezone: normalized.timezone ?? "America/Los_Angeles",
+      category: normalized.category ?? "community",
+      subcategories: normalized.subcategories ?? [],
+      tags: sanitizeEventTags(normalized.tags),
+      price_min: normalized.priceMin ?? null,
+      price_max: normalized.priceMax ?? null,
+      currency: normalized.currency ?? "USD",
+      is_free:
+        normalized.isFree === true || (normalized.priceMin === 0 && normalized.priceMax === 0)
+          ? true
+          : null,
+      series_id: normalized.seriesId ?? null,
+      series_name: normalized.seriesName ?? null,
       ticket_url: normalized.ticketUrl ?? null,
       external_url: normalized.externalUrl ?? candidate.sourceUrl ?? null,
-      hero_image_id: heroImageId,
+      hero_image_id: heroImageId ?? existing.hero_image_id,
       priority,
       occurrence_id: candidate.occurrenceId,
       map_pin_emoji: normalized.mapPinEmoji ?? null,
@@ -485,6 +556,7 @@ export async function getPublishedEventForReview(env: Env, eventId: string) {
       "venue_id",
       "start_ts",
       "end_ts",
+      "doors_ts",
       "timezone",
       "category",
       "subcategories",
@@ -510,7 +582,10 @@ export async function getPublishedEventForReview(env: Env, eventId: string) {
     limit: "1"
   });
 
-  const rows = await supabaseReviewRequest<SupabaseEventWithVenueRow[]>(env, `/rest/v1/events?${params}`);
+  const rows = await supabaseReviewRequest<SupabaseEventWithVenueRow[]>(
+    env,
+    `/rest/v1/events?${params}`
+  );
   const row = rows[0];
   if (!row) {
     return null;
@@ -523,6 +598,7 @@ export async function getPublishedEventForReview(env: Env, eventId: string) {
       title: row.title,
       startTs: row.start_ts,
       ...(row.end_ts ? { endTs: row.end_ts } : {}),
+    ...(row.doors_ts ? { doorsTs: row.doors_ts } : {}),
       ...(row.description_text ? { descriptionText: row.description_text } : {}),
       ...(row.ticket_url ? { ticketUrl: row.ticket_url } : {}),
       ...(row.external_url ? { externalUrl: row.external_url } : {}),

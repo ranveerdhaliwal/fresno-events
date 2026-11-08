@@ -21,7 +21,8 @@ import {
   parseMaxPriority,
   parseOptionalDate,
   parseRequireCoords,
-  parseSeriesId
+  parseSeriesId,
+  parseSeriesCursor
 } from "./events.utils";
 
 export const eventsRoute = new Hono<{ Bindings: Env }>()
@@ -72,8 +73,13 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
     const until = parseOptionalDate(c.req.query("until"));
     const maxPriority = parseMaxPriority(c.req.query("maxPriority"));
     const seriesId = parseSeriesId(c.req.query("series_id"));
+    const seriesOffset = seriesId ? parseSeriesCursor(c.req.query("cursor")) : 0;
     const bounds = parseBounds(c.req.query("bounds"));
     const requireCoords = parseRequireCoords(c.req.query("require_coords"));
+
+    if (seriesOffset === null) {
+      return fail(c, "invalid_cursor", "The series cursor must be a valid non-negative offset.", 400);
+    }
 
     if (!from) {
       return fail(c, "invalid_from", "The from query parameter must be a valid ISO date.", 400);
@@ -99,7 +105,7 @@ export const eventsRoute = new Hono<{ Bindings: Env }>()
           limit,
           ...(until ? { until } : {}),
           ...(maxPriority !== undefined ? { maxPriority } : {}),
-          ...(seriesId ? { seriesId } : {}),
+          ...(seriesId ? { seriesId, seriesOffset } : {}),
           ...(requireCoords ? { requireCoords } : {}),
           ...(bounds ? { bounds } : {})
         })

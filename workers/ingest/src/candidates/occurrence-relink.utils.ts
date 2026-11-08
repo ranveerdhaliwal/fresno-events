@@ -2,6 +2,7 @@ import type { NormalizedEvent } from "@fresno-events/shared";
 import {
   computeOccurrenceFingerprints,
   listingUrlsReferToSamePerformance,
+  normalizeVenue,
   sha256Hex,
   sourcePriorityRank
 } from "@fresno-events/shared";
@@ -116,11 +117,17 @@ function pickRelinkPrimary(group: RelinkCandidateRow[]): RelinkCandidateRow {
   const publishedPool = pool.filter((row) => row.matched_event_id);
   const rankingPool = publishedPool.length > 0 ? publishedPool : pool;
 
-  return [...rankingPool].sort((left, right) => rankRelinkPrimary(left, right, publishedPool.length > 0))[0]!;
+  return [...rankingPool].sort((left, right) =>
+    rankRelinkPrimary(left, right, publishedPool.length > 0)
+  )[0]!;
 }
 
 /** When rows are on the calendar, prefer the original non-TM publisher over Ticketmaster. */
-function rankRelinkPrimary(left: RelinkCandidateRow, right: RelinkCandidateRow, publishedGroup: boolean): number {
+function rankRelinkPrimary(
+  left: RelinkCandidateRow,
+  right: RelinkCandidateRow,
+  publishedGroup: boolean
+): number {
   if (publishedGroup) {
     const leftIsTm = left.source === "ticketmaster";
     const rightIsTm = right.source === "ticketmaster";
@@ -149,7 +156,10 @@ function rankRelinkPrimary(left: RelinkCandidateRow, right: RelinkCandidateRow, 
   return rankUnpublishedPrimary(leftRank, rightRank);
 }
 
-function rankUnpublishedPrimary(left: OccurrenceMatchCandidate, right: OccurrenceMatchCandidate): number {
+function rankUnpublishedPrimary(
+  left: OccurrenceMatchCandidate,
+  right: OccurrenceMatchCandidate
+): number {
   if (left.status === "approved" && right.status !== "approved") {
     return -1;
   }
@@ -212,7 +222,11 @@ function findScheduledEvent(
   return null;
 }
 
-function resolveRelinkStatus(row: RelinkCandidateRow, isPrimary: boolean, crossSourceDedupe: boolean): string {
+function resolveRelinkStatus(
+  row: RelinkCandidateRow,
+  isPrimary: boolean,
+  crossSourceDedupe: boolean
+): string {
   if (!crossSourceDedupe || isPrimary) {
     if (row.status === "duplicate") {
       return row.matched_event_id ? "approved" : "pending_review";
@@ -265,7 +279,9 @@ export function summarizeRelinkLinkGroups(
       continue;
     }
 
-    const linkedPatches = groupPatches.filter((patch) => patch.canonical_candidate_id === primaryPatch.id);
+    const linkedPatches = groupPatches.filter(
+      (patch) => patch.canonical_candidate_id === primaryPatch.id
+    );
     if (linkedPatches.length === 0) {
       continue;
     }
@@ -282,7 +298,9 @@ export function summarizeRelinkLinkGroups(
     }
 
     const sources = new Set(
-      groupPatches.map((patch) => rowById.get(patch.id)?.source).filter((source): source is string => Boolean(source))
+      groupPatches
+        .map((patch) => rowById.get(patch.id)?.source)
+        .filter((source): source is string => Boolean(source))
     );
 
     examples.push({
@@ -329,11 +347,26 @@ export async function computeRelinkPatches(
   }
 
   const uf = new UnionFind();
+  const fairIdsByRoot = new Map<string, Set<string>>();
+  const linkIfCompatible = (left: string, right: string) => {
+    const leftRoot = uf.find(left);
+    const rightRoot = uf.find(right);
+    const fairIds = new Set([
+      ...(fairIdsByRoot.get(leftRoot) ?? []),
+      ...(fairIdsByRoot.get(rightRoot) ?? [])
+    ]);
+    // A third source must not bridge two distinct Fair CMS performances either.
+    if (fairIds.size > 1) return;
+    uf.union(left, right);
+    fairIdsByRoot.set(uf.find(left), fairIds);
+  };
   const keyToIds = new Map<string, string[]>();
   const urlToIds = new Map<string, string[]>();
 
   for (const row of relinkable) {
     uf.add(row.id);
+    if (row.source_event_id.startsWith("venue:big-fresno-fair:"))
+      fairIdsByRoot.set(row.id, new Set([row.source_event_id]));
     const fp = fingerprints.get(row.id)!;
     for (const key of fp.occurrenceKeysForLookup) {
       const bucket = keyToIds.get(key) ?? [];
@@ -348,8 +381,19 @@ export async function computeRelinkPatches(
   }
 
   for (const ids of keyToIds.values()) {
-    for (let index = 1; index < ids.length; index += 1) {
-      uf.union(ids[0]!, ids[index]!);
+    for (let left = 0; left < ids.length; left += 1) {
+      for (let right = left + 1; right < ids.length; right += 1) {
+        const a = relinkable.find((row) => row.id === ids[left])!;
+        const b = relinkable.find((row) => row.id === ids[right])!;
+        // An all-day/unknown-time listing cannot bridge separately timed fair sets.
+        if (
+          (normalizeVenue(a.normalized_event.venueName) === "big-fresno-fair" ||
+            normalizeVenue(b.normalized_event.venueName) === "big-fresno-fair") &&
+          Date.parse(a.normalized_event.startTs) !== Date.parse(b.normalized_event.startTs)
+        )
+          continue;
+        linkIfCompatible(a.id, b.id);
+      }
     }
   }
   for (const ids of urlToIds.values()) {
@@ -365,10 +409,18 @@ export async function computeRelinkPatches(
         const leftFp = fingerprints.get(leftId)!;
         const rightFp = fingerprints.get(rightId)!;
         if (
+          (normalizeVenue(leftRow.normalized_event.venueName) === "big-fresno-fair" ||
+            normalizeVenue(rightRow.normalized_event.venueName) === "big-fresno-fair") &&
+          Date.parse(leftRow.normalized_event.startTs) !==
+            Date.parse(rightRow.normalized_event.startTs) &&
+          !listingUrlsReferToSamePerformance(leftRow.normalized_event, rightRow.normalized_event)
+        )
+          continue;
+        if (
           occurrenceLookupKeysOverlap(leftFp, rightFp) ||
           listingUrlsReferToSamePerformance(leftRow.normalized_event, rightRow.normalized_event)
         ) {
-          uf.union(leftId, rightId);
+          linkIfCompatible(leftId, rightId);
         }
       }
     }

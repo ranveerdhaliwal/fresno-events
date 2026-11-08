@@ -56,6 +56,13 @@ export function parseSeriesId(value: string | undefined): string | undefined {
   return trimmed;
 }
 
+export function parseSeriesCursor(value: string | undefined): number | null {
+  if (value === undefined) return 0;
+  if (!/^\d+$/.test(value)) return null;
+  const offset = Number(value);
+  return Number.isSafeInteger(offset) && offset <= 1_000_000 ? offset : null;
+}
+
 export interface MapBounds {
   swLat: number;
   swLng: number;

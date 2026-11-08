@@ -14,6 +14,7 @@ export interface LinkedDuplicateRow {
 }
 
 export interface ScheduledEventAuditRow {
+  sourceEventId?: string;
   id: string;
   slug: string;
   occurrenceId: string | null;
@@ -56,7 +57,9 @@ export function buildReviewQueueAudit(input: ReviewQueueAuditInput): ReviewQueue
   for (const collision of slugCollisions) {
     issues.push({
       code:
-        collision.reason === "existing_event" ? "slug_conflict_published" : "slug_conflict_pending_peer",
+        collision.reason === "existing_event"
+          ? "slug_conflict_published"
+          : "slug_conflict_pending_peer",
       severity: "error",
       candidateId: collision.candidateId,
       title: collision.title,
@@ -115,7 +118,11 @@ export function buildReviewQueueAudit(input: ReviewQueueAuditInput): ReviewQueue
   const scheduledByContent = new Map<string, ScheduledEventAuditRow[]>();
   for (const event of input.scheduledEvents) {
     const signature = eventContentSignature({
-      event: { title: event.title, startTs: event.startTs },
+      event: {
+        title: event.title,
+        startTs: event.startTs,
+        ...(event.sourceEventId ? { sourceEventId: event.sourceEventId } : {})
+      },
       venue: { name: event.venueName }
     });
     const bucket = scheduledByContent.get(signature) ?? [];
@@ -125,7 +132,11 @@ export function buildReviewQueueAudit(input: ReviewQueueAuditInput): ReviewQueue
 
   for (const row of input.primaries) {
     const signature = eventContentSignature({
-      event: { title: row.title, startTs: row.startTs },
+      event: {
+        title: row.title,
+        startTs: row.startTs,
+        sourceEventId: row.sourceEventId
+      },
       venue: { name: row.venueName }
     });
     const publishedMatches = scheduledByContent.get(signature) ?? [];
@@ -133,7 +144,9 @@ export function buildReviewQueueAudit(input: ReviewQueueAuditInput): ReviewQueue
       continue;
     }
 
-    const hasSameOccurrence = publishedMatches.some((event) => event.occurrenceId === row.occurrenceId);
+    const hasSameOccurrence = publishedMatches.some(
+      (event) => event.occurrenceId === row.occurrenceId
+    );
     if (hasSameOccurrence) {
       continue;
     }

@@ -70,6 +70,7 @@ export {
 export {
   formatIngestExclusionNotes,
   getIngestExclusion,
+  isCancelledListingTitle,
   isGobulldogsAwayGame,
   isMilbAwayGame,
   type IngestExclusion,

@@ -7,7 +7,12 @@ import { resolveDetailMode } from "@/venues/venue-profile.utils";
 
 import { enrichEventWithTicketSiteDetail } from "@/scrapers/ticket-site-detail.utils";
 
-import { DETAIL_DELAY_MS, fetchListingHtml, hostAllowed, mergeListingWithDetail } from "./listing-detail.utils";
+import {
+  DETAIL_DELAY_MS,
+  fetchListingHtml,
+  hostAllowed,
+  mergeListingWithDetail
+} from "./listing-detail.utils";
 import { parsePlainHtmlDetailPage } from "./html-detail.utils";
 
 const DEFAULT_DETAIL_CAP = 40;
@@ -63,12 +68,18 @@ export async function enrichApiVenueEventsWithDetailPrices(
         continue;
       }
       let merged = mergeListingWithDetail(listing, parsed);
+      // Venue detail fallback markup can synthesize "now" when it has no date.
+      // The API schedule is authoritative; use details for descriptive fields.
+      merged = {
+        ...merged,
+        title: listing.title,
+        venueName: listing.venueName,
+        startTs: listing.startTs
+      };
       merged = await enrichEventWithTicketSiteDetail(merged, userAgent, {
         ...(opts.signal ? { signal: opts.signal } : {})
       });
-      if (!hasUsablePrice(merged)) {
-        continue;
-      }
+      // Descriptions and ticket links remain useful when no price is advertised.
       bySourceEventId.set(listing.sourceEventId, merged);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {

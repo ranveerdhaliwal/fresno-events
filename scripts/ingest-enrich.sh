@@ -87,6 +87,7 @@ while true; do
 
   PROCESSED="$(ingest_json_summary_field "$RESP" "processed")"
   UPDATED="$(ingest_json_summary_field "$RESP" "updated")"
+  ERRORS="$(ingest_json_summary_field "$RESP" "errors")"
   SKIPPED="$(ingest_json_summary_bool "$RESP" "skipped_no_backend")"
 
   if command -v jq >/dev/null 2>&1; then
@@ -96,6 +97,10 @@ while true; do
   fi
 
   if [[ "$SKIPPED" == "true" ]]; then
+    exit 1
+  fi
+  if [[ "${ERRORS:-0}" -gt 0 || ( "$PROCESSED" -gt 0 && "$UPDATED" -eq 0 ) ]]; then
+    echo "Enrichment stopped after an error or a batch without progress. Pending rows are retained." >&2
     exit 1
   fi
 

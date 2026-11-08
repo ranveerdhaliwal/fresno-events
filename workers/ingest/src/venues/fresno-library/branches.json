@@ -1,0 +1,90 @@
+{
+  "Betty Rodriguez": {
+    "name": "Betty Rodriguez",
+    "street": "3040 N Cedar Ave",
+    "city": "Fresno",
+    "lat": 36.77820620000001,
+    "lng": -119.7537534,
+    "verified_on": "2026-11-06"
+  },
+  "Central": {
+    "name": "Central",
+    "street": "2420 Mariposa",
+    "city": "Fresno",
+    "lat": 36.7377996,
+    "lng": -119.7860101,
+    "verified_on": "2026-11-06"
+  },
+  "Clovis": {
+    "name": "Clovis",
+    "street": "1155 5th St.",
+    "city": "Clovis",
+    "lat": 36.8243314,
+    "lng": -119.694794,
+    "verified_on": "2026-11-06"
+  },
+  "Fig Garden": {
+    "name": "Fig Garden",
+    "street": "3071 W. Bullard",
+    "city": "Fresno",
+    "lat": 36.821371,
+    "lng": -119.8458756,
+    "verified_on": "2026-11-06"
+  },
+  "Gillis": {
+    "name": "Gillis",
+    "street": "629 W. Dakota",
+    "city": "Fresno",
+    "lat": 36.7862705,
+    "lng": -119.8190206,
+    "verified_on": "2026-11-06"
+  },
+  "Mosqueda": {
+    "name": "Mosqueda",
+    "street": "4670 E. Butler",
+    "city": "Fresno",
+    "lat": 36.7276899,
+    "lng": -119.7429045,
+    "verified_on": "2026-11-06"
+  },
+  "Politi": {
+    "name": "Politi",
+    "street": "5771 N. First",
+    "city": "Fresno",
+    "lat": 36.8222532,
+    "lng": -119.7736578,
+    "verified_on": "2026-11-06"
+  },
+  "Sunnyside": {
+    "name": "Sunnyside",
+    "street": "5566 E. Kings Canyon",
+    "city": "Fresno",
+    "lat": 36.734796,
+    "lng": -119.7012357,
+    "verified_on": "2026-11-06"
+  },
+  "West Fresno": {
+    "name": "West Fresno",
+    "street": "188 E. California Ave",
+    "city": "Fresno",
+    "lat": 36.7207924,
+    "lng": -119.8101719,
+    "verified_on": "2026-11-06"
+  },
+  "Woodward Park": {
+    "name": "Woodward Park",
+    "street": "944 E. Perrin",
+    "city": "Fresno",
+    "lat": 36.8716051,
+    "lng": -119.7664408,
+    "verified_on": "2026-11-06"
+  },
+  "Teague": {
+    "name": "Teague",
+    "street": "4718 N Polk Ave",
+    "city": "Fresno",
+    "lat": 36.803538,
+    "lng": -119.8891102,
+    "verified_on": "2026-11-06"
+  }
+}

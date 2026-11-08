@@ -4,6 +4,9 @@ import { config as chaffeeConfig, run as runChaffee } from "@/venues/chaffee-zoo
 import { config as downtownConfig, run as runDowntown } from "@/venues/downtown-fresno/run";
 import { config as conventionConfig, run as runConvention } from "@/venues/fresno-convention-center/run";
 import { config as fultonConfig, run as runFulton } from "@/venues/fulton-55/run";
+import { config as libraryConfig, run as runLibrary } from "@/venues/fresno-library/run";
+import { config as philharmonicConfig, run as runPhilharmonic } from "@/venues/fresno-philharmonic/run";
+import { config as artsConfig, run as runArts } from "@/venues/fresno-state-arts/run";
 import { config as gobulldogsConfig, run as runGobulldogs } from "@/venues/gobulldogs/run";
 import { config as milbConfig, run as runMilb } from "@/venues/milb-grizzlies/run";
 import { config as rainbowConfig, run as runRainbow } from "@/venues/rainbow-ballroom/run";
@@ -19,6 +22,9 @@ type VenueModule = {
 };
 
 const MODULES: VenueModule[] = [
+  { config: venueConfigSchema.parse(libraryConfig), run: runLibrary },
+  { config: venueConfigSchema.parse(philharmonicConfig), run: runPhilharmonic },
+  { config: venueConfigSchema.parse(artsConfig), run: runArts },
   { config: venueConfigSchema.parse(towerConfig), run: runTower },
   { config: venueConfigSchema.parse(saveMartConfig), run: runSaveMart },
   { config: venueConfigSchema.parse(conventionConfig), run: runConvention },

@@ -167,3 +167,13 @@ describe("fetchAllTicketmasterEvents", () => {
     expect(result.events.length).toBe(201);
   });
 });
+
+it('retains verified access time separately from the show time',()=>{
+ const raw=minimalTicketmasterEvent('doors');raw.dates={start:{dateTime:'2026-11-26T03:00:00Z'},access:{startDateTime:'2026-11-26T02:00:00Z'}};
+ expect(toNormalizedEvent(raw)[0]).toMatchObject({startTs:'2026-11-26T03:00:00Z',doorsTs:'2026-11-26T02:00:00Z'});
+ raw.dates.access={startDateTime:'2026-11-26T05:00:00Z'};expect(toNormalizedEvent(raw)[0]?.doorsTs).toBeUndefined();
+});
+it('keeps provider cancellation status visible to the existing exclusion workflow',()=>{
+ const raw=minimalTicketmasterEvent('cancelled');raw.dates!.status={code:'cancelled'};
+ expect(toNormalizedEvent(raw)[0]?.title).toBe('CANCELLED - Event cancelled');
+});

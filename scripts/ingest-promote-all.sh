@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Real promote for all enabled venue sources.
-
+# Full collection, details, AI enrichment and review checks. Never bulk approves.
 set -euo pipefail
-
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-
-# shellcheck source=scripts/ingest-lib.sh
-source "$REPO_ROOT/scripts/ingest-lib.sh"
-ingest_resolve_user_source "" true || exit $?
-
-ARGS=(--source="$INGEST_SCRAPER" --force "$@")
-
-echo "[ingest] Promote all venues" >&2
-exec bash "$REPO_ROOT/scripts/ingest-run.sh" "${ARGS[@]}"
+case "${1:-}" in
+  --venues-only) shift; exec bash "$REPO_ROOT/scripts/ingest-promote-venues.sh" "$@" ;;
+  # Retain the historical collection-only flag for existing callers.
+  --no-enrich) exec bash "$REPO_ROOT/scripts/ingest-promote-venues.sh" "$@" ;;
+  -h|--help)
+    echo "Usage: pnpm ingest:promote-all [--venues-only <venue collection flags>]"
+    echo "Default: Ticketmaster + VenuNite + venues, details, AI, address cleanup, duplicate/series/coordinate audit."
+    echo "Relinking and orphan deletion are previewed; approvals require a reviewed explicit batch."
+    exit 0 ;;
+  "") exec bash "$REPO_ROOT/scripts/ingest-scheduled-local.sh" ;;
+  *) echo "Collection flags require --venues-only; use --help for the full workflow." >&2; exit 2 ;;
+esac

@@ -32,6 +32,33 @@ function primary(
 }
 
 describe("buildReviewQueueAudit", () => {
+  it("does not label distinct Fair CMS performances as published content duplicates", () => {
+    const audit = buildReviewQueueAudit({
+      primaries: [
+        primary({
+          id: "second",
+          title: "Juggling",
+          startTs: "2026-10-16T00:00:00Z",
+          source: "scrape:www.fresnofair.com",
+          sourceEventId: "venue:big-fresno-fair:second",
+          venueName: "Big Fresno Fair"
+        })
+      ],
+      linkedDuplicates: [],
+      scheduledEvents: [
+        {
+          id: "first",
+          slug: "different-slug",
+          occurrenceId: "first-occ",
+          title: "Juggling",
+          startTs: "2026-10-16T00:00:00Z",
+          sourceEventId: "venue:big-fresno-fair:first",
+          venueName: "Big Fresno Fair"
+        }
+      ]
+    });
+    expect(audit.issues.some((issue) => issue.code === "published_content_duplicate")).toBe(false);
+  });
   it("skips slug check when occurrence already has a scheduled event", () => {
     const occurrenceId = "occ-1";
     const audit = buildReviewQueueAudit({
@@ -70,7 +97,13 @@ describe("buildReviewQueueAudit", () => {
           startTs: "2026-08-01T02:00:00.000Z"
         })
       ],
-      linkedDuplicates: [{ id: "dup-1", title: "Duplicate row", canonicalCandidateId: "primary-1" }],
+      linkedDuplicates: [
+        {
+          id: "dup-1",
+          title: "Duplicate row",
+          canonicalCandidateId: "primary-1"
+        }
+      ],
       scheduledEvents: []
     });
 

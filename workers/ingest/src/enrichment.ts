@@ -268,7 +268,10 @@ export async function enrichRecentCandidates(
           index,
           reason: "no_model_response"
         });
-        continue;
+        summary.errors += 1;
+        // Leave this row pending and stop the batch when the backend cannot
+        // produce a response, including billing and quota failures.
+        break;
       }
 
       const aiNotes = enrichment.reasoning ? `[ai] ${enrichment.reasoning}` : "[ai] enriched";
@@ -518,7 +521,7 @@ export async function runEnrichmentPipeline(
       total_updated: total.updated
     });
 
-    if (!enrichAll || options.dryRun || batch.processed === 0) {
+    if (!enrichAll || options.dryRun || batch.processed === 0 || batch.errors > 0 || batch.updated === 0) {
       break;
     }
   } while (round < 500);

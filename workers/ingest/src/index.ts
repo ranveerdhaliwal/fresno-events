@@ -60,7 +60,7 @@ export default {
       const summaries = await runIngest(env, {
         force,
         dryRun,
-        skipEnrichment: true,
+        skipEnrichment: isVenueTrigger ? skipEnrichment : true,
         signal: req.signal,
         ...(sources ? { sources } : {}),
         ...(venueFilter?.length ? { venueFilter } : {})

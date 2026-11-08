@@ -77,6 +77,22 @@ const FORTY_ABOVE_DETAIL_HTML = `
 `;
 
 describe("parseDollarAmounts", () => {
+  it("preserves the scheduled stage when a longer detail description is preferred", () => {
+    const listing = {
+      source: "scrape:www.fresnofair.com" as const,
+      sourceEventId: "venue:big-fresno-fair:3325:2026-10-18:time-1930",
+      title: "Monster Trucks",
+      venueName: "Big Fresno Fair",
+      startTs: "2026-10-18T19:30:00Z",
+      category: "festival" as const,
+      descriptionText: "Location at the Fair: Grandstand.\n\nShort copy."
+    };
+    const detail = { descriptionText: "A longer official event description. ".repeat(20) };
+    expect(mergeFresnoFairDetail(listing, detail).descriptionText).toBe(
+      `Location at the Fair: Grandstand.\n\n${detail.descriptionText.trim()}`
+    );
+  });
+
   it("parses slash-separated dollar tiers", () => {
     expect(parseDollarAmounts("$45 / $50 / $57 / $65")).toEqual([45, 50, 57, 65]);
     expect(parseDollarAmounts("$51 / $56 / $63.50 / $71.50")).toEqual([51, 56, 63.5, 71.5]);
@@ -206,7 +222,10 @@ describe("mergeFresnoFairDetail", () => {
         "The 4.0 & Above Program provides a fun, rally-like atmosphere to recognize and celebrate students for their hard work and scholastic achievements."
     };
 
-    const merged = mergeFresnoFairDetail(listing, parseFresnoFairDetailPage(FORTY_ABOVE_DETAIL_HTML));
+    const merged = mergeFresnoFairDetail(
+      listing,
+      parseFresnoFairDetailPage(FORTY_ABOVE_DETAIL_HTML)
+    );
     expect(merged.descriptionText).toContain("REWARDING HARD-WORKING FRESNO COUNTY STUDENTS");
     expect(merged.descriptionText).toContain("4gpa@fresnofair.com");
     expect(merged.descriptionText!.length).toBeGreaterThan(300);

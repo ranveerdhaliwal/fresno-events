@@ -35,6 +35,8 @@ Secrets live in `dev-target.env` (gitignored). Regenerate worker env after edits
 
 **AI enrichment locally:** `pnpm env:cloud-dev` sets `APP_ENV=dev` in `.dev.vars`. Local `wrangler dev --local` cannot call the Workers AI binding — ensure `GEMINI_API_KEY` is set in `dev-target.env` (code prefers Gemini when `APP_ENV=dev` + key). Use `--no-enrich` on promote steps, then `pnpm ingest:enrich --all` once at the end.
 
+**AI billing or backend failure:** enrichment stops a batch after the first failed model response; the CLI exits non-zero instead of retrying the same row without progress. The full workflow continues exclusions, address checks, relink/orphan previews, and the quality report, and still reports the incomplete run. Candidates stay queued. After restoring the provider, start the ingest worker and run `pnpm ingest:enrich --all`, then repeat the quality audit and manual review. November 6 evidence: [run review](operations/2026-11-06-promotion-review/REPORT.md).
+
 ---
 
 ## Standard pipeline (Mon/Thu or after a gap)
@@ -58,12 +60,12 @@ pnpm dev:api
 | 0 | `pnpm env:status` | Confirm `DEV_TARGET=cloud-dev` and Supabase URL |
 | 1 | `pnpm ingest:promote --source=ticketmaster --no-enrich` | TM Discovery API → `event_candidates` |
 | 2 | `pnpm ingest:promote --source=venunite --no-enrich` | VenuNite API → candidates |
-| 3 | `pnpm ingest:promote-all --no-enrich` | All 12 venue modules (scrape + in-venue detail) |
+| 3 | `pnpm ingest:promote-all --venues-only --no-enrich` | All 15 registered venue/source modules (scrape + in-venue detail) |
 | 4 | `pnpm ingest:post-promote` | Detail backfill + enrich + **reject-exclusions** + venue addresses |
-| 5 | `pnpm ingest:relink --dry-run` then `pnpm ingest:relink` | Recompute `occurrence_key` / cross-source duplicate links |
-| 6 | Orphan cleanup — preview then apply (requires `pnpm dev:api`) | Remove duplicate **published** `events` rows |
+| 5 | `pnpm ingest:relink --dry-run` | Preview `occurrence_key` / cross-source duplicate links; apply only a reviewed plan |
+| 6 | Orphan cleanup — preview (requires `pnpm dev:api`) | Inspect duplicate **published** `events` rows; deletion requires explicit reviewed scope |
 
-**Shortcut:** `pnpm ingest:post-promote` replaces old steps 4–6 (detail / enrich / addresses) in one command. **Shortcut for full run:** `pnpm ingest:scheduled-local` runs steps 1–6 + maintenance.
+**Shortcut:** `pnpm ingest:post-promote` replaces old steps 4–6 (detail / enrich / addresses) in one command. **Shortcut for full run:** `pnpm ingest:promote-all` (or `pnpm ingest:scheduled-local`) runs steps 1–6 plus the coordinate/series/duplicate quality report.
 
 **Do not skip `--no-enrich` on promote steps** — run enrichment once via `ingest:post-promote` so Gemini is used instead of broken local Workers AI.
 
@@ -85,9 +87,9 @@ Run step 5 after every full promote (re-promote alone does not refresh stale `oc
 
 **Then:** agent audit + summary (see **Cursor review** below) → **user confirms** → `pnpm review:bulk-approve` → `pnpm review:bulk-approve-changes` if `needs_changes` > 0.
 
-### One command (`pnpm ingest:scheduled-local`)
+### One command (`pnpm ingest:promote-all`)
 
-Runs the full table above (steps 1–8), starts ingest + API workers if needed, and writes a **Cursor review manifest** next to the log:
+Runs the full table above plus the saved event-quality audit, starts ingest + API workers if needed, and writes a **Cursor review manifest** next to the log:
 
 ```bash
 pnpm ingest:scheduled-local
@@ -99,8 +101,8 @@ pnpm ingest:scheduled-local
 
 | Step | Preview | Apply |
 | --- | --- | --- |
-| Relink | `pnpm ingest:relink --dry-run` — abort apply if errors > 0 | `pnpm ingest:relink` |
-| Orphan cleanup | `pnpm review:orphan-cleanup --dry-run` | Only when `wouldDelete > 0`; aborted when over `INGEST_SCHEDULED_MAX_ORPHAN_DELETE` (default **50**) unless `INGEST_SCHEDULED_FORCE_ORPHAN=1` |
+| Relink | `pnpm ingest:relink --dry-run` | Default: skipped. Opt in only after reviewing proposed IDs with `INGEST_SCHEDULED_APPLY_RELINK=1` |
+| Orphan cleanup | `pnpm review:orphan-cleanup --dry-run` | Default: skipped. Reviewed opt-in `INGEST_SCHEDULED_APPLY_ORPHANS=1`; deletion cap still applies |
 
 Skip maintenance: `INGEST_SCHEDULED_SKIP_MAINTENANCE=1 pnpm ingest:scheduled-local`
 
@@ -140,7 +142,8 @@ pnpm review:reject-exclusions --apply  # Go Bulldogs away games, Shen Yun, …
 
 ```bash
 pnpm ingest:relink --dry-run   # errors must be 0
-pnpm ingest:relink
+# Inspect proposed status/identity changes, especially held Fair performances.
+# Apply only an explicitly reviewed scope; the full workflow previews by default.
 ```
 
 **5. Spot-check pending rows** — flag and manually reject when needed:
@@ -391,3 +394,54 @@ curl -H "Authorization: Bearer $ADMIN_REVIEW_TOKEN" \
 ```
 
 Do **not** rely on this for `promote-all` on free tier.
+
+
+## Full promote workflow (October 29, 2026)
+
+`pnpm ingest:promote-all` now runs the complete scheduled pipeline: Ticketmaster,
+VenuNite, every enabled venue, detail retrieval, AI enrichment, exclusions, address
+normalization, occurrence/series relink preview, orphan preview, and a saved
+`run-<timestamp>-quality.json` report. `--venues-only --no-enrich` is the internal
+collection pass; the historical leading `--no-enrich` remains collection-only.
+Other collection flags require `--venues-only`; unsupported full-run flags fail
+before collection. The script never bulk approves events.
+
+The quality report pages the entire database and checks pending and published
+records for duplicate title/venue/start, recurring events without a series,
+missing/invalid/out-of-area coordinates, copied fallback pins, possible doors/show time pairs across sources, missing physical
+venues, and inverted end times. It also includes the existing geocode preview
+and pre-approval audit. Coordinates already present are checked too; the geocode
+backfill alone only finds missing coordinates. Review flagged rows against exact
+street addresses and primary sources; a geocode preview is not a verified pin.
+The API pre-approval audit now pages all published events rather than relying on
+a requested limit above Supabase's response cap.
+
+Broad relink and orphan operations are previews by default. After reviewing their
+specific proposed changes, an operator may opt into applying with
+`INGEST_SCHEDULED_APPLY_RELINK=1` and/or `INGEST_SCHEDULED_APPLY_ORPHANS=1`.
+The orphan deletion cap still applies. An error-free preview only confirms that
+the operation ran; it does not establish that every proposed grouping or deletion
+is correct. Preserve separate performances, stage/time identity, held statuses,
+and the distinction between the annual Big Fresno Fair and year-round Fresno
+Fairgrounds parent. Link a reviewed duplicate to its canonical entry instead of
+publishing another copy. Existing session authorization may approve an explicit
+reviewed batch without asking for permission again.
+
+For a read-only report against the deployed cloud-dev API (with the repo's current
+API database credentials), run:
+
+```bash
+REVIEW_API_ORIGIN=https://api.whatupfresno.com node scripts/review-event-quality.mjs --out=/tmp/fresno-quality.json
+```
+
+The October 29 decision journal, source ledger, 122-ID scope, and held records are
+in `docs/operations/2026-10-29-approval-workflow-review/`.
+
+
+### Fair performance identities and annual rollover
+
+The Fair source queries the current/upcoming annual season plus rolling 180-day Fairgrounds months. Every occurrence uses `venue:big-fresno-fair:<provider-id>:<local-date>:time-<UTC-HHMM>`; a single-show day uses the same format as a multi-show day. Do not collapse Fair performances on a shared artist, landing-page URL, calendar day, or festival parent. Annual performances belong to `series:bigfresnofair:YYYY`; year-round grounds events belong to `series:fresno-fairgrounds`.
+
+The verified season map currently covers 2026 and 2027. Before later seasons, verify official opening/closing dates and extend the map; unknown boundaries require manual review. A rescheduled start produces a different identity and needs explicit review against the previous publication. Do not blindly migrate or revive the 431 expired Fair candidates rejected in November 2026.
+
+Use the [November 8 audit](operations/2026-11-08-promotion-audit/REPORT.md) for cutover evidence and remaining source conflicts. Run shared builds/tests before starting collection: rebuilding watched shared output during a request can reload Wrangler and interrupt it. After a reload, wait for stable health and retry only the failed source; finish detail/exclusion/address checks and regenerate the quality report. Restore AI credits before retrying a provider-budget failure.

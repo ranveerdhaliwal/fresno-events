@@ -60,6 +60,7 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
     "suggested_priority (integer 0..5).",
     "cleaned_title: when the source title appends venue/admission policy noise (age gates, 'under 18 must be accompanied',",
     "'21+', 'all ages', 'ID required', similar trailing parentheticals or disclaimers), return a cleaned show name without that noise.",
+    "Never strip cancelled/canceled from the title. If the listing is cancelled, set is_junk=true and leave the title as-is.",
     "Also strip a leading calendar year when it is just season noise (e.g. '2026 NSA Southwest Nationals' → 'NSA Southwest Nationals',",
     "'2026 Summer Band Concerts…' → 'Summer Band Concerts…'). Keep years that are part of a proper name (e.g. 'Class of 2026').",
     "Keep artistic/tour parentheticals that are part of the act name (e.g. Acoustic, Live, tour nicknames).",
@@ -92,7 +93,7 @@ export async function enrichCandidate(env: IngestEnv, event: NormalizedEvent): P
       externalUrl: event.externalUrl,
       ticketUrl: event.ticketUrl
     })}`,
-    "Mark is_junk=true for ads, gift cards, parking, livestream-only, NSFW, Shen Yun, or events more than 50 miles from Fresno."
+    "Mark is_junk=true for ads, gift cards, parking, livestream-only, NSFW, Shen Yun, cancelled/canceled shows, or events more than 50 miles from Fresno."
   ].join("\n");
 
   const result = await backend.generateJson<Partial<AiEnrichment>>({ system, user });

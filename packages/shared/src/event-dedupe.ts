@@ -6,14 +6,16 @@ import {
 } from "./occurrence.js";
 
 export interface EventContentSignatureInput {
-  event: { title: string; startTs: string };
+  event: { title: string; startTs: string; sourceEventId?: string };
   venue: { name?: string | null };
 }
 
 export interface EventListingGroupInput {
   event: {
     title: string;
+    startTs?: string;
     seriesId?: string | null;
+    sourceEventId?: string;
     category?: string;
   };
   venue: { name?: string | null };
@@ -40,8 +42,14 @@ function contentVenue(name: string | null | undefined): string {
 export function eventContentSignature(item: EventContentSignatureInput): string {
   const title = contentTitle(item.event.title);
   const venue = contentVenue(item.venue.name);
-  const bucket = pacificTimeBucketKey(item.event.startTs) ?? item.event.startTs;
-  return `${title}|${venue}|${bucket}`;
+  const bucket =
+    venue === "big-fresno-fair"
+      ? item.event.startTs
+      : (pacificTimeBucketKey(item.event.startTs) ?? item.event.startTs);
+  const sourceIdentity = item.event.sourceEventId?.startsWith("venue:big-fresno-fair:")
+    ? item.event.sourceEventId
+    : "";
+  return `${title}|${venue}|${bucket}${sourceIdentity ? `|${sourceIdentity}` : ""}`;
 }
 
 /** Removes content-duplicate events, keeping the first occurrence (order preserved). */
@@ -70,6 +78,13 @@ export function eventListingGroupKeys(item: EventListingGroupInput): string[] {
   const venue = contentVenue(item.venue.name);
   const keys = [`title:${title}|${venue}`];
   const seriesId = item.event.seriesId?.trim();
+  // A festival parent groups distinct acts and timed performances. It must not
+  // behave like the interchangeable dates of a single touring show.
+  if (seriesId && /^series:bigfresnofair:\d{4}$/.test(seriesId)) {
+    return [
+      `performance:${item.event.sourceEventId ?? title}|${venue}|${item.event.startTs ?? "unknown"}`
+    ];
+  }
   if (seriesId) {
     keys.push(`series:${seriesId}`);
   }

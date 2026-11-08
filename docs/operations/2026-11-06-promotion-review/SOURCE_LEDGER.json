@@ -1,0 +1,128 @@
+[
+  {
+    "identity": "../2026-11-04-promotion-review/recommended-plan.json",
+    "date_received": "2026-11-06",
+    "intended_use": "Apply user-authorized 26 approvals and four updates",
+    "verification_status": "tested",
+    "local_test_result": "25 new approvals and all four existing updates completed. Expired November5 ArtHop held. Three exact recommended rejections applied. See execution-summary.json and actions.jsonl.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://cah.fresnostate.edu/calendar.html",
+    "date_received": "2026-11-06",
+    "intended_use": "Collect public university arts programming",
+    "verification_status": "tested",
+    "local_test_result": "Public page exposes calendar UUID and two arts category UUIDs. Its published widget uses repeated category parameters and UTC for zone-less timestamp values. Two 30-day windows. Initial preflight returned20 physical timed events.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://widget.calendar.moderncampus.net/app.js",
+    "date_received": "2026-11-06",
+    "intended_use": "Determine published public calendar request and timestamp behavior",
+    "verification_status": "tested",
+    "local_test_result": "Read application JavaScript as reference data. It loads app.f66240e626a88dda2d6e.js. No downloaded script was executed.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://widget.calendar.moderncampus.net/app.f66240e626a88dda2d6e.js",
+    "date_received": "2026-11-06",
+    "intended_use": "Verify public read endpoints, category encoding and UTC timestamps",
+    "verification_status": "tested",
+    "local_test_result": "Public requests use /pubcalendar/{id}/events with repeated category parameters. Event detail exposes physical address. Version hash f66240e626a88dda2d6e recorded. Only parsed first-party response data.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://api.calendar.moderncampus.net/pubcalendar/e7caae3d-4f22-4d3b-a99b-14da5397b2f1/events",
+    "date_received": "2026-11-06",
+    "intended_use": "Implement first-party public arts collection",
+    "verification_status": "tested",
+    "local_test_result": "Initial preflight20 eligible events,34 requests,zero errors. Online entries, holidays, internal-only audiences and multi-day exhibit/theatre ranges excluded. Five exact campus venue coordinates verified. Full run:20 records;one existing Briggs recital duplicate,seven pending review,twelve awaiting AI. Two student recitals share the same hall/time and remain held.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://www.support.moderncampus.com/cms/technical-reference/api-documentation/calendar.html",
+    "date_received": "2026-11-06",
+    "intended_use": "Check official public API documentation",
+    "verification_status": "tested",
+    "local_test_result": "Vendor documents API base URL and1000 requests per5minutes limit. Current requests use the same endpoints as the public widget. Detail fetches sequential.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://fresnolibrary.libcal.com/calendar",
+    "date_received": "2026-11-06",
+    "intended_use": "Implement physical public library program source",
+    "verification_status": "tested",
+    "local_test_result": "Calendar HTML exposes its own list endpoint. Initial preflight145 events from3 pages withzero errors. Only mapped Fresno/Clovis branches, timed physical sessions within30 days. Unknown price stays unknown. Recurring groups preserve each provider occurrence ID. Full run:144 distinct occurrences from10 branches,all with coordinates. Three volunteer shifts held for eligibility review.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://fresnolibrary.libcal.com/ajax/calendar/list?c=-1&date=0000-00-00&perpage=100&page=1&audience=&cats=&camps=&inc=0",
+    "date_received": "2026-11-06",
+    "intended_use": "Verify public upcoming list and complete pagination",
+    "verification_status": "tested",
+    "local_test_result": "Initial endpoint reports276 rows. Collector uses actual perpage and total_results, retains the30-day local window and reports incomplete pagination as an error.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://www.fresnolibrary.org/branch/all.html",
+    "date_received": "2026-11-06",
+    "intended_use": "Verify branch-specific physical addresses",
+    "verification_status": "tested",
+    "local_test_result": "Public branch directory yielded Fresno/Clovis addresses.11 mapped branches have exact-address Google review-API geocodes. Snapshot saved as branches.json. All-day, online, cancelled, unknown and outside-metro branches filtered.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://fresnophil.org/upcoming-events/",
+    "date_received": "2026-11-06",
+    "intended_use": "Collect first-party concert performances",
+    "verification_status": "tested",
+    "local_test_result": "Initial preflight10 performances,7 requests,zero errors. Both date nodes per concert are parsed. Series groups do not collapse individual starts.180-day window. Full run:10 performances;two linked to existing Elgar publications andeight entered review. No map-pin or duplicate-provider-ID errors.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://fresnophil.org/plan-your-visit/",
+    "date_received": "2026-11-06",
+    "intended_use": "Verify Philharmonic concert venues",
+    "verification_status": "tested",
+    "local_test_result": "Official venue page gives2770 E InternationalAve and730 MStreet. Exact-address geocodes saved for PaulShaghoian andWilliamSaroyan.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://www.fresno.edu/arts/warkentine-culture-and-arts-center",
+    "date_received": "2026-11-06",
+    "intended_use": "Verify third Philharmonic venue",
+    "verification_status": "tested",
+    "local_test_result": "FresnoPacific official page gives1717 S ChestnutAve. Review geocoder queried the named Warkentine center with that address.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  },
+  {
+    "identity": "https://fresnophil.org/events/farm-to-fiddle-2027/",
+    "date_received": "2026-11-06",
+    "intended_use": "Review an additional venue outside the mapped concert set",
+    "verification_status": "reviewed",
+    "local_test_result": "Publisher confirms a250-dollar dinner atTheBarn. Its exact entrance is unverified, so this venue is excluded from the initial collector.",
+    "decision": "deferred",
+    "next_action": "Verify the venue entrance before extending the physical venue map."
+  },
+  {
+    "identity": "workers/ingest/src/enrichment.ts + scripts/ingest-enrich.sh + scripts/ingest-post-promote.sh + scripts/ingest-scheduled-local.sh",
+    "date_received": "2026-11-06",
+    "intended_use": "Stop repeated no-progress model calls and complete validation after upstream AI failure",
+    "verification_status": "tested",
+    "local_test_result": "Gemini returned402 RESOURCE_EXHAUSTED due depleted prepayment. Reproduced a batch without updates repeatedly retrying. Added actual pipeline regression and shell tests.440 worker tests and27 workflow tests pass. Live guarded rerun stops each failed batch after one no-response and proceeds with collection. Guarded full run completed every source and maintenance stage.51 model-eligible candidates remain;no publication data changed during ingestion.",
+    "decision": "adopted",
+    "next_action": "Integration and full collection complete. Review the saved candidate plan; restore Gemini credits before processing its separate AI backlog."
+  }
+]

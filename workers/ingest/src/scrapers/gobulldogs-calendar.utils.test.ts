@@ -171,3 +171,14 @@ describe("gobulldogsGameToNormalizedEvent", () => {
     expect(away?.seriesId).toBeUndefined();
   });
 });
+
+it('maps named Fresno home facilities and leaves away venues unchanged',()=>{
+ const base={id:1,time:'12 p.m. PT',atVs:'vs',location:'Fresno, CA',dateUtc:'2026-12-05T20:00:00Z',tbd:false,gameCalendarExclude:false,gamePromotionText:null,conferenceTitle:null,gameImageUrl:null,sport:{title:'Swimming & Diving',globalSportShortname:'wswim'},opponent:{title:'Fresno Pacific',tournamentTitle:null},facility:{title:'Aquatics Center'}};
+ for(const name of ['Aquatics Center','Margie Wright Diamond','Student Horse Center']){
+  const e=gobulldogsGameToNormalizedEvent({...base,facility:{title:name}},'2026-12-05');
+  expect(e?.timeUnknown).toBeUndefined();expect(e?.venueLat).toBeGreaterThan(36.8);expect(e?.venueLng).toBeLessThan(-119.7);expect(e?.venueAddress).toBeTruthy();
+ }
+ expect(gobulldogsGameToNormalizedEvent({...base,atVs:'at',location:'San Jose, CA'},'2026-12-05')?.venueLat).toBeUndefined();
+ const unknown=gobulldogsGameToNormalizedEvent({...base,facility:null,location:'',time:'TBA',tbd:true,opponent:{title:'Pac-12 Conference',tournamentTitle:'Championship'}},'2026-11-11');
+ expect(unknown).toMatchObject({venueName:'Venue to be announced',timeUnknown:true});expect(unknown?.venueCity).toBeUndefined();expect(unknown?.venueLat).toBeUndefined();
+});

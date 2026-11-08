@@ -3,6 +3,21 @@ import { describe, expect, it } from "vitest";
 import { dedupeScrapeBatch } from "@/lib/scrape-batch-dedupe.utils";
 
 describe("dedupeScrapeBatch", () => {
+  it("retains different Fair CMS listings with identical artist/time for manual stage review", async () => {
+    const base = {
+      source: "scrape:www.fresnofair.com" as const,
+      venueName: "Big Fresno Fair",
+      title: "VIOLIN ON FIRE",
+      startTs: "2026-10-18T00:00:00Z",
+      seriesId: "series:bigfresnofair:2026"
+    };
+    const result = await dedupeScrapeBatch([
+      { ...base, sourceEventId: "venue:big-fresno-fair:4009:2026-10-17" },
+      { ...base, sourceEventId: "venue:big-fresno-fair:3941:2026-10-17" }
+    ]);
+    expect(result.events).toHaveLength(2);
+    expect(result.removed).toBe(0);
+  });
   it("collapses title drift duplicates at the same time and venue", async () => {
     const base = {
       source: "api:visitfresnocounty" as const,

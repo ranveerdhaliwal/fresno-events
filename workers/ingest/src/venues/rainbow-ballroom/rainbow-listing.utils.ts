@@ -8,6 +8,7 @@ type CardSelection = ReturnType<CheerioAPI>;
 import { getPacificDateTimeParts, instantFromPacificLocal } from "@/lib/pacific-instant.utils";
 import { warnIfSelectorEmpty } from "@/venues/_shared/selector-observability.utils";
 import type { VenueConfig } from "@/venues/venue.types";
+import { parseRainbowFlightListing } from "./rainbow-flight.utils";
 
 const MONTH_ABBR: Record<string, string> = {
   jan: "01",
@@ -69,11 +70,22 @@ function monthDayFromText(text: string): { month: string; day: string } | null {
   return { month, day: String(dayRaw).padStart(2, "0") };
 }
 
-function parseCardDateYmd($card: CardSelection, urlYearHint: string | null, ref: Date): string | null {
-  const monthText = $card.find(".data-categories .datatexdday").eq(1).text().trim().toLowerCase().slice(0, 3);
+function parseCardDateYmd(
+  $card: CardSelection,
+  urlYearHint: string | null,
+  ref: Date
+): string | null {
+  const monthText = $card
+    .find(".data-categories .datatexdday")
+    .eq(1)
+    .text()
+    .trim()
+    .toLowerCase()
+    .slice(0, 3);
   const dayNum = Number.parseInt($card.find(".data-categories .text-block-4").text().trim(), 10);
   let month = MONTH_ABBR[monthText];
-  let day = Number.isFinite(dayNum) && dayNum >= 1 && dayNum <= 31 ? String(dayNum).padStart(2, "0") : null;
+  let day =
+    Number.isFinite(dayNum) && dayNum >= 1 && dayNum <= 31 ? String(dayNum).padStart(2, "0") : null;
 
   // Date classes changed — recover the date from the date block's raw text.
   if (!month || !day) {
@@ -146,6 +158,8 @@ export function parseRainbowListingHtml(
   ref: Date = new Date()
 ): NormalizedEvent[] {
   const $ = load(html);
+  const current = parseRainbowFlightListing($, config);
+  if (current !== null) return current;
   const host = (config.sourceHostname ?? "www.rainbowballroom.com").replace(/^www\./, "");
   const seen = new Set<string>();
   const events: NormalizedEvent[] = [];
@@ -156,7 +170,11 @@ export function parseRainbowListingHtml(
     // Webflow collection markup changed — fall back to the generic dynamic-item class.
     $cards = $(".w-dyn-item, [role='listitem']");
   }
-  warnIfSelectorEmpty({ venueKey: config.key, selector: primarySelector, matched: $cards.length });
+  warnIfSelectorEmpty({
+    venueKey: config.key,
+    selector: primarySelector,
+    matched: $cards.length
+  });
 
   $cards.each((_, el) => {
     const $card = $(el);
@@ -171,7 +189,8 @@ export function parseRainbowListingHtml(
     }
 
     const urlYear = yearFromUrl(ticketUrl);
-    const dateYmd = parseCardDateYmd($card, urlYear, ref) ?? (ticketUrl.match(/(\d{4}-\d{2}-\d{2})/)?.[1] ?? null);
+    const dateYmd =
+      parseCardDateYmd($card, urlYear, ref) ?? ticketUrl.match(/(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
     const startTs = dateYmd ? instantFromPacificLocal(dateYmd, "20:00") : null;
     if (!startTs) {
       return;

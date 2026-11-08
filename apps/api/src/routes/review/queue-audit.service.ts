@@ -8,7 +8,7 @@ import {
   type LinkedDuplicateRow,
   type ScheduledEventAuditRow
 } from "@/routes/review/queue-audit.utils";
-import { supabaseReviewRequest } from "@/routes/review/supabase.utils";
+import { fetchAllReviewRows } from "@/routes/review/fetch-all-review-rows.utils";
 import { logStructured } from "@/lib/structured-log";
 
 interface LinkedDuplicateDbRow {
@@ -18,6 +18,7 @@ interface LinkedDuplicateDbRow {
 }
 
 interface ScheduledEventDbRow {
+  source_event_id: string | null;
   id: string;
   slug: string;
   occurrence_id: string | null;
@@ -27,17 +28,11 @@ interface ScheduledEventDbRow {
 }
 
 async function fetchPendingLinkedDuplicates(env: Env): Promise<LinkedDuplicateRow[]> {
-  const params = new URLSearchParams({
+  const rows = await fetchAllReviewRows<LinkedDuplicateDbRow>(env, "event_candidates", {
     select: "id,title,canonical_candidate_id",
     status: "eq.pending_review",
-    canonical_candidate_id: "not.is.null",
-    limit: "1000"
+    canonical_candidate_id: "not.is.null"
   });
-
-  const rows = await supabaseReviewRequest<LinkedDuplicateDbRow[]>(
-    env,
-    `/rest/v1/event_candidates?${params}`
-  );
 
   return rows.map((row) => ({
     id: row.id,
@@ -47,17 +42,15 @@ async function fetchPendingLinkedDuplicates(env: Env): Promise<LinkedDuplicateRo
 }
 
 async function fetchScheduledEventsForAudit(env: Env): Promise<ScheduledEventAuditRow[]> {
-  const params = new URLSearchParams({
-    select: "id,slug,occurrence_id,title,start_ts,venues(name)",
-    status: "eq.scheduled",
-    limit: "5000"
+  const rows = await fetchAllReviewRows<ScheduledEventDbRow>(env, "events", {
+    select: "id,slug,occurrence_id,title,start_ts,source_event_id,venues(name)",
+    status: "eq.scheduled"
   });
-
-  const rows = await supabaseReviewRequest<ScheduledEventDbRow[]>(env, `/rest/v1/events?${params}`);
 
   return rows.map((row) => ({
     id: row.id,
     slug: row.slug,
+    ...(row.source_event_id ? { sourceEventId: row.source_event_id } : {}),
     occurrenceId: row.occurrence_id,
     title: row.title,
     startTs: row.start_ts,

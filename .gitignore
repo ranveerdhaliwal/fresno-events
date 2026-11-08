@@ -33,6 +33,9 @@ dev-target.env
 .agents/
 .codex/
 .impeccable/
+
+# Browser API origin is public deployment configuration, not a secret.
+!apps/web/.env.production
 .claude/
 skills-lock.json
 

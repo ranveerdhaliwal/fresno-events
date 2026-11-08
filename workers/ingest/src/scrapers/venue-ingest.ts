@@ -202,7 +202,7 @@ export function createVenueIngestRunner(env: IngestEnv) {
             venueResult.events.find((e) => e.source)?.source ??
             `venue-ingest:${config.key}`;
           try {
-            const persistResult = await persistAndEnrichVenueEvents(env, ctx.runId, venueResult.events, sourceFilter);
+            const persistResult = await persistAndEnrichVenueEvents(env, ctx.runId, venueResult.events, sourceFilter, { skipEnrichment: ctx.config.skipEnrichment === true });
             eventsForAggregate = persistResult.events;
             venueEnrichment = persistResult.enrichment;
             venuePersistPerVenue = true;

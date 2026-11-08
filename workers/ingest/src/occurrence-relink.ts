@@ -94,7 +94,7 @@ async function fetchAllCandidates(
     const params = new URLSearchParams({
       select:
         "id,source,source_event_id,status,matched_event_id,canonical_candidate_id,occurrence_id,occurrence_key,url_key,suggested_priority,created_at,normalized_event",
-      order: "created_at.asc",
+      order: "created_at.asc,id.asc",
       limit: String(PAGE_SIZE),
       offset: String(offset)
     });
@@ -120,11 +120,20 @@ async function fetchAllCandidates(
   return all;
 }
 
-async function fetchPublishedEvents(supabase: SupabaseConfig): Promise<RelinkPublishedEvent[]> {
-  return supabaseFetch<RelinkPublishedEvent[]>(
-    supabase,
-    "/rest/v1/events?select=id,occurrence_id,occurrence_key,status&status=eq.scheduled&limit=5000"
-  );
+export async function fetchPublishedEvents(supabase: SupabaseConfig): Promise<RelinkPublishedEvent[]> {
+  const all: RelinkPublishedEvent[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const params = new URLSearchParams({
+      select: "id,occurrence_id,occurrence_key,status",
+      status: "eq.scheduled",
+      order: "id.asc",
+      limit: String(PAGE_SIZE),
+      offset: String(offset)
+    });
+    const page = await supabaseFetch<RelinkPublishedEvent[]>(supabase, `/rest/v1/events?${params}`);
+    all.push(...page);
+    if (page.length < PAGE_SIZE) return all;
+  }
 }
 
 async function applyPatch(supabase: SupabaseConfig, patch: RelinkPatch): Promise<void> {

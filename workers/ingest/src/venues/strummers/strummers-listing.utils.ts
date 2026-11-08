@@ -131,3 +131,31 @@ export function parseStrummersListingHtml(html: string, config: VenueConfig): No
 
   return [...byKey.values()];
 }
+
+/** Official JSON contains purchase links omitted from the public HTML cards. */
+export function addStrummersTicketLinks(events: NormalizedEvent[], json: unknown): NormalizedEvent[] {
+  if (!json || typeof json !== "object") return events;
+  const payload = json as Record<string, unknown>;
+  const records = [payload.upcoming, payload.past].flatMap(value => Array.isArray(value) ? value : []);
+  const links = new Map<string, string>();
+  for (const record of records) {
+    if (!record || typeof record !== "object" || typeof record.fullUrl !== "string" || typeof record.body !== "string") continue;
+    const source = canonicalStrummersShowUrl(new URL(record.fullUrl, "https://www.strummersclub.com").href);
+    if (!source) continue;
+    const $ = load(record.body);
+    const tickets = new Set<string>();
+    $("a[href]").each((_, a) => {
+      try {
+        const url = new URL($(a).attr("href") ?? "");
+        if (url.protocol === "https:" && /^(www\.)?ticketweb\.com$/.test(url.hostname) && /^\/event\/[^/]+\/\d+\/?$/.test(url.pathname)) {
+          url.search = ""; url.hash = ""; tickets.add(url.href);
+        }
+      } catch { /* Ignore malformed links; don't infer a purchase URL. */ }
+    });
+    if (tickets.size === 1) links.set(source, [...tickets][0]!);
+  }
+  return events.map(event => {
+    const ticketUrl = event.externalUrl ? links.get(event.externalUrl) : undefined;
+    return ticketUrl ? { ...event, ticketUrl } : event;
+  });
+}

@@ -1,0 +1,146 @@
+[
+  {
+    "identity": "https://www.fresnofair.com/events/2026/fleamarket",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence and first-party detail page checked. Verified ground address/pin used; individual performances kept separate.",
+    "decision": "adopted",
+    "next_action": "Approved new occurrences or retained an existing matching publication; recheck on material source change."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/fresno-ag-expo",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence parsed; detail page checked against normalized candidate. Source conflict retained for review.",
+    "decision": "deferred",
+    "next_action": "CMS says 6:30am but official detail page says 7am. Confirm registration versus program start."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/gold-gulch-super-saturday",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence and first-party detail page checked. Verified ground address/pin used; individual performances kept separate.",
+    "decision": "adopted",
+    "next_action": "Approved new occurrences or retained an existing matching publication; recheck on material source change."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/the-big-fresno-card-show22",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence and first-party detail page checked. Verified ground address/pin used; individual performances kept separate.",
+    "decision": "adopted",
+    "next_action": "Approved new occurrences or retained an existing matching publication; recheck on material source change."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/bridal--wedding-expo2",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence and first-party detail page checked. Verified ground address/pin used; individual performances kept separate.",
+    "decision": "adopted",
+    "next_action": "Approved new occurrences or retained an existing matching publication; recheck on material source change."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/drive-forward-expo",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence and first-party detail page checked. Verified ground address/pin used; individual performances kept separate.",
+    "decision": "adopted",
+    "next_action": "Approved new occurrences or retained an existing matching publication; recheck on material source change."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/26vdf",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence parsed; detail page checked against normalized candidate. Source conflict retained for review.",
+    "decision": "deferred",
+    "next_action": "Official page says Jr Exhibit Building near Butler Gate, location metadata says Commerce Building. Confirm the room."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/fchm",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence and first-party detail page checked. Verified ground address/pin used; individual performances kept separate.",
+    "decision": "adopted",
+    "next_action": "Approved new occurrences or retained an existing matching publication; recheck on material source change."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/animewave",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence and first-party detail page checked. Verified ground address/pin used; individual performances kept separate.",
+    "decision": "adopted",
+    "next_action": "Approved new occurrences or retained an existing matching publication; recheck on material source change."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/christmas-in-the-valley---a-holiday-festival",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence and first-party detail page checked. Verified ground address/pin used; individual performances kept separate.",
+    "decision": "adopted",
+    "next_action": "Approved new occurrences or retained an existing matching publication; recheck on material source change."
+  },
+  {
+    "identity": "https://www.fresnofair.com/events/2026/fan-verse-expo",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify Fairgrounds dates, times, rooms and admission before publication",
+    "verification_status": "reviewed",
+    "local_test_result": "Official API occurrence parsed; detail page checked against normalized candidate. Source conflict retained for review.",
+    "decision": "deferred",
+    "next_action": "CMS dates December12/13 conflict with detail text December11/12; weekday/date labels also disagree. Confirm organizer schedule."
+  },
+  {
+    "identity": "https://www.fresnofair.com/p/plan/general-info",
+    "date_received": "2026-11-08",
+    "intended_use": "Verify 2027 annual Fair season",
+    "verification_status": "reviewed",
+    "local_test_result": "Official page confirms October6\u201317,2027. Date-window and season-rollover tests pass. No 2027 performance schedule was returned by the live collector.",
+    "decision": "adopted",
+    "next_action": "Collect actual 2027 performances when published. Verify each later year before extending FRESNO_FAIR_SEASONS; do not copy old prices."
+  },
+  {
+    "identity": "https://www.fresnofair.com/services/eventsservice.asmx/GetEventDaysByList",
+    "date_received": "2026-11-08",
+    "intended_use": "Annual Fair plus rolling180-day year-round discovery",
+    "verification_status": "tested",
+    "local_test_result": "Eight unique monthly windows,243 dates,32 upcoming occurrences,11 detail URLs,zero source errors. Repeated collection kept32 distinct IDs;all ground coordinates resolved.",
+    "decision": "adopted",
+    "next_action": "Maintain independent source-event/date/time identities; review reschedules and unknown season boundaries."
+  },
+  {
+    "identity": "https://venunite.com/api/events?state=ca&cities=Fresno&sort=date-asc&includeFilters=false&page=3",
+    "date_received": "2026-11-08",
+    "intended_use": "Continue authorized VenuNite collection while publicly accessible",
+    "verification_status": "tested",
+    "local_test_result": "Retry recovered39 records;page3 returnedHTTP403. No paywall bypass or purchase attempted.",
+    "decision": "adopted",
+    "next_action": "Keep enabled with partial-coverage warning;do not interpret blocked pages as cancellations."
+  },
+  {
+    "identity": "https://whatupfresno.com/calendar?year=2026&month=11",
+    "date_received": "2026-11-08",
+    "intended_use": "User-reported November calendar problem, carried forward from earlier chat",
+    "verification_status": "tested",
+    "local_test_result": "Public and local API month totals agree at347 upcoming November events;local built calendar HTTP200. Browser automation unavailable because its WSL sandbox cwd was rejected.",
+    "decision": "adopted",
+    "next_action": "Visually review mobile calendar locally before merge."
+  },
+  {
+    "identity": "https://fresnolibrary.libcal.com/event/17356762",
+    "date_received": "2026-11-08",
+    "intended_use": "Check reopened Sunnyside Cinema title",
+    "verification_status": "reviewed",
+    "local_test_result": "Fresh LibCal collector changed title to Supergirl,description,image and title-derived series. Web-tool detail fetch unavailable. Existing publication retained.",
+    "decision": "deferred",
+    "next_action": "Review the new source payload and retain established Cinema parent when accepting changes."
+  }
+]

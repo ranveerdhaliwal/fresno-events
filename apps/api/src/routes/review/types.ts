@@ -60,6 +60,7 @@ export interface SupabaseEventRow {
   venue_id: string;
   start_ts: string;
   end_ts: string | null;
+  doors_ts?: string | null;
   timezone: string | null;
   category: string;
   subcategories: string[] | null;
@@ -71,6 +72,7 @@ export interface SupabaseEventRow {
   ticket_url: string | null;
   external_url: string | null;
   status: string | null;
+  hero_image_id?: string | null;
   gallery_image_ids: string[] | null;
   all_artist_ids: string[] | null;
   dedupe_hash: string | null;
@@ -107,6 +109,7 @@ export interface PublishCandidateOptions {
   priority: number;
   reviewedBy: string;
   existingSlug?: string;
+  existingEventId?: string;
   siblings?: EventCandidate[];
 }
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatIngestExclusionNotes,
   getIngestExclusion,
+  isCancelledListingTitle,
   isGobulldogsAwayGame,
   isMilbAwayGame
 } from "./ingest-exclusions.js";
@@ -22,6 +23,17 @@ describe("ingest-exclusions", () => {
 
   it("allows unrelated events", () => {
     expect(getIngestExclusion({ title: "Mrs. Doubtfire" })).toBeNull();
+  });
+
+  it("rejects listings whose title says cancelled", () => {
+    expect(isCancelledListingTitle({ title: "CANCELLED - THIS WILD LIFE, Nate Bergman" })).toBe(true);
+    expect(getIngestExclusion({ title: "CANCELLED - THIS WILD LIFE, Nate Bergman" })?.id).toBe(
+      "cancelled-listing"
+    );
+    expect(getIngestExclusion({ title: "JUST THE TIPS Comedy This weeks show cancelled back next Week" })?.id).toBe(
+      "cancelled-listing"
+    );
+    expect(getIngestExclusion({ title: "THIS WILD LIFE, Nate Bergman" })).toBeNull();
   });
 
   it("rejects professional certification courses", () => {

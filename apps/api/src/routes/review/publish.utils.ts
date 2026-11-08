@@ -30,6 +30,7 @@ import { ReviewRouteError } from "@/routes/review/errors";
 import {
   getPublishedEventForReview,
   getScheduledEventByContentSignature,
+  getScheduledEventById,
   getScheduledEventByOccurrenceId,
   linkOccurrenceSiblings,
   patchApprovedEvent,
@@ -61,6 +62,14 @@ export async function publishCandidateToEvent(
   options: PublishCandidateOptions
 ): Promise<{ event: Event; normalized: NormalizedEvent }> {
   const normalized = mergeNormalizedEvent(candidate.normalizedEvent, options.eventOverride);
+  // A reviewed update must retain its published identity even when its time or
+  // occurrence has changed. Never fall through to creating another event.
+  const explicitExisting = options.existingEventId
+    ? await getScheduledEventById(env, options.existingEventId)
+    : null;
+  if (options.existingEventId && !explicitExisting) {
+    throw new ReviewRouteError(`Scheduled event ${options.existingEventId} could not be found.`, 409);
+  }
   const venue = await upsertVenue(env, normalized);
 
   const heroImage = normalized.imageUrl
@@ -68,7 +77,7 @@ export async function publishCandidateToEvent(
     : null;
 
   const siblings = options.siblings ?? [];
-  const existingByOccurrence = await getScheduledEventByOccurrenceId(env, candidate.occurrenceId);
+  const existingByOccurrence = explicitExisting ?? await getScheduledEventByOccurrenceId(env, candidate.occurrenceId);
   const existingByContent =
     existingByOccurrence ?? (await getScheduledEventByContentSignature(env, normalized));
 
@@ -189,7 +198,8 @@ export async function approveChangesCore(
     eventOverride: options.eventOverride,
     priority,
     reviewedBy: options.reviewedBy ?? "admin",
-    existingSlug: published.event.slug
+    existingSlug: published.event.slug,
+    existingEventId: candidate.matchedEventId
   });
 
   const updated = await updateCandidate(env, candidate.id, {

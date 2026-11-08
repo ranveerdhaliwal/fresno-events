@@ -10,6 +10,60 @@ import configJson from "./venue.config.json";
 
 const config = configJson as VenueConfig;
 
+describe("current Rainbow Next listing", () => {
+  function flight(records: unknown[]) {
+    const payload = `5:${JSON.stringify(["$", "main", null, { children: ["$", "EventList", null, { initialEvents: records }] }])}\n`;
+    // Exercise split Flight chunks and escaping through the real decoding path.
+    const mid = Math.floor(payload.length / 2);
+    return [payload.slice(0, mid), payload.slice(mid)]
+      .map((chunk) => `<script>self.__next_f.push(${JSON.stringify([1, chunk])})</script>`)
+      .join("");
+  }
+  const base = {
+    id: 5,
+    title: 'Deathpact "Eclipsed"',
+    slug: "eclipsed",
+    eventDate: "2026-11-01T01:00:00.000Z",
+    eventFlyer: "/api/media/file/flyer.jpeg",
+    ticketUrl: "https://posh.vip/e/deathpact-fresno?t=rainbow",
+    status: "published"
+  };
+  it("preserves UTC instants, imported Pacific dates, images and stable Eventmania IDs", () => {
+    const events = parseRainbowListingHtml(
+      flight([
+        base,
+        {
+          ...base,
+          id: "import-id",
+          title: "DJ Pauly D",
+          slug: "pauly",
+          eventDate: "2027-01-09T20:00:00",
+          ticketUrl: "https://eventmania.com/events/dj-pauly-d/1apB"
+        }
+      ]),
+      config
+    );
+    expect(events).toHaveLength(2);
+    expect(events[0]?.startTs).toBe("2026-11-01T01:00:00.000Z");
+    expect(events[0]?.imageUrl).toBe("https://www.rainbowballroom.com/api/media/file/flyer.jpeg");
+    expect(events[1]?.startTs).toBe("2027-01-10T04:00:00.000Z");
+    expect(events[1]?.sourceEventId).toBe("venue:rainbow-ballroom:1apB");
+  });
+  it("ignores drafts, invalid dates, untrusted ticket hosts and duplicate records", () => {
+    const events = parseRainbowListingHtml(
+      flight([
+        base,
+        base,
+        { ...base, status: "draft" },
+        { ...base, eventDate: "nonsense" },
+        { ...base, ticketUrl: "https://posh.vip.evil.test/ticket" }
+      ]),
+      config
+    );
+    expect(events).toHaveLength(1);
+  });
+});
+
 const SAMPLE = `
 <div class="collection-list-blog-grid w-dyn-items">
   <div role="listitem" class="collection-item w-dyn-item">
